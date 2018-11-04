@@ -90,6 +90,9 @@
     <ClInclude Include="CharacterX.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGSDKMesh.h">
+      <Filter>XUSG\Advanced\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Common\DXFramework.cpp">
@@ -124,6 +127,9 @@
     </ClCompile>
     <ClCompile Include="CharacterX.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="XUSG\Advanced\XUSGSDKMesh.cpp">
+      <Filter>XUSG\Advanced\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

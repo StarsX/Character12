@@ -83,17 +83,17 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 	//V_RETURN(DXUTFindDXSDKMediaFileCch(strPath, MAX_PATH, szFileName));
 
 	// Open the file
-	const auto hFile = CreateFile(strPath, FILE_READ_DATA, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+	const auto fileHandle = CreateFile(strPath, FILE_READ_DATA, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
 		FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-	if (INVALID_HANDLE_VALUE == hFile)
-		return E_FAIL;//DXUTERR_MEDIANOTFOUND;
+	if (INVALID_HANDLE_VALUE == fileHandle)
+		return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
 
 	/////////////////////////
 	// Header
 	SDKANIMATION_FILE_HEADER fileheader;
-	if (!ReadFile(hFile, &fileheader, sizeof( SDKANIMATION_FILE_HEADER ), &dwBytesRead, nullptr))
+	if (!ReadFile(fileHandle, &fileheader, sizeof( SDKANIMATION_FILE_HEADER ), &dwBytesRead, nullptr))
 	{
-		CloseHandle(hFile);
+		CloseHandle(fileHandle);
 
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
@@ -102,24 +102,24 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 	m_pAnimationData = new (std::nothrow) uint8_t[static_cast<size_t>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize)];
 	if (!m_pAnimationData)
 	{
-		CloseHandle(hFile);
+		CloseHandle(fileHandle);
 
 		return E_OUTOFMEMORY;
 	}
 
 	// read it all in
 	liMove.QuadPart = 0;
-	if (!SetFilePointerEx(hFile, liMove, nullptr, FILE_BEGIN))
+	if (!SetFilePointerEx(fileHandle, liMove, nullptr, FILE_BEGIN))
 	{
-		CloseHandle(hFile);
+		CloseHandle(fileHandle);
 
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
 
-	if (!ReadFile(hFile, m_pAnimationData, static_cast<DWORD>(sizeof( SDKANIMATION_FILE_HEADER) +
+	if (!ReadFile(fileHandle, m_pAnimationData, static_cast<DWORD>(sizeof( SDKANIMATION_FILE_HEADER) +
 		fileheader.AnimationDataSize ),&dwBytesRead, nullptr))
 	{
-		CloseHandle(hFile);
+		CloseHandle(fileHandle);
 
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
@@ -634,7 +634,6 @@ void SDKMesh::loadMaterials(SDKMESH_MATERIAL *pMaterials, uint32_t numMaterials)
 			/* if (FAILED(DXUTGetGlobalResourceCache().CreateTextureFromFile(pd3dDevice, DXUTGetD3D11DeviceContext(),
 			strPath, &pMaterials[m].pDiffuseRV11, true)))
 			pMaterials[m].pDiffuseRV11 = ( ID3D11ShaderResourceView* )ERROR_RESOURCE_VALUE;*/
-
 		}
 		if (pMaterials[m].NormalTexture[0] != 0)
 		{
@@ -644,6 +643,7 @@ void SDKMesh::loadMaterials(SDKMESH_MATERIAL *pMaterials, uint32_t numMaterials)
 			&pMaterials[m].pNormalRV11 ) ) )
 			pMaterials[m].pNormalRV11 = ( ID3D11ShaderResourceView* )ERROR_RESOURCE_VALUE;*/
 		}
+
 		if (pMaterials[m].SpecularTexture[0] != 0)
 		{
 			sprintf_s(strPath, MAX_PATH, "%s%s", m_strPath, pMaterials[m].SpecularTexture);
@@ -707,7 +707,7 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName)
 	m_filehandle = CreateFile(m_strPathW, FILE_READ_DATA, FILE_SHARE_READ, nullptr,
 		OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
 	if (INVALID_HANDLE_VALUE == m_filehandle)
-		return E_FAIL;//DXUTERR_MEDIANOTFOUND;
+		return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
 
 	// Change the path to just the directory
 	const auto pLastBSlash = wcsrchr(&m_strPathW[0], L'\\');

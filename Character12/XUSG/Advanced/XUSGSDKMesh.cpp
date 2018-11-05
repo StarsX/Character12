@@ -1,16 +1,7 @@
 //--------------------------------------------------------------------------------------
-// File: SDKMesh.cpp
-//
-// The SDK Mesh format (.sdkmesh) is not a recommended file format for games.  
-// It was designed to meet the specific needs of the SDK samples.  Any real-world 
-// applications should avoid this file format in favor of a destination format that 
-// meets the specific needs of the application.
-//
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License.
-//
-// http://go.microsoft.com/fwlink/?LinkId=320437
+// By Stars XU Tianchen
 //--------------------------------------------------------------------------------------
+
 #include "XUSGSDKMesh.h"
 //#include "SDKMisc.h"
 
@@ -147,7 +138,6 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 void SDKMesh::ReleaseUploadResources()
 {
 	m_resourceUploads.clear();
-	m_resourceUploads.resize(0);
 	m_resourceUploads.shrink_to_fit();
 }
 
@@ -232,16 +222,14 @@ void SDKMesh::TransformMesh(CXMMATRIX world, double fTime)
 		// move it to the final position
 		for (auto i = 0u; i < m_pMeshHeader->NumFrames; ++i)
 		{
-			auto m = XMLoadFloat4x4( &m_pBindPoseFrameMatrices[i] );
-			const auto mInvBindPose = XMMatrixInverse( nullptr, m );
-			m = XMLoadFloat4x4( &m_pTransformedFrameMatrices[i] );
-			const auto mFinal = mInvBindPose * m;
-			XMStoreFloat4x4( &m_pTransformedFrameMatrices[i], mFinal );
+			const auto invBindPose = XMMatrixInverse(nullptr, XMLoadFloat4x4(&m_pBindPoseFrameMatrices[i]));
+			const auto final = invBindPose * XMLoadFloat4x4(&m_pTransformedFrameMatrices[i]);
+			XMStoreFloat4x4(&m_pTransformedFrameMatrices[i], final);
 		}
 	}
 	else if (FTT_ABSOLUTE == m_pAnimationHeader->FrameTransformType)
-		for(auto i = 0u; i < m_pAnimationHeader->NumFrames; ++i)
-			transformFrameAbsolute( i, fTime );
+		for (auto i = 0u; i < m_pAnimationHeader->NumFrames; ++i)
+			transformFrameAbsolute(i, fTime);
 }
 
 
@@ -380,13 +368,13 @@ uint32_t SDKMesh::GetNumIBs() const
 }
 
 //--------------------------------------------------------------------------------------
-VertexBuffer *SDKMesh::GetVB11At(_In_ uint32_t iVB) const
+VertexBuffer *SDKMesh::GetVertexBufferAt(_In_ uint32_t iVB) const
 {
 	return m_pVertexBufferArray[iVB].pVertexBuffer;
 }
 
 //--------------------------------------------------------------------------------------
-IndexBuffer *SDKMesh::GetIB11At(_In_ uint32_t iIB) const
+IndexBuffer *SDKMesh::GetIndexBufferAt(_In_ uint32_t iIB) const
 {
 	return m_pIndexBufferArray[iIB].pIndexBuffer;
 }
@@ -448,13 +436,21 @@ SDKMESH_FRAME *SDKMesh::GetFrame(_In_ uint32_t iFrame) const
 }
 
 //--------------------------------------------------------------------------------------
-SDKMESH_FRAME *SDKMesh::FindFrame(_In_z_ const char *pszName) const
+SDKMESH_FRAME *SDKMesh::FindFrame(_In_z_ const char *szName) const
+{
+	const auto i = FindFrameIndex(szName);
+
+	return i == INVALID_FRAME ? nullptr : &m_pFrameArray[i];
+}
+
+//--------------------------------------------------------------------------------------
+uint32_t SDKMesh::FindFrameIndex(_In_z_ const char *szName) const
 {
 	for (auto i = 0u; i < m_pMeshHeader->NumFrames; ++i)
-		if (_stricmp(m_pFrameArray[i].Name, pszName ) == 0)
-			return &m_pFrameArray[i];
+		if (_stricmp(m_pFrameArray[i].Name, szName) == 0)
+			return i;
 
-	return nullptr;
+	return INVALID_FRAME;
 }
 
 //--------------------------------------------------------------------------------------
@@ -583,6 +579,11 @@ XMMATRIX SDKMesh::GetWorldMatrix(_In_ uint32_t iFrameIndex) const
 XMMATRIX SDKMesh::GetInfluenceMatrix(_In_ uint32_t iFrameIndex) const
 {
 	return XMLoadFloat4x4(&m_pTransformedFrameMatrices[iFrameIndex]);
+}
+
+XMMATRIX SDKMesh::GetBindMatrix(uint32_t iFrameIndex) const
+{
+	return XMLoadFloat4x4(&m_pBindPoseFrameMatrices[iFrameIndex]);
 }
 
 //--------------------------------------------------------------------------------------
@@ -944,11 +945,11 @@ void SDKMesh::transformBindPoseFrame(uint32_t iFrame, CXMMATRIX parentWorld)
 
 	// Transform our siblings
 	if (m_pFrameArray[iFrame].SiblingFrame != INVALID_FRAME)
-		transformBindPoseFrame( m_pFrameArray[iFrame].SiblingFrame, parentWorld);
+		transformBindPoseFrame(m_pFrameArray[iFrame].SiblingFrame, parentWorld);
 
 	// Transform our children
 	if( m_pFrameArray[iFrame].ChildFrame != INVALID_FRAME)
-		transformBindPoseFrame( m_pFrameArray[iFrame].ChildFrame, mLocalWorld);
+		transformBindPoseFrame(m_pFrameArray[iFrame].ChildFrame, mLocalWorld);
 }
 
 //--------------------------------------------------------------------------------------
@@ -958,39 +959,39 @@ _Use_decl_annotations_
 void SDKMesh::transformFrame(uint32_t iFrame, CXMMATRIX parentWorld, double fTime)
 {
 	// Get the tick data
-	XMMATRIX mLocalTransform;
-
-	const auto iTick = GetAnimationKeyFromTime(fTime);
+	XMMATRIX localTransform;
+	const auto tick = GetAnimationKeyFromTime(fTime);
 
 	if (INVALID_ANIMATION_DATA != m_pFrameArray[iFrame].AnimationDataIndex)
 	{
-		const auto pFrameData = &m_pAnimationFrameData[m_pFrameArray[iFrame].AnimationDataIndex];
-		const auto pData = &pFrameData->pAnimationData[iTick];
+		const auto frameData = &m_pAnimationFrameData[m_pFrameArray[iFrame].AnimationDataIndex];
+		const auto data = &frameData->pAnimationData[tick];
 
-		// turn it into a matrix (Ignore scaling for now)
-		const auto parentPos = pData->Translation;
-		const auto mTranslate = XMMatrixTranslation(parentPos.x, parentPos.y, parentPos.z);
+		// Turn it into a matrix
+		const auto translate = XMMatrixTranslation(data->Translation.x, data->Translation.y, data->Translation.z);
+		const auto scaling = XMMatrixScaling(data->Scaling.x, data->Scaling.y, data->Scaling.z); // BY STARS----Scaling
+		auto quat = XMLoadFloat4(&data->Orientation);
 
-		auto quat = XMVectorSet(pData->Orientation.x, pData->Orientation.y, pData->Orientation.z, pData->Orientation.w);
 		if (XMVector4Equal(quat, g_XMZero)) quat = XMQuaternionIdentity();
+
 		quat = XMQuaternionNormalize(quat);
-		const auto mQuat = XMMatrixRotationQuaternion(quat);
-		mLocalTransform = (mQuat * mTranslate);
+		const auto quatMatrix = XMMatrixRotationQuaternion(quat);
+		localTransform = scaling * quatMatrix * translate;
 	}
-	else mLocalTransform = XMLoadFloat4x4(&m_pFrameArray[iFrame].Matrix);
+	else localTransform = XMLoadFloat4x4(&m_pFrameArray[iFrame].Matrix);
 
 	// Transform ourselves
-	const auto mLocalWorld = XMMatrixMultiply(mLocalTransform, parentWorld);
-	DirectX::XMStoreFloat4x4(&m_pTransformedFrameMatrices[iFrame], mLocalWorld);
-	DirectX::XMStoreFloat4x4(&m_pWorldPoseFrameMatrices[iFrame], mLocalWorld);
+	auto localWorld = XMMatrixMultiply(localTransform, parentWorld);
+	XMStoreFloat4x4(&m_pTransformedFrameMatrices[iFrame], localWorld);
+	XMStoreFloat4x4(&m_pWorldPoseFrameMatrices[iFrame], localWorld);
 
 	// Transform our siblings
 	if (m_pFrameArray[iFrame].SiblingFrame != INVALID_FRAME)
-		transformFrame( m_pFrameArray[iFrame].SiblingFrame, parentWorld, fTime);
+		transformFrame(m_pFrameArray[iFrame].SiblingFrame, parentWorld, fTime);
 
 	// Transform our children
 	if (m_pFrameArray[iFrame].ChildFrame != INVALID_FRAME)
-		transformFrame( m_pFrameArray[iFrame].ChildFrame, mLocalWorld, fTime);
+		transformFrame(m_pFrameArray[iFrame].ChildFrame, localWorld, fTime);
 }
 
 //--------------------------------------------------------------------------------------

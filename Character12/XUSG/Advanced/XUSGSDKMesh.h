@@ -320,8 +320,8 @@ namespace XUSG
 		uint32_t			GetNumVBs() const;
 		uint32_t			GetNumIBs() const;
 
-		VertexBuffer		*GetVB11At(_In_ uint32_t iVB) const;
-		IndexBuffer			*GetIB11At(_In_ uint32_t iIB) const;
+		VertexBuffer		*GetVertexBufferAt(_In_ uint32_t iVB) const;
+		IndexBuffer			*GetIndexBufferAt(_In_ uint32_t iIB) const;
 
 		uint8_t				*GetRawVerticesAt(_In_ uint32_t iVB) const;
 		uint8_t				*GetRawIndicesAt(_In_ uint32_t iIB) const;
@@ -333,7 +333,8 @@ namespace XUSG
 		uint32_t			GetVertexStride(_In_ uint32_t iMesh, _In_ uint32_t iVB) const;
 		uint32_t			GetNumFrames() const;
 		SDKMESH_FRAME		*GetFrame(_In_ uint32_t iFrame) const;
-		SDKMESH_FRAME		*FindFrame(_In_z_ const char *pszName) const;
+		SDKMESH_FRAME		*FindFrame(_In_z_ const char *szName) const;
+		uint32_t			FindFrameIndex(_In_ const char *szName) const;
 		uint64_t			GetNumVertices(_In_ uint32_t iMesh, _In_ uint32_t iVB) const;
 		uint64_t			GetNumIndices(_In_ uint32_t iMesh) const;
 		DirectX::XMVECTOR	GetMeshBBoxCenter(_In_ uint32_t iMesh) const;
@@ -352,6 +353,7 @@ namespace XUSG
 		uint32_t			GetAnimationKeyFromTime(_In_ double fTime) const;
 		DirectX::XMMATRIX	GetWorldMatrix(_In_ uint32_t iFrameIndex) const;
 		DirectX::XMMATRIX	GetInfluenceMatrix(_In_ uint32_t iFrameIndex) const;
+		DirectX::XMMATRIX	GetBindMatrix(_In_ uint32_t iFrameIndex) const;
 		bool				GetAnimationProperties(_Out_ uint32_t *pNumKeys, _Out_ float* pFrameTime) const;
 
 	protected:

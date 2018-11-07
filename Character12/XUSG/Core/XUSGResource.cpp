@@ -417,25 +417,19 @@ void Texture2D::CreateSubSRVs(Format format)
 	}
 }
 
-const Descriptor &Texture2D::GetUAV(uint8_t i) const
+Descriptor Texture2D::GetUAV(uint8_t i) const
 {
-	assert(m_UAVs.size() > i);
-
-	return m_UAVs[i];
+	return m_UAVs.size() > i ? m_UAVs[i] : Descriptor(D3D12_DEFAULT);
 }
 
-const Descriptor &Texture2D::GetSRVLevel(uint8_t i) const
+Descriptor Texture2D::GetSRVAtLevel(uint8_t i) const
 {
-	assert(m_SRVs.size() > i);
-
-	return m_SRVs[i];
+	return m_SRVs.size() > i ? m_SRVs[i] : Descriptor(D3D12_DEFAULT);
 }
 
-const Descriptor &Texture2D::GetSubSRV(uint8_t i) const
+Descriptor Texture2D::GetSubSRV(uint8_t i) const
 {
-	assert(m_subSRVs.size() > i);
-
-	return m_subSRVs[i];
+	return m_subSRVs.size() > i ? m_subSRVs[i] : Descriptor(D3D12_DEFAULT);
 }
 
 //--------------------------------------------------------------------------------------
@@ -548,12 +542,10 @@ void RenderTarget::CreateArray(uint32_t width, uint32_t height, uint32_t arraySi
 	}
 }
 
-const Descriptor &RenderTarget::GetRTV(uint32_t slice, uint8_t mipLevel) const
+Descriptor RenderTarget::GetRTV(uint32_t slice, uint8_t mipLevel) const
 {
-	assert(m_RTVs.size() > slice);
-	assert(m_RTVs[slice].size() > mipLevel);
-
-	return m_RTVs[slice][mipLevel];
+	return m_RTVs.size() > slice && m_RTVs[slice].size() > mipLevel ?
+		m_RTVs[slice][mipLevel] : Descriptor(D3D12_DEFAULT);
 }
 
 uint32_t RenderTarget::GetArraySize() const
@@ -563,9 +555,7 @@ uint32_t RenderTarget::GetArraySize() const
 
 uint8_t RenderTarget::GetNumMips(uint32_t slice) const
 {
-	assert(m_RTVs.size() > slice);
-
-	return static_cast<uint8_t>(m_RTVs[slice].size());
+	return m_RTVs.size() > slice ? static_cast<uint8_t>(m_RTVs[slice].size()) : 0;
 }
 
 void RenderTarget::create(uint32_t width, uint32_t height, uint32_t arraySize, Format format,
@@ -804,18 +794,14 @@ void DepthStencil::Create(uint32_t width, uint32_t height, Format format, Resour
 	}
 }
 
-const Descriptor &DepthStencil::GetDSV(uint8_t mipLevel) const
+Descriptor DepthStencil::GetDSV(uint8_t mipLevel) const
 {
-	assert(m_DSVs.size() > mipLevel);
-
-	return m_DSVs[mipLevel];
+	return m_DSVs.size() > mipLevel ? m_DSVs[mipLevel] : Descriptor(D3D12_DEFAULT);
 }
 
-const Descriptor &DepthStencil::GetDSVReadOnly(uint8_t mipLevel) const
+Descriptor DepthStencil::GetDSVReadOnly(uint8_t mipLevel) const
 {
-	assert(m_DSVROs.size() > mipLevel);
-
-	return m_DSVROs[mipLevel];
+	return m_DSVROs.size() > mipLevel ? m_DSVROs[mipLevel] : Descriptor(D3D12_DEFAULT);
 }
 
 const Descriptor &DepthStencil::GetSRVStencil() const
@@ -994,25 +980,19 @@ void Texture3D::CreateSubSRVs(Format format)
 	}
 }
 
-const Descriptor &Texture3D::GetUAV(uint8_t i) const
+Descriptor Texture3D::GetUAV(uint8_t i) const
 {
-	assert(m_UAVs.size() > i);
-
-	return m_UAVs[i];
+	return m_UAVs.size() > i ? m_UAVs[i] : Descriptor(D3D12_DEFAULT);
 }
 
-const Descriptor &Texture3D::GetSRVLevel(uint8_t i) const
+Descriptor Texture3D::GetSRVLevel(uint8_t i) const
 {
-	assert(m_SRVs.size() > i);
-
-	return m_SRVs[i];
+	return m_SRVs.size() > i ? m_SRVs[i] : Descriptor(D3D12_DEFAULT);
 }
 
-const Descriptor &Texture3D::GetSubSRV(uint8_t i) const
+Descriptor Texture3D::GetSubSRV(uint8_t i) const
 {
-	assert(m_subSRVs.size() > i);
-
-	return m_subSRVs[i];
+	return m_subSRVs.size() > i ? m_subSRVs[i] : Descriptor(D3D12_DEFAULT);
 }
 
 //--------------------------------------------------------------------------------------

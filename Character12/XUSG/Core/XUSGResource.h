@@ -90,7 +90,8 @@ namespace XUSG
 			uint8_t stride = sizeof(float), ResourceState dstState = ResourceState(0));
 		void CreateSRV(uint32_t arraySize, Format format = Format(0),
 			uint8_t numMips = 1, uint8_t sampleCount = 1);
-		void CreateUAV(uint32_t arraySize, Format format = Format(0), uint8_t numMips = 1);
+		void CreateSRVs(uint32_t arraySize, uint8_t numMips, Format format = Format(0), uint8_t sampleCount = 1);
+		void CreateUAVs(uint32_t arraySize, Format format = Format(0), uint8_t numMips = 1);
 		void CreateSubSRVs(Format format = Format(0));
 
 		const Descriptor	&GetUAV(uint8_t i = 0) const;
@@ -186,7 +187,8 @@ namespace XUSG
 			ResourceFlags resourceFlags = ResourceFlags(0), uint8_t numMips = 1,
 			PoolType poolType = PoolType(1), ResourceState state = ResourceState(0));
 		void CreateSRV(Format format = Format(0), uint8_t numMips = 1);
-		void CreateUAV(Format format = Format(0), uint8_t numMips = 1);
+		void CreateSRVs(uint8_t numMips, Format format = Format(0));
+		void CreateUAVs(Format format = Format(0), uint8_t numMips = 1);
 		void CreateSubSRVs(Format format = Format(0));
 
 		const Descriptor	&GetUAV(uint8_t i = 0) const;

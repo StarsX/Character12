@@ -49,6 +49,18 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Enumerated Types.
 	//--------------------------------------------------------------------------------------
+	enum SubsetType : uint32_t
+	{
+		SUBSET_FULL,
+		SUBSET_OPAQUE,
+		SUBSET_ALPHA,
+		SUBSET_ALPHA_TEST,
+		SUBSET_ALPHA_TEST_FULL,
+		SUBSET_OPAQUE_REFLECTED,
+		SUBSET_ALPHA_REFLECTED,
+		SUBSET_FULL_REFLECTED
+	};
+
 	enum SDKMESH_PRIMITIVE_TYPE
 	{
 		PT_TRIANGLE_LIST = 0,

@@ -225,18 +225,23 @@ void Texture2D::Create(uint32_t width, uint32_t height, Format format, uint32_t 
 		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)));
 
 	// Allocate descriptor pool
-	auto numDescriptors = hasSRV ? 1 + (numMips > 1 ? numMips : 0) : 0;
+	auto numDescriptors = hasSRV ? 1 : 0;
 	numDescriptors += hasUAV ? numMips : 0;
-	numDescriptors += hasSRV ? max(numMips, 1) - 1 : 0;	// Sub SRVs
+	numDescriptors += hasSRV && hasUAV && numMips > 1 ? numMips : 0;
+	numDescriptors += hasSRV && hasUAV ? max(numMips, 1) - 1 : 0;	// Sub SRVs
 	allocateDescriptorPool(numDescriptors);
 
 	// Create SRV
 	if (hasSRV)
 		CreateSRV(arraySize, format, numMips, sampleCount);
 
-	// Create UAV
+	// Create UAVs
 	if (hasUAV)
-		CreateUAV(arraySize, formatUAV, numMips);
+		CreateUAVs(arraySize, formatUAV, numMips);
+
+	// Create SRV for each level
+	if (hasSRV && hasUAV)
+		CreateSRVs(arraySize, numMips, format, sampleCount);
 }
 
 void Texture2D::Upload(const GraphicsCommandList &commandList, Resource &resourceUpload,
@@ -304,9 +309,17 @@ void Texture2D::CreateSRV(uint32_t arraySize, Format format, uint8_t numMips, ui
 	m_SRV = m_srvUavCurrent;
 	m_device->CreateShaderResourceView(m_resource.Get(), &desc, m_SRV);
 	m_srvUavCurrent.Offset(m_strideSrvUav);
+}
 
+void Texture2D::CreateSRVs(uint32_t arraySize, uint8_t numMips, Format format, uint8_t sampleCount)
+{
 	if (numMips > 1)
 	{
+		// Setup the description of the shader resource view.
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+		desc.Format = format ? format : m_resource->GetDesc().Format;
+		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
 		auto mipLevel = 0ui8;
 		m_SRVs.resize(numMips);
 
@@ -331,7 +344,7 @@ void Texture2D::CreateSRV(uint32_t arraySize, Format format, uint8_t numMips, ui
 	}
 }
 
-void Texture2D::CreateUAV(uint32_t arraySize, Format format, uint8_t numMips)
+void Texture2D::CreateUAVs(uint32_t arraySize, Format format, uint8_t numMips)
 {
 	format = format ? format : m_resource->GetDesc().Format;
 
@@ -587,7 +600,7 @@ void RenderTarget::create(uint32_t width, uint32_t height, uint32_t arraySize, F
 
 	// Create UAV
 	if (hasUAV)
-		CreateUAV(arraySize, formatUAV, numMips);
+		CreateUAVs(arraySize, formatUAV, numMips);
 }
 
 void RenderTarget::allocateRtvPool(uint32_t numDescriptors)
@@ -863,8 +876,10 @@ void Texture3D::Create(uint32_t width, uint32_t height, uint32_t depth, Format f
 		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)));
 
 	// Allocate descriptor pool
-	auto numDescriptors = hasSRV ? 1 + (numMips > 1 ? numMips : 0) : 0;
+	auto numDescriptors = hasSRV ? 1 : 0;
 	numDescriptors += hasUAV ? numMips : 0;
+	numDescriptors += hasSRV && hasUAV && numMips > 1 ? numMips : 0;
+	numDescriptors += hasSRV && hasUAV ? max(numMips, 1) - 1 : 0;	// Sub SRVs
 	allocateDescriptorPool(numDescriptors);
 
 	// Create SRV
@@ -873,7 +888,11 @@ void Texture3D::Create(uint32_t width, uint32_t height, uint32_t depth, Format f
 
 	// Create UAV
 	if (hasUAV)
-		CreateUAV(formatUAV, numMips);
+		CreateUAVs(formatUAV, numMips);
+
+	// Create SRV for each level
+	if (hasSRV && hasUAV)
+		CreateSRVs(numMips, format);
 }
 
 void Texture3D::CreateSRV(Format format, uint8_t numMips)
@@ -888,9 +907,17 @@ void Texture3D::CreateSRV(Format format, uint8_t numMips)
 	m_SRV = m_srvUavCurrent;
 	m_device->CreateShaderResourceView(m_resource.Get(), &desc, m_SRV);
 	m_srvUavCurrent.Offset(m_strideSrvUav);
+}
 
+void Texture3D::CreateSRVs(uint8_t numMips, Format format)
+{
 	if (numMips > 1)
 	{
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+		desc.Format = format ? format : m_resource->GetDesc().Format;
+		desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+
 		auto mipLevel = 0ui8;
 		m_SRVs.resize(numMips);
 
@@ -908,7 +935,7 @@ void Texture3D::CreateSRV(Format format, uint8_t numMips)
 	}
 }
 
-void Texture3D::CreateUAV(Format format, uint8_t numMips)
+void Texture3D::CreateUAVs(Format format, uint8_t numMips)
 {
 	const auto txDesc = m_resource->GetDesc();
 	format = format ? format : txDesc.Format;

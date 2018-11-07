@@ -93,6 +93,12 @@
     <ClInclude Include="XUSG\Advanced\XUSGSDKMesh.h">
       <Filter>XUSG\Advanced\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGModel.h">
+      <Filter>XUSG\Advanced\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGShaderCommon.h">
+      <Filter>XUSG\Advanced\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Common\DXFramework.cpp">
@@ -129,6 +135,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="XUSG\Advanced\XUSGSDKMesh.cpp">
+      <Filter>XUSG\Advanced\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="XUSG\Advanced\XUSGModel.cpp">
       <Filter>XUSG\Advanced\Source Files</Filter>
     </ClCompile>
   </ItemGroup>

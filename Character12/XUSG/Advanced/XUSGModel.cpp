@@ -78,12 +78,25 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 #endif
 }
 
+void Model::SetPipelineState(SubsetFlag subsetFlags)
+{
+	assert(!(subsetFlags & SUBSET_FULL));
+
+	if (subsetFlags & SUBSET_ALPHA_TEST)
+		m_commandList->SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE].Get());
+	else if (subsetFlags & SUBSET_ALPHA)
+		m_commandList->SetPipelineState(m_pipelines[ALPHA_TWO_SIDE].Get());
+	else if (subsetFlags & SUBSET_REFLECTED)
+		m_commandList->SetPipelineState(m_pipelines[REFLECTED].Get());
+	else m_commandList->SetPipelineState(m_pipelines[OPAQUE_FRONT].Get());
+}
+
 void Model::SetPipelineState(PipelineIndex pipeline)
 {
 	m_commandList->SetPipelineState(m_pipelines[pipeline].Get());
 }
 
-void Model::Render(SubsetType subsetType, uint8_t pipeline, bool isShadow, bool reset)
+void Model::Render(SubsetFlag subsetFlags, uint8_t pipeline, bool isShadow, bool reset)
 {
 	DescriptorPool::InterfaceType* heaps[] =
 	{
@@ -104,32 +117,11 @@ void Model::Render(SubsetType subsetType, uint8_t pipeline, bool isShadow, bool 
 			*m_cbvTables[isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 
 		// Render mesh
-		render(m, subsetType, reset);
+		render(m, subsetFlags, reset);
 	}
 
 	// Clear out the vb bindings for the next pass
-	m_commandList->IASetVertexBuffers(0, 1, nullptr);
-}
-
-SubsetType Model::MaskSubsetType(SubsetType subsetType, bool reset)
-{
-#if 0
-	if (bReset)
-	{
-		if (uMaskType & SUBSET_ALPHA)
-		{
-			if (uMaskType == SUBSET_ALPHA)
-				m_pDXContext->OMSetBlendState(m_pState->AutoAlphaBlend().Get(), nullptr, D3D11_DEFAULT_SAMPLE_MASK);
-			m_pDXContext->RSSetState(m_pState->CullNone().Get());
-		}
-		// Reflected
-		else if (uMaskType == SUBSET_ROPAQUE)
-			m_pDXContext->RSSetState(m_pState->CullClockwise().Get());
-	}
-
-	return SDKMesh::MaskSubsetType(maskType);
-#endif
-	return SUBSET_FULL;
+	if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
 void Model::LoadSDKMesh(const Device &device, const wstring &meshFileName, shared_ptr<SDKMesh> &mesh)
@@ -268,6 +260,10 @@ void Model::createPipelines(const InputLayout &inputLayout, const Format *rtvFor
 	state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
 	m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelinePool);
 
+	// Get alpha-test pipeline
+	state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelinePool);
+	m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelinePool);
+
 	// Get transparent pipeline
 	state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelinePool);
 	state.OMSetBlendState(BlendPreset::AUTO_NON_PREMUL, *m_pipelinePool);
@@ -296,60 +292,73 @@ void Model::createDescriptorTables()
 	m_samplerTable = samplerTable.GetSamplerTable(*m_descriptorTablePool);
 	
 	// Materials
-	const auto numMeshes = m_mesh->GetNumMeshes();
-	for (auto m = 0u; m < numMeshes; ++m)
+	const auto numMaterials = m_mesh->GetNumMaterials();
+	m_srvTables.resize(numMaterials);
+	for (auto m = 0u; m < numMaterials; ++m)
 	{
-		const auto numSubsets = m_mesh->GetNumSubsets(m);// , subsetMask);
-		for (auto s = 0u; s < numSubsets; ++s)
-		{
-			const auto pSubset = m_mesh->GetSubset(m, s);// , subsetMask);
-			const auto pMaterial = m_mesh->GetMaterial(pSubset->MaterialID);
+		const auto pMaterial = m_mesh->GetMaterial(m);
 
-			if (pMaterial)
-			{
-				Util::DescriptorTable srvTable;
-				
-				const Descriptor srvs[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };
-				srvTable.SetDescriptors(0, _countof(srvs), srvs);
-				m_srvTables[m][s] = samplerTable.GetCbvSrvUavTable(*m_descriptorTablePool);
-			}
+		if (pMaterial)
+		{
+			Util::DescriptorTable srvTable;
+			const Descriptor srvs[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };
+			srvTable.SetDescriptors(0, _countof(srvs), srvs);
+			m_srvTables[m] = samplerTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 		}
+		else m_srvTables[m] = nullptr;
 	}
 }
 
-void Model::render(uint32_t mesh, SubsetType subsetType, bool reset)
+void Model::render(uint32_t mesh, SubsetFlag subsetFlags, bool reset)
 {
 	// Set IA parameters
 	m_commandList->IASetIndexBuffer(&m_mesh->GetIndexBuffer(mesh)->GetIBV());
 
-	// Set materials
-	const auto subsetMask = MaskSubsetType(subsetType, reset);
-	const auto numSubsets = m_mesh->GetNumSubsets(mesh);// , subsetMask);
-	for (auto subset = 0u; subset < numSubsets; ++subset)
+	// Opaque subsets
+	if (subsetFlags & SUBSET_OPAQUE)	
 	{
-		const auto pSubset = m_mesh->GetSubset(mesh, subset);// , subsetMask);
-		const auto primType = m_mesh->GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE(pSubset->PrimitiveType));
-		m_commandList->IASetPrimitiveTopology(primType);
+		// Set pipeline state
+		if (reset) SetPipelineState(SubsetFlag(~SUBSET_ALPHA & subsetFlags));
 
-		if (m_mesh->GetMaterial(pSubset->MaterialID))
-			m_commandList->SetGraphicsRootDescriptorTable(MATERIAL, *m_srvTables[mesh][subset]);
+		const auto numSubsets = m_mesh->GetNumSubsets(mesh, SUBSET_OPAQUE);
+		for (auto subset = 0u; subset < numSubsets; ++subset)
+		{
+			// Get subset
+			const auto pSubset = m_mesh->GetSubset(mesh, subset, SUBSET_OPAQUE);
+			const auto primType = m_mesh->GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE(pSubset->PrimitiveType));
+			m_commandList->IASetPrimitiveTopology(primType);
 
-		setSubsetStates(mesh, subset, subsetType);
+			// Set material
+			if (m_mesh->GetMaterial(pSubset->MaterialID) && m_srvTables[pSubset->MaterialID])
+				m_commandList->SetGraphicsRootDescriptorTable(MATERIAL, *m_srvTables[pSubset->MaterialID]);
 
-		m_commandList->DrawIndexedInstanced(static_cast<uint32_t>(pSubset->IndexCount), 1,
-			static_cast<uint32_t>(pSubset->IndexStart), static_cast<int32_t>(pSubset->VertexStart), 0);
+			// Draw
+			m_commandList->DrawIndexedInstanced(static_cast<uint32_t>(pSubset->IndexCount), 1,
+				static_cast<uint32_t>(pSubset->IndexStart), static_cast<int32_t>(pSubset->VertexStart), 0);
+		}
 	}
-}
 
-void Model::setSubsetStates(uint32_t mesh, uint32_t subset, SubsetType subsetType)
-{
-	if (!(subsetType & SUBSET_ALPHA_TEST) || subsetType == SUBSET_FULL_REFLECTED)	// Full subsets
+	// Transparent subsets
+	if (subsetFlags & SUBSET_ALPHA)
 	{
-		//if (m_pMesh->IsTranslucent(mesh, subset))
-		if (false)
-			if (subsetType == SUBSET_FULL)
-				m_commandList->SetPipelineState(m_pipelines[ALPHA_TWO_SIDE].Get());
-		else m_commandList->SetPipelineState(m_pipelines[subsetType == SUBSET_FULL_REFLECTED ?
-				REFLECTED : OPAQUE_FRONT].Get());
+		// Set pipeline state
+		if (reset) SetPipelineState(SubsetFlag(~SUBSET_OPAQUE & subsetFlags));
+
+		const auto numSubsets = m_mesh->GetNumSubsets(mesh, SUBSET_ALPHA);
+		for (auto subset = 0u; subset < numSubsets; ++subset)
+		{
+			// Get subset
+			const auto pSubset = m_mesh->GetSubset(mesh, subset, SUBSET_ALPHA);
+			const auto primType = m_mesh->GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE(pSubset->PrimitiveType));
+			m_commandList->IASetPrimitiveTopology(primType);
+
+			// Set material
+			if (m_mesh->GetMaterial(pSubset->MaterialID) && m_srvTables[pSubset->MaterialID])
+				m_commandList->SetGraphicsRootDescriptorTable(MATERIAL, *m_srvTables[pSubset->MaterialID]);
+
+			// Draw
+			m_commandList->DrawIndexedInstanced(static_cast<uint32_t>(pSubset->IndexCount), 1,
+				static_cast<uint32_t>(pSubset->IndexStart), static_cast<int32_t>(pSubset->VertexStart), 0);
+		}
 	}
 }

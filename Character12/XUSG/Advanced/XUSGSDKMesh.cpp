@@ -409,10 +409,24 @@ uint32_t SDKMesh::GetNumSubsets(_In_ uint32_t iMesh) const
 	return m_pMeshArray[iMesh].NumSubsets;
 }
 
+uint32_t SDKMesh::GetNumSubsets(_In_ uint32_t iMesh, _In_ SubsetFlag materialType) const
+{
+	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
+
+	return static_cast<uint32_t>(m_classifiedSubsets[materialType - 1][iMesh].size());
+}
+
 //--------------------------------------------------------------------------------------
 SDKMESH_SUBSET *SDKMesh::GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset) const
 {
 	return &m_pSubsetArray[m_pMeshArray[iMesh].pSubsets[iSubset]];
+}
+
+SDKMESH_SUBSET *SDKMesh::GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset, _In_ SubsetFlag materialType) const
+{
+	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
+
+	return &m_pSubsetArray[m_classifiedSubsets[materialType - 1][iMesh][iSubset]];
 }
 
 //--------------------------------------------------------------------------------------
@@ -926,9 +940,63 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 	}
 	// Update 
 
+	// Classify material type for each subset
+	classifyMaterialType();
+
 	return S_OK;
 }
 
+_Use_decl_annotations_
+void SDKMesh::classifyMaterialType()
+{
+	const auto numMeshes = GetNumMeshes();
+	for (auto &subsets : m_classifiedSubsets)
+		subsets.resize(numMeshes);
+
+	for (auto m = 0u; m < numMeshes; ++m)
+	{
+		const auto &numSubsets = m_pMeshArray[m].NumSubsets;
+		for (auto s = 0u; s < numSubsets; ++s)
+		{
+			const auto &subsetIdx = m_pMeshArray[m].pSubsets[s];
+			const auto &pSubset = m_pSubsetArray[subsetIdx];
+			const auto pMaterial = GetMaterial(pSubset.MaterialID);
+			
+			auto subsetType = SUBSET_OPAQUE - 1;
+			
+			if (pMaterial && pMaterial->pAlbedo)
+			{
+				switch (pMaterial->pAlbedo->GetResource()->GetDesc().Format)
+				{
+				case DXGI_FORMAT_BC2_UNORM:
+				case DXGI_FORMAT_BC2_UNORM_SRGB:
+				case DXGI_FORMAT_BC3_UNORM:
+				case DXGI_FORMAT_BC3_UNORM_SRGB:
+				case DXGI_FORMAT_BC4_UNORM:
+				case DXGI_FORMAT_BC5_UNORM:
+
+				case DXGI_FORMAT_B8G8R8A8_UNORM:
+				case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+				case DXGI_FORMAT_B5G5R5A1_UNORM:
+				case DXGI_FORMAT_B4G4R4A4_UNORM:
+
+				case DXGI_FORMAT_R8G8B8A8_UNORM:
+				case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+				case DXGI_FORMAT_R10G10B10A2_UNORM:
+
+				case DXGI_FORMAT_R16G16B16A16_FLOAT:
+				case DXGI_FORMAT_R16G16B16A16_UNORM:
+				case DXGI_FORMAT_R32G32B32A32_FLOAT:
+					subsetType = SUBSET_ALPHA - 1;
+				}
+			}
+			m_classifiedSubsets[subsetType][m].push_back(subsetIdx);
+		}
+
+		m_classifiedSubsets[SUBSET_OPAQUE - 1][m].shrink_to_fit();
+		m_classifiedSubsets[SUBSET_ALPHA - 1][m].shrink_to_fit();
+	}
+}
 
 //--------------------------------------------------------------------------------------
 // transform bind pose frame using a recursive traversal

@@ -17,6 +17,7 @@ namespace XUSG
 		enum PipelineIndex : uint8_t
 		{
 			OPAQUE_FRONT,
+			OPAQUE_TWO_SIDE,
 			ALPHA_TWO_SIDE,
 			REFLECTED,
 
@@ -33,10 +34,9 @@ namespace XUSG
 		void FrameMove();
 		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
+		void SetPipelineState(SubsetFlag subsetFlags);
 		void SetPipelineState(PipelineIndex pipeline);
-		void Render(SubsetType subsetType, uint8_t pipeline, bool isShadow, bool reset = false);
-
-		SubsetType MaskSubsetType(SubsetType subsetType, bool reset);
+		void Render(SubsetFlag subsetFlags, uint8_t pipeline, bool isShadow, bool reset = false);
 
 		static void LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
 			std::shared_ptr<SDKMesh> &mesh);
@@ -76,8 +76,7 @@ namespace XUSG
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
-		void render(uint32_t mesh, SubsetType subsetType, bool reset);
-		void setSubsetStates(uint32_t mesh, uint32_t subset, SubsetType subsetType);
+		void render(uint32_t mesh, SubsetFlag subsetFlags, bool reset);
 
 		uint8_t	m_temporalIndex;
 
@@ -97,7 +96,7 @@ namespace XUSG
 		Graphics::PipelineState	m_pipelines[NUM_PIPELINE];
 		DescriptorTable			m_cbvTables[NUM_CBV];
 		DescriptorTable			m_samplerTable;
-		std::vector<std::vector<DescriptorTable>> m_srvTables;
+		std::vector<DescriptorTable> m_srvTables;
 
 		Device					m_device;
 		GraphicsCommandList		m_commandList;

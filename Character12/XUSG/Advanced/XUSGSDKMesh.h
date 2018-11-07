@@ -49,16 +49,15 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Enumerated Types.
 	//--------------------------------------------------------------------------------------
-	enum SubsetType : uint32_t
+	enum SubsetFlag : uint8_t
 	{
-		SUBSET_FULL,
-		SUBSET_OPAQUE,
-		SUBSET_ALPHA,
-		SUBSET_ALPHA_TEST,
-		SUBSET_ALPHA_TEST_FULL,
-		SUBSET_OPAQUE_REFLECTED,
-		SUBSET_ALPHA_REFLECTED,
-		SUBSET_FULL_REFLECTED
+		SUBSET_OPAQUE		= 0x1,
+		SUBSET_ALPHA		= 0x2,
+		SUBSET_ALPHA_TEST	= 0x4 | SUBSET_ALPHA,
+		SUBSET_REFLECTED	= 0x8,
+		SUBSET_FULL = SUBSET_OPAQUE | SUBSET_ALPHA,
+
+		NUM_SUBSET_TYPE = 2
 	};
 
 	enum SDKMESH_PRIMITIVE_TYPE
@@ -341,7 +340,9 @@ namespace XUSG
 		SDKMESH_MATERIAL	*GetMaterial(_In_ uint32_t iMaterial) const;
 		SDKMESH_MESH		*GetMesh(_In_ uint32_t iMesh) const;
 		uint32_t			GetNumSubsets(_In_ uint32_t iMesh) const;
+		uint32_t			GetNumSubsets(_In_ uint32_t iMesh, _In_ SubsetFlag materialType) const;
 		SDKMESH_SUBSET		*GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset) const;
+		SDKMESH_SUBSET		*GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset, _In_ SubsetFlag materialType) const;
 		uint32_t			GetVertexStride(_In_ uint32_t iMesh, _In_ uint32_t iVB) const;
 		uint32_t			GetNumFrames() const;
 		SDKMESH_FRAME		*GetFrame(_In_ uint32_t iFrame) const;
@@ -377,6 +378,8 @@ namespace XUSG
 		virtual HRESULT createFromFile(_In_opt_ const Device &device, _In_z_ const wchar_t *szFileName);
 		virtual HRESULT createFromMemory(_In_opt_ const Device &device, _In_reads_(DataBytes) uint8_t *pData,
 			_In_ size_t DataBytes, _In_ bool bCopyStatic);
+
+		void classifyMaterialType();
 
 		// Frame manipulation
 		void transformBindPoseFrame(_In_ uint32_t iFrame, _In_ DirectX::CXMMATRIX parentWorld);
@@ -418,6 +421,9 @@ namespace XUSG
 		SDKMESH_SUBSET					*m_pSubsetArray;
 		SDKMESH_FRAME					*m_pFrameArray;
 		SDKMESH_MATERIAL				*m_pMaterialArray;
+
+		// Classified subsets
+		std::vector<std::vector<uint32_t>> m_classifiedSubsets[NUM_SUBSET_TYPE];
 
 		// Adjacency information (not part of the m_pStaticMeshData, so it must be created and destroyed separately )
 		SDKMESH_INDEX_BUFFER_HEADER		*m_pAdjacencyIndexBufferArray;

@@ -56,6 +56,7 @@ Format MapToPackedFormat(Format &format)
 ConstantBuffer::ConstantBuffer(const Device &device) :
 	m_device(device),
 	m_resource(nullptr),
+	m_CBV(D3D12_DEFAULT),
 	m_cbvPool(nullptr),
 	m_pDataBegin(nullptr)
 {
@@ -132,6 +133,8 @@ void ConstantBuffer::allocateDescriptorPool(uint32_t numDescriptors)
 ResourceBase::ResourceBase(const Device &device) :
 	m_device(device),
 	m_resource(nullptr),
+	m_SRV(D3D12_DEFAULT),
+	m_srvUavCurrent(D3D12_DEFAULT),
 	m_state(ResourceState(0)),
 	m_srvUavPool(nullptr)
 {
@@ -442,6 +445,7 @@ const Descriptor &Texture2D::GetSubSRV(uint8_t i) const
 RenderTarget::RenderTarget(const Device &device) :
 	Texture2D(device),
 	m_RTVs(0),
+	m_rtvCurrent(D3D12_DEFAULT),
 	m_rtvPool(nullptr)
 {
 	if (m_device)
@@ -574,11 +578,11 @@ void RenderTarget::create(uint32_t width, uint32_t height, uint32_t arraySize, F
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// Map formats
-	auto formatReousrce = format;
-	const auto formatUAV = isPacked ? MapToPackedFormat(formatReousrce) : format;
+	auto formatResource = format;
+	const auto formatUAV = isPacked ? MapToPackedFormat(formatResource) : format;
 
 	// Setup the texture description.
-	const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(formatReousrce, width, height, arraySize,
+	const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(formatResource, width, height, arraySize,
 		numMips, sampleCount, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | resourceFlags);
 
 	// Determine initial state
@@ -621,6 +625,8 @@ DepthStencil::DepthStencil(const Device &device) :
 	Texture2D(device),
 	m_DSVs(0),
 	m_DSVROs(0),
+	m_SRVStencil(D3D12_DEFAULT),
+	m_dsvCurrent(D3D12_DEFAULT),
 	m_dsvPool(nullptr)
 {
 	if (m_device)
@@ -638,7 +644,7 @@ void DepthStencil::Create(uint32_t width, uint32_t height, Format format, Resour
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 
 	// Map formats
-	auto formatReousrce = format;
+	auto formatResource = format;
 	auto formatDepth = DXGI_FORMAT_UNKNOWN;
 	auto formatStencil = DXGI_FORMAT_UNKNOWN;
 
@@ -647,28 +653,31 @@ void DepthStencil::Create(uint32_t width, uint32_t height, Format format, Resour
 		switch (format)
 		{
 		case DXGI_FORMAT_D24_UNORM_S8_UINT:
-			formatReousrce = DXGI_FORMAT_R24G8_TYPELESS;
+			formatResource = DXGI_FORMAT_R24G8_TYPELESS;
 			formatDepth = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 			formatStencil = DXGI_FORMAT_X24_TYPELESS_G8_UINT;
 			break;
 		case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
-			formatReousrce = DXGI_FORMAT_R32G8X24_TYPELESS;
+			formatResource = DXGI_FORMAT_R32G8X24_TYPELESS;
 			formatDepth = DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
 			formatStencil = DXGI_FORMAT_X32_TYPELESS_G8X24_UINT;
 			break;
 		case DXGI_FORMAT_D16_UNORM:
-			formatReousrce = DXGI_FORMAT_R16_TYPELESS;
+			formatResource = DXGI_FORMAT_R16_TYPELESS;
 			formatDepth = DXGI_FORMAT_R16_UNORM;
 			break;
-		default:
-			formatReousrce = DXGI_FORMAT_R32_TYPELESS;
+		case DXGI_FORMAT_D32_FLOAT:
+			formatResource = DXGI_FORMAT_R32_TYPELESS;
 			formatDepth = DXGI_FORMAT_R32_FLOAT;
+		default:
+			formatResource = DXGI_FORMAT_R24G8_TYPELESS;
+			formatDepth = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 		}
 	}
 
 	// Setup the render depth stencil description.
 	{
-		const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(formatReousrce, width, height, arraySize,
+		const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(formatResource, width, height, arraySize,
 			numMips, sampleCount, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | resourceFlags);
 
 		// Determine initial state
@@ -1054,7 +1063,8 @@ void BufferBase::Upload(const GraphicsCommandList &commandList, Resource &resour
 
 RawBuffer::RawBuffer(const Device &device) :
 	BufferBase(device),
-	m_counter(nullptr)
+	m_counter(nullptr),
+	m_UAV(D3D12_DEFAULT)
 {
 }
 

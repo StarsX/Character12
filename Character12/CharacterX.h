@@ -65,7 +65,7 @@ private:
 
 	XUSG::Device m_device;
 	XUSG::Resource m_renderTargets[FrameCount];
-	XUSG::Graphics::PipelineState m_pipelineState;
+	XUSG::PipelineState m_pipelineState;
 	XUSG::GraphicsCommandList m_commandList;
 	
 	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
@@ -75,11 +75,11 @@ private:
 	XUSG::DescriptorTable	m_samplerTable;
 
 	// App resources.
-	std::unique_ptr<XUSG::DepthStencil>	m_depth;
-	std::unique_ptr<XUSG::VertexBuffer>	m_vertexBuffer;
-	std::unique_ptr<XUSG::IndexBuffer>	m_indexBuffer;
-	std::unique_ptr<XUSG::ConstantBuffer> m_constantBuffer;
-	std::unique_ptr<XUSG::Texture2D>	m_textures[8];
+	XUSG::DepthStencil	m_depth;
+	XUSG::VertexBuffer	m_vertexBuffer;
+	XUSG::IndexBuffer	m_indexBuffer;
+	XUSG::ConstantBuffer m_constantBuffer;
+	XUSG::Texture2D		m_textures[8];
 	XMFLOAT4 m_cbData_Offset;
 
 	// Synchronization objects.

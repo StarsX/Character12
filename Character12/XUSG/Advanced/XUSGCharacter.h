@@ -12,8 +12,6 @@ namespace XUSG
 		public Model
 	{
 	public:
-		using LPCPDXInputLayout = std::add_pointer_t<CPDXInputLayout>;
-
 		struct Vertex
 		{
 			DirectX::XMFLOAT3	Pos;
@@ -28,101 +26,77 @@ namespace XUSG
 			uint32_t			uBone;
 		};
 
-		using vMeshLink			= std::vector<MeshLink>;
-		using svMeshLink		= std::shared_ptr<vMeshLink>;
-		using pvCPDXSRV			= std::add_pointer_t<vCPDXSRV>;
-		using pvCPDXUAV			= std::add_pointer_t<vCPDXUAV>;
-
-		Character(const CPDXDevice &pDXDevice);
+		Character(const Device &device, const GraphicsCommandList &commandList);
 		virtual ~Character();
 
-		virtual void Init(const CPDXInputLayout &pVertexLayout, const spMesh &pSkinnedMesh,
-			const spShader &pShader, const spState &pState, const bool bReadVB = false,
-			const CPDXInputLayout pSkinnedVertexLayout = nullptr);
-		void Init(const CPDXInputLayout &pVertexLayout, const spMesh &pSkinnedMesh,
-			const svMesh &pvLinkedMeshes, const svMeshLink &pvMeshLinks, const spShader &pShader,
-			const spState &pState, const bool bReadVB = false,
-			const CPDXInputLayout pSkinnedVertexLayout = nullptr);
-		void InitPosition(const DirectX::XMFLOAT4 &vPosRot);
-		void FrameMove(const double fTime);
-		void FrameMove(const double fTime, DirectX::CXMMATRIX mWorld, DirectX::CXMMATRIX mViewProj);
-		void SetMatrices(DirectX::CXMMATRIX mViewProj,
-			const LPCMATRIX pMatShadow = nullptr, bool bTemporal = true);
-		virtual void SetMatrices(DirectX::CXMMATRIX mWorld, DirectX::CXMMATRIX mViewProj,
-			const LPCMATRIX pMatShadow = nullptr, bool bTemporal = true);
-		void Skinning(const bool bReset = false);
-		void RenderTransformed(const SubsetType uMaskType = SUBSET_FULL,
-			const uint8_t uVS = g_uVSBasePass, const uint8_t uGS = NULL_SHADER,
-			const uint8_t uPS = g_uPSBasePass, const bool bReset = false);
+		void Init(const InputLayout &inputLayout,
+			const std::shared_ptr<SDKMesh> &mesh,
+			const std::shared_ptr<Shader::Pool> &shaderPool,
+			const std::shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
+			const std::shared_ptr<DescriptorTablePool> &descriptorTablePool,
+			const std::shared_ptr<std::vector<SDKMesh>> &linkedMeshes = nullptr,
+			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr);
+		void InitPosition(const DirectX::XMFLOAT4 &posRot);
+		void FrameMove(double time);
+		void FrameMove(double time, DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj);
+		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
+			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
+		void Skinning(bool reset = false);
+		void RenderTransformed(SubsetFlag subsetFlags = SUBSET_FULL, bool isShadow = false, bool reset = false);
 
 		const DirectX::XMFLOAT4 &GetPosition() const;
 		DirectX::FXMMATRIX GetWorldMatrix() const;
 
-		static void LoadSDKMesh(const CPDXDevice &pDXDevice, const std::wstring &szMeshFileName,
-			const std::wstring &szAnimFileName, spMesh &pSkinnedMesh);
-		static void LoadSDKMesh(const CPDXDevice &pDXDevice, const std::wstring &szMeshFileName,
-			const std::wstring &szAnimFileName, spMesh &pSkinnedMesh,
-			svMesh &pvLinkedMeshes, const svMeshLink &pvMeshLinkage);
-		static void InitLayout(const CPDXDevice &pDXDevice, CPDXInputLayout &pVertexLayout,
-			const spShader &pShader, const bool bDualQuat, const uint8_t uVSShading = g_uVSBasePass,
-			LPCPDXInputLayout ppSkinnedVertexLayout = nullptr, const uint8_t uVSSkinning = g_uVSSkinning);
-		static void SetSkinningShader(const CPDXContext &pDXContext, const spShader &pShader,
-			const uint8_t uCS, const uint8_t uVS = NULL_SHADER);
-
-		static const D3D11_SO_DECLARATION_ENTRY m_pSODecl[];
-		static const uint8_t m_uNumSODecls;
+		static void LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
+			const std::wstring &animFileName, std::shared_ptr<SDKMesh> &mesh,
+			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr,
+			std::vector<SDKMesh> *pLinkedMeshes = nullptr);
 
 	protected:
-		void createTransformedStates(const uint8_t uBindFlags = 0);
-		void createTransformedVBs(vuRawBuffer &vpVBs, const uint8_t uBindFlags);
-		void createConstBuffers();
-		void setResourceSlots(const bool bReadVB);
-		virtual void setLinkedMatrices(const uint32_t uMesh, DirectX::CXMMATRIX mWorld,
-			DirectX::CXMMATRIX mViewProj, const LPCMATRIX pMatShadow, bool bTemporal);
-		void skinning(const bool bReset);
-		void skinningSO(const bool bReset);
-		void renderTransformed(const uint8_t uVS, const uint8_t uGS, const uint8_t uPS,
-			const SubsetType uMaskType, const bool bReset);
-		void renderLinked(const uint8_t uVS, const uint8_t uGS, const uint8_t uPS,
-			const uint32_t uMesh, const bool bReset);
-		void setBoneMatrices(const uint32_t uMesh);
-		void convertToDQ(DirectX::XMFLOAT4 &vDQTran,
-			const DirectX::CXMVECTOR &vQuat, const DirectX::XMFLOAT3 &vTran) const;
-		DirectX::FXMMATRIX getDualQuat(const uint32_t uMesh, const uint32_t uInfluence) const;
+		enum DescriptorTableSlot : uint8_t
+		{
+			INPUT,
+			OUTPUT
+		};
 
-		static void createSkinnedLayout(const CPDXDevice &pDXDevice,
-			CPDXInputLayout &pSkinnedVertexLayout, const spShader &pShader, const uint8_t uVSSkinning);
+		void createTransformedStates();
+		void createTransformedVBs(std::vector<VertexBuffer> &vertexBuffers);
+		void createBuffers();
+		void createPipelineLayout();
+		void createPipelines();
+		void createDescriptorTables();
+		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world,
+			DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pShadow, bool isTemporal);
+		void skinning(bool reset);
+		void renderTransformed(SubsetFlag subsetFlags, bool isShadow, bool reset);
+		void renderLinked(uint32_t mesh, bool isShadow, bool reset);
+		void setBoneMatrices(uint32_t mesh);
+		void convertToDQ(DirectX::XMFLOAT4 &dqTran, DirectX::CXMVECTOR quat,
+			const DirectX::XMFLOAT3 &tran) const;
+		DirectX::FXMMATRIX getDualQuat(uint32_t mesh, uint32_t influence) const;
 
-		svMesh				m_pvLinkedMeshes;
-		svMeshLink			m_pvMeshLinks;
+		std::shared_ptr<std::vector<SDKMesh>>	m_linkedMeshes;
+		std::shared_ptr<std::vector<MeshLink>>	m_meshLinks;
 
-		vuRawBuffer			m_pvpTransformedVBs[2];
+		std::vector<VertexBuffer> m_transformedVBs[2];
 		DirectX::XMFLOAT4X4	m_mWorld;
 		DirectX::XMFLOAT4	m_vPosRot;
 
 #if	TEMPORAL
-		vfloat4x4			m_vmLinkedWVPs[2];
+		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[2];
 #endif
 
-		double				m_fTime;
+		double				m_time;
 
-		uint8_t				m_uUAVertices;
-		uint8_t				m_uSRVertices;
-		uint8_t				m_uSRBoneWorld;
+		std::vector<StructuredBuffer> m_boneWorlds;
+		std::vector<ConstantBuffer> m_cbLinkedMatrices;
+		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
 
-		upStructuredBuffer	m_pSBBoneWorld;
-		vCPDXBuffer			m_vpCBLinkedMats;
-
-		CPDXInputLayout		m_pSkinnedVertexLayout;
+		PipelineLayout	m_skinningPipelineLayout;
+		PipelineState	m_skinningPipeline;
+		std::vector<DescriptorTable> m_srvSkinningTables;
+		std::vector<DescriptorTable> m_uavSkinningTables[2];
 
 		static bool			m_bDualQuat;
 	};
-
-	using upCharacter = std::unique_ptr<Character>;
-	using spCharacter = std::shared_ptr<Character>;
-	using vuCharacter = std::vector<upCharacter>;
-	using vpCharacter = std::vector<spCharacter>;
-
-	using vMeshLink = Character::vMeshLink;
-	using svMeshLink = Character::svMeshLink;
 }

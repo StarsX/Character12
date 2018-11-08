@@ -6,27 +6,12 @@
 
 using namespace std;
 using namespace DirectX;
-//using namespace DX;
 using namespace XUSG;
-
-const D3D11_SO_DECLARATION_ENTRY Character::m_pSODecl[] =
-{
-	{ 0,	"POSITION",	0,	0,	3,	0 },	// output all components of position
-	{ 0,	"NORMAL",	0,	0,	2,	0 },	// output the first 2 of the encoded normal
-	{ 0,	"TEXCOORD",	0,	0,	1,	0 },	// output the first 1 encoded texture coordinates
-	{ 0,	"TANGENT",	0,	0,	2,	0 },	// output the first 2 of the encoded tangent
-	{ 0,	"BINORMAL",	0,	0,	2,	0 }		// output the first 2 of the encoded binormal
-};
-const uint8_t Character::m_uNumSODecls = ARRAYSIZE(Character::m_pSODecl);
 
 bool Character::m_bDualQuat = true;
 
-Character::Character(const CPDXDevice &pDXDevice) :
-	Model(pDXDevice),
-	m_uUAVertices(0),
-	m_uSRVertices(0),
-	m_uSRBoneWorld(1),
-	m_pSkinnedVertexLayout(nullptr)
+Character::Character(const Device &device, const GraphicsCommandList &commandList) :
+	Model(device, commandList)
 {
 }
 
@@ -34,90 +19,83 @@ Character::~Character(void)
 {
 }
 
-void Character::Init(const CPDXInputLayout &pVertexLayout, const spMesh &pSkinnedMesh,
-	const spShader &pShader, const spState &pState, const bool bReadVB,
-	const CPDXInputLayout pSkinnedVertexLayout)
-{
-	// Get SDKMesh
-	m_pSkinnedVertexLayout = pSkinnedVertexLayout;
-	Model::Init(pVertexLayout, pSkinnedMesh, pShader, pState);
-
-	// Create variable slots
-	createConstBuffers();
-	setResourceSlots(bReadVB);
-
-	// Create VBs that will hold all of the skinned vertices that need to be streamed out
-	const auto &eBindFlag = pSkinnedVertexLayout ? D3D11_BIND_STREAM_OUTPUT : D3D11_BIND_UNORDERED_ACCESS;
-	createTransformedStates(bReadVB ? eBindFlag | D3D11_BIND_SHADER_RESOURCE : eBindFlag);
-}
-
-void Character::Init(const CPDXInputLayout &pVertexLayout, const spMesh &pSkinnedMesh,
-	const svMesh &pvLinkedMeshes, const svMeshLink &pvMeshLinks, const spShader &pShader,
-	const spState &pState, const bool bReadVB, const CPDXInputLayout pSkinnedVertexLayout)
+void Character::Init(const InputLayout &inputLayout,
+	const shared_ptr<SDKMesh> &mesh,
+	const shared_ptr<Shader::Pool> &shaderPool,
+	const shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
+	const shared_ptr<DescriptorTablePool> &descriptorTablePool,
+	const shared_ptr<vector<SDKMesh>> &linkedMeshes,
+	const shared_ptr<vector<MeshLink>> &meshLinks)
 {
 	// Set the Linked Meshes
-	m_pvMeshLinks = pvMeshLinks;
-	m_pvLinkedMeshes = pvLinkedMeshes;
+	m_meshLinks = meshLinks;
+	m_linkedMeshes = linkedMeshes;
 
-	Init(pVertexLayout, pSkinnedMesh, pShader, pState, bReadVB, pSkinnedVertexLayout);
+	// Get SDKMesh
+	Model::Init(inputLayout, mesh, shaderPool, pipelinePool, descriptorTablePool);
+
+	// Create variable slots
+	createBuffers();
+	createPipelineLayout();
+	createPipelines();
+
+	// Create VBs that will hold all of the skinned vertices that need to be transformed output
+	createTransformedStates();
 }
 
-void Character::InitPosition(const XMFLOAT4 &vPosRot)
+void Character::InitPosition(const XMFLOAT4 &posRot)
 {
-	m_vPosRot = vPosRot;
+	m_vPosRot = posRot;
 }
 
-void Character::FrameMove(const double fTime)
+void Character::FrameMove(double time)
 {
 	Model::FrameMove();
-	m_fTime = fTime;
+	m_time = time;
 }
 
-void Character::FrameMove(const double fTime, CXMMATRIX mWorld, CXMMATRIX mViewProj)
+void Character::FrameMove(double time, CXMMATRIX world, CXMMATRIX viewProj)
 {
-	m_pMesh->TransformMesh(XMMatrixIdentity(), fTime);
-	SetMatrices(mWorld, mViewProj);
+	m_mesh->TransformMesh(XMMatrixIdentity(), time);
+	SetMatrices(viewProj, &world);
 }
 
-void Character::SetMatrices(CXMMATRIX mViewProj, const LPCMATRIX pMatShadow, bool bTemporal)
+void Character::SetMatrices(CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld,
+	DirectX::FXMMATRIX *pShadow, bool isTemporal)
 {
-	const auto mTrans = XMMatrixTranslation(m_vPosRot.x, m_vPosRot.y, m_vPosRot.z);
-	const auto mRot = XMMatrixRotationY(m_vPosRot.w);
-	const auto mWorld = XMMatrixMultiply(mRot, mTrans);
-	XMStoreFloat4x4(&m_mWorld, mWorld);
-
-	// Update World-View-Proj matrix
-	SetMatrices(mWorld, mViewProj, pMatShadow, bTemporal);
-}
-
-void Character::SetMatrices(CXMMATRIX mWorld, CXMMATRIX mViewProj,
-	const LPCMATRIX pMatShadow, bool bTemporal)
-{
-	Model::SetMatrices(mWorld, mViewProj, pMatShadow, bTemporal);
-
-	if (m_pvMeshLinks)
+	XMMATRIX world;
+	if (!pWorld)
 	{
-		const auto uNumLinks = static_cast<uint8_t>(m_pvMeshLinks->size());
-		for (auto m = 0ui8; m < uNumLinks; ++m)
-			setLinkedMatrices(m, mWorld, mViewProj, pMatShadow, bTemporal);
+		const auto translation = XMMatrixTranslation(m_vPosRot.x, m_vPosRot.y, m_vPosRot.z);
+		const auto rotation = XMMatrixRotationY(m_vPosRot.w);
+		world = XMMatrixMultiply(rotation, translation);
+		XMStoreFloat4x4(&m_mWorld, world);
+	}
+	else world = *pWorld;
+
+	Model::SetMatrices(world, viewProj, pShadow, isTemporal);
+
+	if (m_meshLinks)
+	{
+		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
+		for (auto m = 0ui8; m < numLinks; ++m)
+			setLinkedMatrices(m, world, viewProj, pShadow, isTemporal);
 	}
 }
 
-void Character::Skinning(const bool bReset)
+void Character::Skinning(bool reset)
 {
-	m_pMesh->TransformMesh(XMMatrixIdentity(), m_fTime);
-	if (m_pSkinnedVertexLayout) skinningSO(bReset);
-	else skinning(bReset);
+	m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
+	skinning(reset);
 }
 
-void Character::RenderTransformed(const SubsetType uMaskType, const uint8_t uVS,
-	const uint8_t uGS, const uint8_t uPS, const bool bReset)
+void Character::RenderTransformed(SubsetFlag subsetFlags, bool isShadow, bool reset)
 {
-	renderTransformed(uVS, uGS, uPS, uMaskType, bReset);
-	if (m_pvMeshLinks)
+	renderTransformed(subsetFlags, isShadow, reset);
+	if (m_meshLinks)
 	{
-		const auto uNumLinks = static_cast<uint8_t>(m_pvMeshLinks->size());
-		for (auto m = 0ui8; m < uNumLinks; ++m) renderLinked(uVS, uGS, uPS, m, bReset);
+		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
+		//for (auto m = 0ui8; m < numLinks; ++m) renderLinked(uVS, uGS, uPS, m, bReset);
 	}
 }
 
@@ -131,262 +109,246 @@ FXMMATRIX Character::GetWorldMatrix() const
 	return XMLoadFloat4x4(&m_mWorld);
 }
 
-void Character::LoadSDKMesh(const CPDXDevice &pDXDevice, const wstring &szMeshFileName,
-	const wstring &szAnimFileName, spMesh &pSkinnedMesh)
+void Character::LoadSDKMesh(const Device &device, const wstring &meshFileName,
+	const wstring &animFileName, shared_ptr<SDKMesh> &mesh,
+	const shared_ptr<vector<MeshLink>> &meshLinks,
+	vector<SDKMesh> *linkedMeshes)
 {
 	// Load the animated mesh
-	Model::LoadSDKMesh(pDXDevice, szMeshFileName, pSkinnedMesh);
-	ThrowIfFailed(pSkinnedMesh->LoadAnimation(szAnimFileName.c_str()));
-	pSkinnedMesh->TransformBindPose(XMMatrixIdentity());
+	Model::LoadSDKMesh(device, meshFileName, mesh);
+	ThrowIfFailed(mesh->LoadAnimation(animFileName.c_str()));
+	mesh->TransformBindPose(XMMatrixIdentity());
 
 	// Fix the frame name to avoid space
-	for (auto i = 0u; i < pSkinnedMesh->GetNumFrames(); ++i)
+	const auto numFrames = mesh->GetNumFrames();
+	for (auto i = 0u; i < numFrames; ++i)
 	{
-		auto szName = pSkinnedMesh->GetFrame(i)->Name;
+		auto szName = mesh->GetFrame(i)->Name;
 		for (auto j = 0ui8; szName[j] != '\0'; ++j)
 			if (szName[j] == ' ') szName[j] = '_';
 	}
-}
-
-void Character::LoadSDKMesh(const CPDXDevice &pDXDevice, const wstring &szMeshFileName,
-	const wstring &szAnimFileName, spMesh &pSkinnedMesh,
-	svMesh &pLinkedMeshes, const svMeshLink &pMeshLinkage)
-{
-	// Load the animated mesh
-	LoadSDKMesh(pDXDevice, szMeshFileName, szAnimFileName, pSkinnedMesh);
 
 	// Load the linked meshes
-	const auto uNumLinks = static_cast<uint8_t>(pMeshLinkage->size());
-	VEC_ALLOC_PTR(pLinkedMeshes, vMesh, uNumLinks);
-	for (auto m = 0ui8; m < uNumLinks; ++m)
+	if (meshLinks)
 	{
-		auto &meshInfo = pMeshLinkage->at(m);
-		meshInfo.uBone = pSkinnedMesh->FindFrameIndex(meshInfo.szBoneName.c_str());
-		ThrowIfFailed(pLinkedMeshes->at(m).Create(pDXDevice.Get(), meshInfo.szMeshName.c_str()));
+		const auto numLinks = static_cast<uint8_t>(meshLinks->size());
+		linkedMeshes->resize(numLinks);
+
+		for (auto m = 0ui8; m < numLinks; ++m)
+		{
+			auto &meshInfo = meshLinks->at(m);
+			meshInfo.uBone = mesh->FindFrameIndex(meshInfo.szBoneName.c_str());
+			ThrowIfFailed(linkedMeshes->at(m).Create(device.Get(), meshInfo.szMeshName.c_str()));
+		}
 	}
 }
 
-void Character::InitLayout(const CPDXDevice &pDXDevice, CPDXInputLayout &pVertexLayout,
-	const spShader &pShader, const bool bDualQuat, const uint8_t uVSShading,
-	LPCPDXInputLayout ppSkinnedVertexLayout, const uint8_t uVSSkinning)
-{
-	m_bDualQuat = bDualQuat;
-
-	// Define our vertex data layout for post-transformed objects
-	Model::InitLayout(pDXDevice, pVertexLayout, pShader, uVSShading);
-
-	// Define our vertex data layout for skinned objects
-	if (ppSkinnedVertexLayout)
-		createSkinnedLayout(pDXDevice, dref(ppSkinnedVertexLayout), pShader, uVSSkinning);
-}
-
-void Character::SetSkinningShader(const CPDXContext &pDXContext, const spShader &pShader,
-	const uint8_t uCS, const uint8_t uVS)
-{
-	if (uVS == NULL_SHADER) pDXContext->CSSetShader(pShader->GetComputeShader(uCS).Get(), nullptr, 0);
-	else
-	{
-		pDXContext->VSSetShader(pShader->GetVertexShader(uVS).Get(), nullptr, 0);
-		pDXContext->GSSetShader(pShader->GetGeometryShader(uVS).Get(), nullptr, 0);
-	}
-}
-
-void Character::createTransformedStates(const uint8_t uBindFlags)
+void Character::createTransformedStates()
 {
 #if	TEMPORAL
-	for (auto &vpVBs : m_pvpTransformedVBs)
-		createTransformedVBs(vpVBs, uBindFlags);
+	for (auto &vertexBuffers : m_transformedVBs)
+		createTransformedVBs(vertexBuffers);
 #else
-	createTransformedVBs(m_pvpTransformedVBs[0], uBindFlags);
+	createTransformedVBs(m_transformedVBs[0]);
 #endif
 }
 
-void Character::createTransformedVBs(vuRawBuffer &vpVBs, const uint8_t uBindFlags)
+void Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
-	const auto uNumMeshes = m_pMesh->GetNumMeshes();
-	VEC_ALLOC(vpVBs, uNumMeshes);
+	const auto numMeshes = m_mesh->GetNumMeshes();
+	vertexBuffers.resize(numMeshes);
 
-	for (auto m = 0u; m < uNumMeshes; ++m)
+	for (auto m = 0u; m < numMeshes; ++m)
 	{
-		const auto uVertexCount = static_cast<uint32_t>(m_pMesh->GetNumVertices(m, 0));
-		const auto uByteWidth = uVertexCount * static_cast<uint32_t>(sizeof(Vertex));
-		vpVBs[m] = make_unique<RawBuffer>(m_pDXDevice);
-		vpVBs[m]->Create(uByteWidth, D3D11_BIND_VERTEX_BUFFER | uBindFlags);
+		const auto vertexCount = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
+		const auto byteWidth = vertexCount * static_cast<uint32_t>(sizeof(Vertex));
+		vertexBuffers[m].Create(m_device, byteWidth, sizeof(Vertex),
+			D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE |
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	}
 }
 
-void Character::createConstBuffers()
+void Character::createBuffers()
 {
-	const auto desc = CD3D11_BUFFER_DESC(sizeof(CBMatrices), D3D11_BIND_CONSTANT_BUFFER,
-		D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE);
+	// Bone world matrices
+	const auto numMeshes = m_mesh->GetNumMeshes();
+	m_boneWorlds.resize(numMeshes);
 
-	VEC_ALLOC(m_vpCBLinkedMats, m_pvMeshLinks->size());
-	for (auto &pCBLinkedMat : m_vpCBLinkedMats)
-		ThrowIfFailed(m_pDXDevice->CreateBuffer(&desc, nullptr, &pCBLinkedMat));
+	for (auto m = 0u; m < numMeshes; ++m)
+	{
+		m_boneWorlds[m].Create(m_device, UINT8_MAX, sizeof(XMFLOAT4X3),
+			D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD);
+	}
 
-	m_pSBBoneWorld = make_unique<StructuredBuffer>(m_pDXDevice);
-	m_pSBBoneWorld->Create(UINT8_MAX, sizeof(XMFLOAT4X3), D3D11_BIND_SHADER_RESOURCE,
-		nullptr, 0, D3D11_USAGE_DYNAMIC);
+	// Linked meshes
+	m_cbLinkedMatrices.resize(m_meshLinks->size());
+	for (auto &cbLinkedMatrices : m_cbLinkedMatrices)
+		cbLinkedMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices));
+
+	m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
+	for (auto &cbLinkedMatrix : m_cbLinkedShadowMatrices)
+		cbLinkedMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4));
 }
 
-void Character::setResourceSlots(const bool bReadVB)
+void Character::createPipelineLayout()
 {
+	auto rwVertices = 0u;
+	auto roVertices = 0u;
+	auto roBoneWorld = roVertices + 1;
+
 	// Get shader resource slots
-	auto desc = D3D11_SHADER_INPUT_BIND_DESC();
-	const auto pReflector = m_pShader->GetCSReflector(g_uCSSkinning);
+	auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+	const auto pReflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
 	if (pReflector)
 	{
 		auto hr = pReflector->GetResourceBindingDescByName("g_rwVertices", &desc);
-		if (SUCCEEDED(hr)) m_uUAVertices = desc.BindPoint;
+		if (SUCCEEDED(hr)) rwVertices = desc.BindPoint;
 
 		hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
-		if (SUCCEEDED(hr)) m_uSRVertices = desc.BindPoint;
+		if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
 
 		hr = pReflector->GetResourceBindingDescByName("g_roDualQuat", &desc);
-		if (SUCCEEDED(hr)) m_uSRBoneWorld = desc.BindPoint;
+		if (SUCCEEDED(hr)) roBoneWorld = desc.BindPoint;
+	}
+
+	// Get pipeline layout
+	Util::PipelineLayout utilPipelineLayout;
+
+	// Input vertices and bone matrices
+	if (roBoneWorld == roVertices + 1)
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 2, roVertices);
+	else
+	{
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld);
+	}
+	utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
+
+	// Output vertices
+	utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices);
+	utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
+
+	m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
+		D3D12_ROOT_SIGNATURE_FLAG_NONE);
+}
+
+void Character::createPipelines()
+{
+	Compute::PipelineDesc desc = {};
+	desc.pRootSignature = m_skinningPipelineLayout.Get();
+	desc.CS = Shader::ByteCode(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING).Get());
+	ThrowIfFailed(m_device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_skinningPipeline)));
+}
+
+void Character::createDescriptorTables()
+{
+	const auto numMeshes = m_mesh->GetNumMeshes();
+	m_srvSkinningTables.resize(numMeshes);
+	for (auto &uavSkinningTables : m_uavSkinningTables)
+		uavSkinningTables.resize(numMeshes);
+
+	for (auto m = 0u; m < numMeshes; ++m)
+	{
+		Util::DescriptorTable srvTable;
+		const Descriptor srvs[] = { m_mesh->GetVertexBuffer(m, 0)->GetSRV(), m_boneWorlds[m].GetSRV() };
+		srvTable.SetDescriptors(0, _countof(srvs), srvs);
+		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+
+		Util::DescriptorTable uavTables[_countof(m_transformedVBs)];
+		for (auto i = 0u; i < _countof(uavTables); ++i)
+		{
+			uavTables[i].SetDescriptors(0, 1, &m_transformedVBs[i][m].GetUAV());
+			m_uavSkinningTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+		}
 	}
 }
 
-void Character::setLinkedMatrices(const uint32_t uMesh, CXMMATRIX mWorld,
-	CXMMATRIX mViewProj, const LPCMATRIX pMatShadow, bool bTemporal)
+void Character::setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world,
+	DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pShadow, bool isTemporal)
 {
 	// Set World-View-Proj matrix
-	const auto rMat = m_pMesh->GetInfluenceMatrix(m_pvMeshLinks->at(uMesh).uBone);
-	const auto mWorldViewProj = rMat * mWorld * mViewProj;
+	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).uBone);
+	const auto worldViewProj = influenceMatrix * world * viewProj;
 
 	// Update constant buffers
-	auto mappedSubres = D3D11_MAPPED_SUBRESOURCE();
-	const auto pCBMatrices = m_vpCBLinkedMats[uMesh].Get();
-	ThrowIfFailed(m_pDXContext->Map(pCBMatrices, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedSubres));
-	const auto pCBDataMatrices = reinterpret_cast<LPCBMatrices>(mappedSubres.pData);
-	pCBDataMatrices->m_mWorldViewProj = XMMatrixTranspose(mWorldViewProj);
-	pCBDataMatrices->m_mWorld = XMMatrixTranspose(mWorld);
-	pCBDataMatrices->m_mNormal = XMMatrixInverse(nullptr, mWorld);
-	//D3DXMatrixTranspose(&mWorldIT, &mWorldIT);	// transpose once
-	//D3DXMatrixTranspose(&mWorldIT, &mWorldIT);	// transpose twice
-	
-	if (pMatShadow)
+	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbLinkedMatrices[mesh].Map());
+	pCBData->WorldViewProj = XMMatrixTranspose(worldViewProj);
+	pCBData->World = XMMatrixTranspose(world);
+	pCBData->Normal = XMMatrixInverse(nullptr, world);
+	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose once
+	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose twice
+
+	if (pShadow)
 	{
-		const auto mModel = XMMatrixMultiply(rMat, mWorld);
-		const auto mShadow = XMMatrixMultiply(mModel, dref(pMatShadow));
-		pCBDataMatrices->m_mShadow = XMMatrixTranspose(mShadow);
+		const auto model = XMMatrixMultiply(influenceMatrix, world);
+		const auto shadow = XMMatrixMultiply(model, *pShadow);
+		pCBData->ShadowProj = XMMatrixTranspose(shadow);
+
+		auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh].Map());
+		cbData = pCBData->ShadowProj;
 	}
 
 #if	TEMPORAL
-	if (bTemporal)
+	if (isTemporal)
 	{
-		XMStoreFloat4x4(&m_vmLinkedWVPs[m_uTSIdx][uMesh], mWorldViewProj);
-		const auto mWVPPrev = XMLoadFloat4x4(&m_vmLinkedWVPs[!m_uTSIdx][uMesh]);
-		pCBDataMatrices->m_mWVPPrev = XMMatrixTranspose(mWVPPrev);
+		XMStoreFloat4x4(&m_linkedWorldViewProjs[m_temporalIndex][mesh], worldViewProj);
+		const auto worldViewProjPrev = XMLoadFloat4x4(&m_linkedWorldViewProjs[!m_temporalIndex][mesh]);
+		pCBDataMatrices->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
 	}
 #endif
-	
-	m_pDXContext->Unmap(pCBMatrices, 0);
 }
 
-void Character::skinning(const bool bReset)
+void Character::skinning(bool reset)
 {
-	if (bReset) m_pDXContext->CSSetShader(m_pShader->GetComputeShader(g_uVSSkinning).Get(), nullptr, 0);
+	if (reset)
+	{
+		m_commandList->SetDescriptorHeaps(1, m_descriptorTablePool->GetCbvSrvUavPool().GetAddressOf());
+		m_commandList->SetComputeRootSignature(m_skinningPipelineLayout.Get());
+		m_commandList->SetPipelineState(m_skinningPipeline.Get());
+	}
 
 	// Skin the vertices and output them to buffers
-	const auto uNumMeshes = m_pMesh->GetNumMeshes();
-	for (auto m = 0u; m < uNumMeshes; ++m)
+	const auto numMeshes = m_mesh->GetNumMeshes();
+	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Set the bone matrices
 		setBoneMatrices(m);
 		
 		// Setup
-		const auto &pUAV = m_pvpTransformedVBs[m_uTSIdx][m]->GetUAV().Get();
-		m_pDXContext->CSSetUnorderedAccessViews(m_uUAVertices, 1, &pUAV, &m_uNullUint);
-		m_pDXContext->CSSetShaderResources(m_uSRVertices, 1, m_pMesh->GetVBSRV11(m, 0).GetAddressOf());
-		m_pDXContext->CSSetShaderResources(m_uSRBoneWorld, 1, m_pSBBoneWorld->GetSRV().GetAddressOf());
-
+		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m]);
+		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_temporalIndex][m]);
+		
 		// Skinning
-		const auto fNumGroups = ceilf(m_pMesh->GetNumVertices(m, 0) / 64.0f);
-		m_pDXContext->Dispatch(static_cast<uint32_t>(fNumGroups), 1, 1);
+		const auto numGroups = ceilf(m_mesh->GetNumVertices(m, 0) / 64.0f);
+		m_commandList->Dispatch(static_cast<uint32_t>(numGroups), 1, 1);
 	}
-
-	if (bReset)
-	{
-		// Unset
-		const auto pNullSRV = LPDXShaderResourceView(nullptr);	// Helper to Clear SRVs
-		m_pDXContext->CSSetShaderResources(m_uSRBoneWorld, 1, &pNullSRV);
-		m_pDXContext->CSSetShaderResources(m_uSRVertices, 1, &pNullSRV);
-		m_pDXContext->CSSetShader(nullptr, nullptr, 0);
-	}
-
-	const auto pNullUAV = LPDXUnorderedAccessView(nullptr);	// Helper to Clear UAVs
-	m_pDXContext->CSSetUnorderedAccessViews(m_uUAVertices, 1, &pNullUAV, &m_uNullUint);
 }
 
-void Character::skinningSO(const bool bReset)
+void Character::renderTransformed(SubsetFlag subsetFlags, bool isShadow, bool reset)
 {
-	// Set vertex Layout
-	m_pDXContext->IASetInputLayout(m_pSkinnedVertexLayout.Get());
-	m_pDXContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);	// When skinning vertices, we don't care about topology.
-																				// Treat the entire vertex buffer as list of points.
-
-	// Set Shaders
-	if (bReset)
+	if (reset)
 	{
-		m_pDXContext->VSSetShader(m_pShader->GetVertexShader(g_uVSSkinning).Get(), nullptr, 0);
-		m_pDXContext->GSSetShader(m_pShader->GetGeometryShader(g_uVSSkinning).Get(), nullptr, 0);
-		m_pDXContext->PSSetShader(nullptr, nullptr, 0);
-		m_pDXContext->RSSetState(nullptr);
-		m_pDXContext->OMSetBlendState(nullptr, nullptr, D3D11_DEFAULT_SAMPLE_MASK);
-		m_pDXContext->OMSetDepthStencilState(m_pState->DepthNone().Get(), 0);
+		DescriptorPool::InterfaceType* heaps[] =
+		{
+			m_descriptorTablePool->GetCbvSrvUavPool().Get(),
+			m_descriptorTablePool->GetSamplerPool().Get()
+		};
+		m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
+		m_commandList->SetGraphicsRootSignature(m_pipelineLayout.Get());
+		m_commandList->SetGraphicsRootDescriptorTable(SAMPLERS, *m_samplerTable);
 	}
 
-	// Skin the vertices and stream them out
-	const auto uNumMeshes = m_pMesh->GetNumMeshes();
-	for (auto m = 0u; m < uNumMeshes; ++m)
-	{
-		// Turn on stream out
-		auto pBuffer = m_pvpTransformedVBs[m_uTSIdx][m]->GetBuffer().Get();
-		m_pDXContext->SOSetTargets(1, &pBuffer, &m_uOffset);
+	// Set matrices
+	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
+		*m_cbvTables[isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 
-		// Set source vertex buffer
-		pBuffer = m_pMesh->GetVB11(m, 0);
-		const auto uStride = m_pMesh->GetVertexStride(m, 0);
-		m_pDXContext->IASetVertexBuffers(0, 1, &pBuffer, &uStride, &m_uOffset);
-
-		// Set the bone matrices
-		setBoneMatrices(m);
-		m_pDXContext->VSSetShaderResources(m_uSRBoneWorld, 1, m_pSBBoneWorld->GetSRV().GetAddressOf());
-
-		// Render the vertices as an array of points
-		m_pDXContext->Draw(static_cast<uint32_t>(m_pMesh->GetNumVertices(m, 0)), 0);
-	}
-
-	if (bReset)
-	{
-		m_pDXContext->OMSetDepthStencilState(nullptr, 0);
-		m_pDXContext->VSSetShader(nullptr, nullptr, 0);
-		m_pDXContext->GSSetShader(nullptr, nullptr, 0);
-	}
-
-	// Turn off stream out
-	m_pDXContext->SOSetTargets(1, &m_pNullBuffer, &m_uOffset);
-}
-
-void Character::renderTransformed(const uint8_t uVS, const uint8_t uGS, const uint8_t uPS,
-	const SubsetType uMaskType, const bool bReset)
-{
-	// Set vertex Layout
-	m_pDXContext->IASetInputLayout(m_pVertexLayout.Get());
-	m_pDXContext->VSSetConstantBuffers(m_uCBMatrices, 1, m_pCBMatrices.GetAddressOf());
-
-	// Set Shaders
-	setShaders(uVS, uGS, uPS, bReset);
-
-	const auto uNumMeshes = m_pMesh->GetNumMeshes();
-	for (auto m = 0u; m < uNumMeshes; ++m)
+	const auto numMeshes = m_mesh->GetNumMeshes();
+	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Set IA parameters
-		const auto pBuffer = m_pvpTransformedVBs[m_uTSIdx][m]->GetBuffer();
-		const auto uStride = static_cast<uint32_t>(sizeof(Vertex));
-		m_pDXContext->IASetVertexBuffers(0, 1, pBuffer.GetAddressOf(), &uStride, &m_uOffset);
+		const auto vertexBuffer = m_mesh->GetVertexBuffer(m, 0);
+		m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer->GetVBV());
 
 		// Set historical motion states, if neccessary
 #if	TEMPORAL
@@ -395,7 +357,7 @@ void Character::renderTransformed(const uint8_t uVS, const uint8_t uGS, const ui
 #endif
 
 		// Render mesh
-		render(m, uMaskType, bReset);
+		render(m, subsetFlags, reset);
 	}
 
 	// Clear out the vb bindings for the next pass
@@ -403,12 +365,13 @@ void Character::renderTransformed(const uint8_t uVS, const uint8_t uGS, const ui
 	const auto pNullSRV = LPDXShaderResourceView(nullptr);	// Helper to Clear SRVs
 	m_pDXContext->VSSetShaderResources(m_uSRVertices, 1, &pNullSRV);
 #endif
-	m_pDXContext->IASetVertexBuffers(0, 1, &m_pNullBuffer, &m_uNullStride, &m_uOffset);
-	resetShaders(uVS, uGS, uPS, uMaskType, bReset);
+
+	// Clear out the vb bindings for the next pass
+	if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
-void Character::renderLinked(const uint8_t uVS, const uint8_t uGS, const uint8_t uPS,
-	const uint32_t uMesh, const bool bReset)
+#if 0
+void Character::renderLinked(uint32_t mesh, bool isShadow, bool reset)
 {
 	// Set constant buffers
 	m_pDXContext->VSSetConstantBuffers(m_uCBMatrices, 1, m_vpCBLinkedMats[uMesh].GetAddressOf());
@@ -423,6 +386,7 @@ void Character::renderLinked(const uint8_t uVS, const uint8_t uGS, const uint8_t
 
 	resetShaders(uVS, uGS, uPS, SUBSET_FULL, bReset);
 }
+#endif
 
 //--------------------------------------------------------------------------------------
 // SetBoneMatrices
@@ -433,80 +397,47 @@ void Character::renderLinked(const uint8_t uVS, const uint8_t uGS, const uint8_t
 //			The shader will index into the constant buffer to grab the correct
 //			transformation matrices for each vertex.
 //--------------------------------------------------------------------------------------
-void Character::setBoneMatrices(const uint32_t uMesh)
+void Character::setBoneMatrices(uint32_t mesh)
 {
-	auto mappedSubres = D3D11_MAPPED_SUBRESOURCE();
-	const auto &pCBBoneWorld = m_pSBBoneWorld->GetBuffer().Get();
-	ThrowIfFailed(m_pDXContext->Map(pCBBoneWorld, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedSubres));
-	auto pCBDataBoneWorld = reinterpret_cast<lpfloat4x3>(mappedSubres.pData);
+	XMFLOAT4X3 *pDataBoneWorld;
+	CD3DX12_RANGE readRange(0, 0);	// We do not intend to read from this resource on the CPU.
+	ThrowIfFailed(m_boneWorlds[mesh].GetResource()->Map(0, &readRange,
+		reinterpret_cast<void**>(&pDataBoneWorld)));
 
-	const auto uNumBones = m_pMesh->GetNumInfluences(uMesh);
-	if (m_bDualQuat)
+	const auto numBones = m_mesh->GetNumInfluences(mesh);
+	for (auto i = 0u; i < numBones; ++i)
 	{
-		for (auto i = 0u; i < uNumBones; ++i)
-		{
-			const auto qMat = getDualQuat(uMesh, i);
-			XMStoreFloat4x3(&pCBDataBoneWorld[i], XMMatrixTranspose(qMat));
-		}
-	}
-	else
-	{
-		for (auto i = 0u; i < uNumBones; ++i)
-		{
-			const auto rMat = m_pMesh->GetMeshInfluenceMatrix(uMesh, i);
-			XMStoreFloat4x3(&pCBDataBoneWorld[i], XMMatrixTranspose(rMat));
-		}
+		const auto qMat = getDualQuat(mesh, i);
+		XMStoreFloat4x3(&pDataBoneWorld[i], XMMatrixTranspose(qMat));
 	}
 
-	m_pDXContext->Unmap(pCBBoneWorld, 0);
+	m_boneWorlds[mesh].GetResource()->Unmap(0, nullptr);
 }
 
 // Convert unit quaternion and translation to unit dual quaternion
-void Character::convertToDQ(XMFLOAT4 &vDQTran, const CXMVECTOR &vQuat, const XMFLOAT3 &vTran) const
+void Character::convertToDQ(XMFLOAT4 &dqTran, CXMVECTOR quat, const XMFLOAT3 &tran) const
 {
-	auto vDQRot = XMFLOAT4();
-	XMStoreFloat4(&vDQRot, vQuat);
-	vDQTran.x = 0.5f * (vTran.x * vDQRot.w + vTran.y * vDQRot.z - vTran.z * vDQRot.y);
-	vDQTran.y = 0.5f * (-vTran.x * vDQRot.z + vTran.y * vDQRot.w + vTran.z * vDQRot.x);
-	vDQTran.z = 0.5f * (vTran.x * vDQRot.y - vTran.y * vDQRot.x + vTran.z * vDQRot.w);
-	vDQTran.w = -0.5f * (vTran.x * vDQRot.x + vTran.y * vDQRot.y + vTran.z * vDQRot.z);
+	XMFLOAT4 dqRot;
+	XMStoreFloat4(&dqRot, quat);
+	dqTran.x = 0.5f * (tran.x * dqRot.w + tran.y * dqRot.z - tran.z * dqRot.y);
+	dqTran.y = 0.5f * (-tran.x * dqRot.z + tran.y * dqRot.w + tran.z * dqRot.x);
+	dqTran.z = 0.5f * (tran.x * dqRot.y - tran.y * dqRot.x + tran.z * dqRot.w);
+	dqTran.w = -0.5f * (tran.x * dqRot.x + tran.y * dqRot.y + tran.z * dqRot.z);
 }
 
-FXMMATRIX Character::getDualQuat(const uint32_t uMesh, const uint32_t uInfluence) const
+FXMMATRIX Character::getDualQuat(uint32_t mesh, uint32_t influence) const
 {
-	const auto mInfluence = m_pMesh->GetMeshInfluenceMatrix(uMesh, uInfluence);
+	const auto influenceMatrix = m_mesh->GetMeshInfluenceMatrix(mesh, influence);
 
-	auto mQuat = XMMATRIX();
-	XMMatrixDecompose(&mQuat.r[2], &mQuat.r[0], &mQuat.r[1], mInfluence);
+	XMMATRIX quatMatrix;
+	XMMatrixDecompose(&quatMatrix.r[2], &quatMatrix.r[0], &quatMatrix.r[1], influenceMatrix);
 
-	auto vTranslation = XMFLOAT3();
-	XMStoreFloat3(&vTranslation, mQuat.r[1]);
+	XMFLOAT3 translation;
+	XMStoreFloat3(&translation, quatMatrix.r[1]);
 
-	auto vDQTran = XMFLOAT4();
-	convertToDQ(vDQTran, mQuat.r[0], vTranslation);
-	mQuat.r[1] = XMLoadFloat4(&vDQTran);
+	XMFLOAT4 dqTran;
+	convertToDQ(dqTran, quatMatrix.r[0], translation);
+	quatMatrix.r[1] = XMLoadFloat4(&dqTran);
 
-	return mQuat;
-}
-
-void Character::createSkinnedLayout(const CPDXDevice &pDXDevice, CPDXInputLayout &pSkinnedVertexLayout,
-	const spShader &pShader, const uint8_t uVSSkinning)
-{
-	// Define our vertex data layout for skinned objects
-	const auto offset = D3D11_APPEND_ALIGNED_ELEMENT;
-	const auto layout = initializer_list<D3D11_INPUT_ELEMENT_DESC>
-	{
-		{ "POSITION",	0, DXGI_FORMAT_R32G32B32_FLOAT,		0, 0,		D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "WEIGHTS",	0, DXGI_FORMAT_R8G8B8A8_UNORM,		0, offset,	D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BONES",		0, DXGI_FORMAT_R8G8B8A8_UINT,		0, offset,	D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "NORMAL",		0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD",	0, DXGI_FORMAT_R32_UINT,			0, offset,	D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TANGENT",	0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "BINORMAL",	0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-
-	ThrowIfFailed(pDXDevice->CreateInputLayout(layout.begin(), static_cast<uint32_t>(layout.size()),
-		pShader->GetVertexShaderBuffer(uVSSkinning)->GetBufferPointer(),
-		pShader->GetVertexShaderBuffer(uVSSkinning)->GetBufferSize(),
-		&pSkinnedVertexLayout));
+	return quatMatrix;
 }

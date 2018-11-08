@@ -33,7 +33,7 @@ void Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 	m_mesh = mesh;
 
 	// Create variable slots
-	createConstBuffers();
+	createConstantBuffers();
 	createPipelineLayout();
 	createPipelines(inputLayout);
 	createDescriptorTables();
@@ -52,7 +52,7 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 	const auto worldViewProj = XMMatrixMultiply(world, viewProj);
 
 	// Update constant buffers
-	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices->Map());
+	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices.Map());
 	pCBData->WorldViewProj = XMMatrixTranspose(worldViewProj);
 	pCBData->World = XMMatrixTranspose(world);
 	pCBData->Normal = XMMatrixInverse(nullptr, world);
@@ -64,7 +64,7 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 		const auto shadow = XMMatrixMultiply(world, *pShadow);
 		pCBData->ShadowProj = XMMatrixTranspose(shadow);
 
-		auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrix->Map());
+		auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrix.Map());
 		cbData = pCBData->ShadowProj;
 	}
 
@@ -96,7 +96,7 @@ void Model::SetPipelineState(PipelineIndex pipeline)
 	m_commandList->SetPipelineState(m_pipelines[pipeline].Get());
 }
 
-void Model::Render(SubsetFlag subsetFlags, uint8_t pipeline, bool isShadow, bool reset)
+void Model::Render(SubsetFlag subsetFlags, bool isShadow, bool reset)
 {
 	DescriptorPool::InterfaceType* heaps[] =
 	{
@@ -105,6 +105,8 @@ void Model::Render(SubsetFlag subsetFlags, uint8_t pipeline, bool isShadow, bool
 	};
 	m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 	m_commandList->SetGraphicsRootSignature(m_pipelineLayout.Get());
+	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
+		*m_cbvTables[isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 	m_commandList->SetGraphicsRootDescriptorTable(SAMPLERS, *m_samplerTable);
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -113,8 +115,6 @@ void Model::Render(SubsetFlag subsetFlags, uint8_t pipeline, bool isShadow, bool
 		// Set IA parameters
 		const auto vertexBuffer = m_mesh->GetVertexBuffer(m, 0);
 		m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer->GetVBV());
-		m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
-			*m_cbvTables[isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 
 		// Render mesh
 		render(m, subsetFlags, reset);
@@ -155,13 +155,10 @@ void Model::SetShadowMap(const GraphicsCommandList &commandList, const Descripto
 	commandList->SetGraphicsRootDescriptorTable(SHADOW_MAP, *shadowTable);
 }
 
-void Model::createConstBuffers()
+void Model::createConstantBuffers()
 {
-	m_cbMatrices = make_unique<ConstantBuffer>(m_device);
-	m_cbMatrices->Create(512 * 128, sizeof(CBMatrices));
-
-	m_cbShadowMatrix = make_unique<ConstantBuffer>(m_device);
-	m_cbMatrices->Create(256 * 128, sizeof(XMFLOAT4));
+	m_cbMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices));
+	m_cbShadowMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4));
 }
 
 void Model::createPipelineLayout()
@@ -202,7 +199,7 @@ void Model::createPipelineLayout()
 
 	// Get pipeline layout
 	Util::PipelineLayout utilPipelineLayout;
-	// Constan buffers
+	// Constant buffers
 	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices);
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
 
@@ -278,11 +275,11 @@ void Model::createPipelines(const InputLayout &inputLayout, const Format *rtvFor
 void Model::createDescriptorTables()
 {
 	Util::DescriptorTable cbMatricesTable;
-	cbMatricesTable.SetDescriptors(0, 1, &m_cbMatrices->GetCBV());
+	cbMatricesTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV());
 	m_cbvTables[CBV_MATRICES] = cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 
 	Util::DescriptorTable cbShadowTable;
-	cbShadowTable.SetDescriptors(0, 1, &m_cbMatrices->GetCBV());
+	cbShadowTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV());
 	m_cbvTables[CBV_SHADOW_MATRIX] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 
 	Util::DescriptorTable samplerTable;

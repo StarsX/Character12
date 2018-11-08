@@ -678,9 +678,8 @@ HRESULT SDKMesh::createVertexBuffer(SDKMESH_VERTEX_BUFFER_HEADER *pHeader, void 
 	pHeader->DataOffset = 0;
 
 	//Vertex Buffer
-	//pHeader->pVB11 = make_unique<VertexBuffer>(m_pDev11);
-	pHeader->pVertexBuffer = new VertexBuffer(m_device);
-	pHeader->pVertexBuffer->Create(static_cast<uint32_t>(pHeader->SizeBytes),
+	pHeader->pVertexBuffer = new VertexBuffer();
+	pHeader->pVertexBuffer->Create(m_device, static_cast<uint32_t>(pHeader->SizeBytes),
 		static_cast<uint32_t>(pHeader->StrideBytes));
 
 	m_resourceUploads.push_back(Resource());
@@ -698,8 +697,8 @@ HRESULT SDKMesh::createIndexBuffer(SDKMESH_INDEX_BUFFER_HEADER *pHeader, void *p
 
 	//Index Buffer
 	//pHeader->pIB11 = make_unique<IndexBuffer>(m_pDev11);
-	pHeader->pIndexBuffer = new IndexBuffer(m_device);
-	pHeader->pIndexBuffer->Create(static_cast<uint32_t>(pHeader->SizeBytes));
+	pHeader->pIndexBuffer = new IndexBuffer();
+	pHeader->pIndexBuffer->Create(m_device, static_cast<uint32_t>(pHeader->SizeBytes));
 
 	m_resourceUploads.push_back(Resource());
 	pHeader->pIndexBuffer->Upload(m_commandList, m_resourceUploads.back(), pIndices);

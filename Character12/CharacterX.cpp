@@ -157,9 +157,9 @@ void CharacterX::LoadPipeline()
 
 	// Create a DSV
 	{
-		m_depth = make_unique<DepthStencil>(m_device);
-		m_depth->Create(m_width, m_height, DXGI_FORMAT_D24_UNORM_S8_UINT, D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
-		m_dsv = m_depth->GetDSV();
+		m_depth.Create(m_device, m_width, m_height, DXGI_FORMAT_D24_UNORM_S8_UINT,
+			D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
+		m_dsv = m_depth.GetDSV();
 	}
 }
 
@@ -226,9 +226,8 @@ void CharacterX::LoadAssets()
 		};
 		const uint32_t vertexBufferSize = sizeof(triangleVertices);
 
-		m_vertexBuffer = make_unique<VertexBuffer>(m_device);
-		m_vertexBuffer->Create(vertexBufferSize, sizeof(Vertex), D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
-		m_vertexBuffer->Upload(m_commandList, vertexUpload, triangleVertices);
+		m_vertexBuffer.Create(m_device, vertexBufferSize, sizeof(Vertex), D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
+		m_vertexBuffer.Upload(m_commandList, vertexUpload, triangleVertices);
 	}
 
 	// Create the index buffer.
@@ -238,9 +237,8 @@ void CharacterX::LoadAssets()
 		uint16_t triangleIndices[] = { 0, 1, 2 };
 		const uint32_t indexBufferSize = sizeof(triangleIndices);
 
-		m_indexBuffer = make_unique<IndexBuffer>(m_device);
-		m_indexBuffer->Create(indexBufferSize, DXGI_FORMAT_R16_UINT);
-		m_indexBuffer->Upload(m_commandList, indexUpload, triangleIndices);
+		m_indexBuffer.Create(m_device, indexBufferSize, DXGI_FORMAT_R16_UINT);
+		m_indexBuffer.Upload(m_commandList, indexUpload, triangleIndices);
 	}
 
 	// Note: ComPtr's are CPU objects but this resource needs to stay in scope until
@@ -251,11 +249,10 @@ void CharacterX::LoadAssets()
 
 	// Create the constant buffer.
 	{
-		m_constantBuffer = make_unique<ConstantBuffer>(m_device);
-		m_constantBuffer->Create(1024 * 64, sizeof(XMFLOAT4));
+		m_constantBuffer.Create(m_device, 1024 * 64, sizeof(XMFLOAT4));
 
 		Util::DescriptorTable cbvTable;
-		cbvTable.SetDescriptors(0, 1, &m_constantBuffer->GetCBV());
+		cbvTable.SetDescriptors(0, 1, &m_constantBuffer.GetCBV());
 		m_cbvTable = cbvTable.GetCbvSrvUavTable(m_descriptorTablePool);
 	}
 
@@ -268,10 +265,9 @@ void CharacterX::LoadAssets()
 		{
 			const auto texture = GenerateTextureData(i);
 
-			m_textures[i] = make_unique<Texture2D>(m_device);
-			m_textures[i]->Create(TextureWidth, TextureHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
-			m_textures[i]->Upload(m_commandList, textureUploads[i], texture.data(), TexturePixelSize);
-			srvs[i] = m_textures[i]->GetSRV();
+			m_textures[i].Create(m_device, TextureWidth, TextureHeight, DXGI_FORMAT_R8G8B8A8_UNORM);
+			m_textures[i].Upload(m_commandList, textureUploads[i], texture.data(), TexturePixelSize);
+			srvs[i] = m_textures[i].GetSRV();
 		}
 		
 		Util::DescriptorTable srvTable;
@@ -362,7 +358,7 @@ void CharacterX::OnUpdate()
 
 	// Map and initialize the constant buffer. We don't unmap this until the
 	// app closes. Keeping things mapped for the lifetime of the resource is okay.
-	const auto pCbData = reinterpret_cast<XMFLOAT4*>(m_constantBuffer->Map());
+	const auto pCbData = reinterpret_cast<XMFLOAT4*>(m_constantBuffer.Map());
 	*pCbData = m_cbData_Offset;
 }
 
@@ -429,8 +425,8 @@ void CharacterX::PopulateCommandList()
 	m_commandList->ClearRenderTargetView(*m_rtvTables[m_frameIndex], clearColor, 0, nullptr);
 	m_commandList->ClearDepthStencilView(m_dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer->GetVBV());
-	m_commandList->IASetIndexBuffer(&m_indexBuffer->GetIBV());
+	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer.GetVBV());
+	m_commandList->IASetIndexBuffer(&m_indexBuffer.GetIBV());
 	m_commandList->DrawIndexedInstanced(3, 2, 0, 0, 0);
 
 	// Indicate that the back buffer will now be used to present.

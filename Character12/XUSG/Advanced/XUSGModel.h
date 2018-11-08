@@ -36,7 +36,7 @@ namespace XUSG
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
 		void SetPipelineState(SubsetFlag subsetFlags);
 		void SetPipelineState(PipelineIndex pipeline);
-		void Render(SubsetFlag subsetFlags, uint8_t pipeline, bool isShadow, bool reset = false);
+		void Render(SubsetFlag subsetFlags, bool isShadow, bool reset = false);
 
 		static void LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
 			std::shared_ptr<SDKMesh> &mesh);
@@ -71,7 +71,7 @@ namespace XUSG
 #endif
 		};
 
-		void createConstBuffers();
+		void createConstantBuffers();
 		void createPipelineLayout();
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
@@ -86,19 +86,19 @@ namespace XUSG
 		std::shared_ptr<DescriptorTablePool>		m_descriptorTablePool;
 
 #if	TEMPORAL
-		DirectX::XMFLOAT4X4		m_worldViewProjs[2];
+		DirectX::XMFLOAT4X4	m_worldViewProjs[2];
 #endif
 
-		std::unique_ptr<ConstantBuffer> m_cbMatrices;
-		std::unique_ptr<ConstantBuffer> m_cbShadowMatrix;
+		ConstantBuffer		m_cbMatrices;
+		ConstantBuffer		m_cbShadowMatrix;
 
-		PipelineLayout			m_pipelineLayout;
-		Graphics::PipelineState	m_pipelines[NUM_PIPELINE];
-		DescriptorTable			m_cbvTables[NUM_CBV];
-		DescriptorTable			m_samplerTable;
+		PipelineLayout		m_pipelineLayout;
+		PipelineState		m_pipelines[NUM_PIPELINE];
+		DescriptorTable		m_cbvTables[NUM_CBV];
+		DescriptorTable		m_samplerTable;
 		std::vector<DescriptorTable> m_srvTables;
 
-		Device					m_device;
-		GraphicsCommandList		m_commandList;
+		Device				m_device;
+		GraphicsCommandList	m_commandList;
 	};
 }

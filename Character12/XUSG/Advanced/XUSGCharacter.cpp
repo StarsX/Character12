@@ -315,7 +315,8 @@ void Character::skinning(bool reset)
 		// Set the bone matrices
 		setBoneMatrices(m);
 		
-		// Setup
+		// Setup descriptor tables
+		m_transformedVBs[m_temporalIndex][m].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m]);
 		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_temporalIndex][m]);
 		
@@ -347,13 +348,14 @@ void Character::renderTransformed(SubsetFlag subsetFlags, bool isShadow, bool re
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Set IA parameters
-		const auto vertexBuffer = m_mesh->GetVertexBuffer(m, 0);
-		m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer->GetVBV());
+		auto &vertexBuffer = m_transformedVBs[m_temporalIndex][m];
+		vertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV());
 
 		// Set historical motion states, if neccessary
 #if	TEMPORAL
 		m_pDXContext->VSSetShaderResources(m_uSRVertices, 1,
-			m_pvpTransformedVBs[!m_uTSIdx][m]->GetSRV().GetAddressOf());
+			m_pvpTransformedVBs[!m_temporalIndex][m]->GetSRV().GetAddressOf());
 #endif
 
 		// Render mesh

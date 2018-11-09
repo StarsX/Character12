@@ -59,6 +59,7 @@ namespace XUSG
 		//static void CreateReadBuffer(const Device &device,
 			//CPDXBuffer &pDstBuffer, const CPDXBuffer &pSrcBuffer);
 	protected:
+		void setDevice(const Device &device);
 		void allocateDescriptorPool(uint32_t numDescriptors);
 
 		Resource		m_resource;

@@ -69,7 +69,6 @@ private:
 	XUSG::GraphicsCommandList m_commandList;
 	
 	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
-	XUSG::Descriptor		m_dsv;
 	XUSG::DescriptorTable	m_cbvTable;
 	XUSG::DescriptorTable	m_srvTable;
 	XUSG::DescriptorTable	m_samplerTable;

@@ -156,11 +156,8 @@ void CharacterX::LoadPipeline()
 	}
 
 	// Create a DSV
-	{
-		m_depth.Create(m_device, m_width, m_height, DXGI_FORMAT_D24_UNORM_S8_UINT,
+	m_depth.Create(m_device, m_width, m_height, DXGI_FORMAT_D24_UNORM_S8_UINT,
 			D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
-		m_dsv = m_depth.GetDSV();
-	}
 }
 
 // Load the sample assets.
@@ -418,12 +415,12 @@ void CharacterX::PopulateCommandList()
 	// Indicate that the back buffer will be used as a render target.
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	m_commandList->OMSetRenderTargets(1, m_rtvTables[m_frameIndex].get(), FALSE, &m_dsv);
+	m_commandList->OMSetRenderTargets(1, m_rtvTables[m_frameIndex].get(), FALSE, &m_depth.GetDSV());
 	
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList->ClearRenderTargetView(*m_rtvTables[m_frameIndex], clearColor, 0, nullptr);
-	m_commandList->ClearDepthStencilView(m_dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	m_commandList->ClearDepthStencilView(m_depth.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer.GetVBV());
 	m_commandList->IASetIndexBuffer(&m_indexBuffer.GetIBV());

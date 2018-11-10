@@ -14,14 +14,14 @@
 using namespace std;
 using namespace XUSG;
 
-enum VertexShader
+enum VertexShaderX
 {
 	VS_TRIANGLE,
 
 	NUM_VS
 };
 
-enum PixelShader
+enum PixelShaderX
 {
 	PS_TRIANGLE,
 
@@ -122,7 +122,8 @@ void CharacterX::LoadPipeline()
 	ThrowIfFailed(swapChain.As(&m_swapChain));
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_descriptorTablePool.SetDevice(m_device);
+	m_descriptorTablePool = make_shared<DescriptorTablePool>();
+	m_descriptorTablePool->SetDevice(m_device);
 
 	// Create descriptor heaps.
 	{
@@ -147,7 +148,7 @@ void CharacterX::LoadPipeline()
 
 			Util::DescriptorTable rtvTable;
 			rtvTable.SetDescriptors(0, 1, &rtv);
-			m_rtvTables[n] = rtvTable.GetRtvTable(m_descriptorTablePool);
+			m_rtvTables[n] = rtvTable.GetRtvTable(*m_descriptorTablePool);
 
 			rtv.Offset(strideRtv);
 
@@ -163,7 +164,8 @@ void CharacterX::LoadPipeline()
 // Load the sample assets.
 void CharacterX::LoadAssets()
 {
-	m_pipelinePool.SetDevice(m_device);
+	m_shaderPool = make_shared<Shader::Pool>();
+	m_pipelinePool = make_shared<Graphics::Pipeline::Pool>(m_device);
 	
 	// Create the root signature.
 	{
@@ -174,16 +176,16 @@ void CharacterX::LoadAssets()
 		pipelineLayout.SetShaderStage(0, Shader::Stage::VS);
 		pipelineLayout.SetShaderStage(1, Shader::Stage::PS);
 		pipelineLayout.SetShaderStage(2, Shader::Stage::PS);
-		m_pipelineLayout = pipelineLayout.GetPipelineLayout(m_pipelinePool, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		m_pipelineLayout = pipelineLayout.GetPipelineLayout(*m_pipelinePool, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 	}
 
 	// Create the pipeline state, which includes compiling and loading shaders.
 	{
-		m_shaderPool.CreateShader(Shader::Stage::VS, VS_TRIANGLE, L"VertexShader.cso");
-		m_shaderPool.CreateShader(Shader::Stage::PS, PS_TRIANGLE, L"PixelShader.cso");
+		m_shaderPool->CreateShader(Shader::Stage::VS, VS_TRIANGLE, L"VertexShader.cso");
+		m_shaderPool->CreateShader(Shader::Stage::PS, PS_TRIANGLE, L"PixelShader.cso");
 
-		const auto vertexShader = m_shaderPool.GetShader(Shader::Stage::VS, VS_TRIANGLE);
-		const auto pixelShader = m_shaderPool.GetShader(Shader::Stage::PS, PS_TRIANGLE);
+		const auto vertexShader = m_shaderPool->GetShader(Shader::Stage::VS, VS_TRIANGLE);
+		const auto pixelShader = m_shaderPool->GetShader(Shader::Stage::PS, PS_TRIANGLE);
 
 		// Define the vertex input layout.
 		InputElementTable inputElementDescs =
@@ -192,24 +194,30 @@ void CharacterX::LoadAssets()
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 		};
 
-		m_inputLayout = m_pipelinePool.CreateInputLayout(inputElementDescs);
+		m_inputLayout = m_pipelinePool->CreateInputLayout(inputElementDescs);
 
 		// Describe and create the graphics pipeline state object (PSO).
 		Graphics::State state;
 		state.IASetInputLayout(m_inputLayout);
 		state.SetPipelineLayout(m_pipelineLayout);
-		state.SetShader(Shader::Stage::VS, m_shaderPool.GetShader(Shader::Stage::VS, VS_TRIANGLE));
-		state.SetShader(Shader::Stage::PS, m_shaderPool.GetShader(Shader::Stage::PS, PS_TRIANGLE));
+		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_TRIANGLE));
+		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_TRIANGLE));
 		//state.DSSetState(Graphics::DepthStencilPreset::DEPTH_STENCIL_NONE, m_pipelinePool);
 		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		state.OMSetNumRenderTargets(1);
 		state.OMSetRTVFormat(0, DXGI_FORMAT_R8G8B8A8_UNORM);
 		state.OMSetDSVFormat(DXGI_FORMAT_D24_UNORM_S8_UINT);
-		m_pipelineState = state.GetPipeline(m_pipelinePool);
+		m_pipelineState = state.GetPipeline(*m_pipelinePool);
 	}
 
 	// Create the command list.
 	ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+
+	// Load character asset
+	m_charInputLayout = Character::InitLayout(*m_pipelinePool);
+	const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh", L"Media/Bright/Stars.sdkmesh_anim");
+	m_character = make_unique<Character>(m_device, m_commandList);
+	//m_character->Init(m_charInputLayout, characterMesh, m_shaderPool, m_pipelinePool, m_descriptorTablePool);
 
 	// Create the vertex buffer.
 	Resource vertexUpload;
@@ -250,7 +258,7 @@ void CharacterX::LoadAssets()
 
 		Util::DescriptorTable cbvTable;
 		cbvTable.SetDescriptors(0, 1, &m_constantBuffer.GetCBV());
-		m_cbvTable = cbvTable.GetCbvSrvUavTable(m_descriptorTablePool);
+		m_cbvTable = cbvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 	}
 
 	// Create the textures.
@@ -269,15 +277,15 @@ void CharacterX::LoadAssets()
 		
 		Util::DescriptorTable srvTable;
 		srvTable.SetDescriptors(0, _countof(m_textures), srvs.data());
-		m_srvTable = srvTable.GetCbvSrvUavTable(m_descriptorTablePool);
+		m_srvTable = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 	}
 
 	// Create the sampler
 	{
 		Util::DescriptorTable samplerTable;
 		const auto samplerAnisoWrap = SamplerPreset::ANISOTROPIC_WRAP;
-		samplerTable.SetSamplers(0, 1, &samplerAnisoWrap, m_descriptorTablePool);
-		m_samplerTable = samplerTable.GetSamplerTable(m_descriptorTablePool);
+		samplerTable.SetSamplers(0, 1, &samplerAnisoWrap, *m_descriptorTablePool);
+		m_samplerTable = samplerTable.GetSamplerTable(*m_descriptorTablePool);
 	}
 	
 	// Close the command list and execute it to begin the initial GPU setup.
@@ -401,8 +409,8 @@ void CharacterX::PopulateCommandList()
 
 	DescriptorPool::InterfaceType* ppHeaps[] =
 	{
-		m_descriptorTablePool.GetCbvSrvUavPool().Get(),
-		m_descriptorTablePool.GetSamplerPool().Get()
+		m_descriptorTablePool->GetCbvSrvUavPool().Get(),
+		m_descriptorTablePool->GetSamplerPool().Get()
 	};
 	m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 

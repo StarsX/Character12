@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "DXFramework.h"
 #include "Core/XUSGGraphicsState.h"
 #include "XUSGShaderCommon.h"
 #include "XUSGSDKMesh.h"
@@ -38,9 +37,8 @@ namespace XUSG
 		void SetPipelineState(PipelineIndex pipeline);
 		void Render(SubsetFlag subsetFlags, bool isShadow, bool reset = false);
 
-		static void LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
-			std::shared_ptr<SDKMesh> &mesh);
-		static void InitLayout(Graphics::Pipeline::Pool &pipelinePool, InputLayout &inputLayout);
+		static InputLayout InitLayout(Graphics::Pipeline::Pool &pipelinePool);
+		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName);
 		static void SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable);
 
 	protected:

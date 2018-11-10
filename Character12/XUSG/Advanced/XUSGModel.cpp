@@ -124,17 +124,7 @@ void Model::Render(SubsetFlag subsetFlags, bool isShadow, bool reset)
 	if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
-void Model::LoadSDKMesh(const Device &device, const wstring &meshFileName, shared_ptr<SDKMesh> &mesh)
-{
-	// Load the mesh
-	mesh = make_shared<SDKMesh>();
-
-	ThrowIfFailed(mesh->Create(device, meshFileName.c_str()));
-
-	//mesh->ClassifyMatType();
-}
-
-void Model::InitLayout(Pipeline::Pool &pipelinePool, InputLayout &inputLayout)
+InputLayout Model::InitLayout(Pipeline::Pool &pipelinePool)
 {
 	// Define vertex data layout for post-transformed objects
 	const auto offset = 0xffffffff;
@@ -147,7 +137,16 @@ void Model::InitLayout(Pipeline::Pool &pipelinePool, InputLayout &inputLayout)
 		{ "BINORMAL",	0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
 
-	inputLayout = pipelinePool.CreateInputLayout(inputElementDescs);
+	return pipelinePool.CreateInputLayout(inputElementDescs);
+}
+
+shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &meshFileName)
+{
+	// Load the mesh
+	const auto mesh = make_shared<SDKMesh>();
+	ThrowIfFailed(mesh->Create(device, meshFileName.c_str()));
+
+	return mesh;
 }
 
 void Model::SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable)

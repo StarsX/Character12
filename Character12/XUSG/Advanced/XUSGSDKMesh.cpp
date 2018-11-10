@@ -16,7 +16,7 @@ SDKMesh::SDKMesh() noexcept :
 	m_filehandle(0),
 	//m_hFileMappingObject(0),
 	m_device(nullptr),
-	m_commandList(nullptr),
+	//m_commandList(nullptr),
 	m_pStaticMeshData(nullptr),
 	m_pHeapData(nullptr),
 	m_pAnimationData(nullptr),
@@ -501,6 +501,7 @@ uint32_t SDKMesh::GetOutstandingResources() const
 
 	if (m_device)
 	{
+#if 0
 		for (auto i = 0u; i < m_pMeshHeader->NumMaterials; ++i)
 		{
 			if (m_pMaterialArray[i].DiffuseTexture[0] != 0)
@@ -515,6 +516,7 @@ uint32_t SDKMesh::GetOutstandingResources() const
 				if (!m_pMaterialArray[i].pSpecular && !IsErrorResource(m_pMaterialArray[i].pSpecular->GetSRV().ptr))
 					++outstandingResources;
 		}
+#endif
 	}
 
 	return outstandingResources;
@@ -672,7 +674,7 @@ void SDKMesh::loadMaterials(SDKMESH_MATERIAL *pMaterials, uint32_t numMaterials)
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT SDKMesh::createVertexBuffer(SDKMESH_VERTEX_BUFFER_HEADER *pHeader, void *pVertices)
+HRESULT SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, SDKMESH_VERTEX_BUFFER_HEADER *pHeader, void *pVertices)
 {
 	HRESULT hr = S_OK;
 	pHeader->DataOffset = 0;
@@ -680,17 +682,19 @@ HRESULT SDKMesh::createVertexBuffer(SDKMESH_VERTEX_BUFFER_HEADER *pHeader, void 
 	//Vertex Buffer
 	pHeader->pVertexBuffer = new VertexBuffer();
 	pHeader->pVertexBuffer->Create(m_device, static_cast<uint32_t>(pHeader->SizeBytes),
-		static_cast<uint32_t>(pHeader->StrideBytes));
+		static_cast<uint32_t>(pHeader->StrideBytes), D3D12_RESOURCE_FLAG_NONE,
+		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST);
 
 	m_resourceUploads.push_back(Resource());
-	pHeader->pVertexBuffer->Upload(m_commandList, m_resourceUploads.back(), pVertices);
+	pHeader->pVertexBuffer->Upload(commandList, m_resourceUploads.back(), pVertices,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
 	return hr;
 }
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT SDKMesh::createIndexBuffer(SDKMESH_INDEX_BUFFER_HEADER *pHeader, void *pIndices)
+HRESULT SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, SDKMESH_INDEX_BUFFER_HEADER *pHeader, void *pIndices)
 {
 	HRESULT hr = S_OK;
 	pHeader->DataOffset = 0;
@@ -698,10 +702,14 @@ HRESULT SDKMesh::createIndexBuffer(SDKMESH_INDEX_BUFFER_HEADER *pHeader, void *p
 	//Index Buffer
 	//pHeader->pIB11 = make_unique<IndexBuffer>(m_pDev11);
 	pHeader->pIndexBuffer = new IndexBuffer();
-	pHeader->pIndexBuffer->Create(m_device, static_cast<uint32_t>(pHeader->SizeBytes));
+	pHeader->pIndexBuffer->Create(m_device, static_cast<uint32_t>(pHeader->SizeBytes),
+		pHeader->IndexType == IT_32BIT ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT,
+		D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE, D3D12_HEAP_TYPE_DEFAULT,
+		D3D12_RESOURCE_STATE_COPY_DEST);
 
 	m_resourceUploads.push_back(Resource());
-	pHeader->pIndexBuffer->Upload(m_commandList, m_resourceUploads.back(), pIndices);
+	pHeader->pIndexBuffer->Upload(commandList, m_resourceUploads.back(), pIndices,
+		D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
 	return hr;
 }
@@ -767,6 +775,13 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 	XMFLOAT3 upper; 
 	
 	m_device = device;
+	ComPtr<ID3D12CommandAllocator> commandAllocator = nullptr;
+	GraphicsCommandList commandList = nullptr;
+	if (device)
+	{
+		ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
+		ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
+	}
 
 	if (DataBytes < sizeof(SDKMESH_HEADER)) return E_FAIL;
 
@@ -828,7 +843,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 		uint8_t *pVertices = nullptr;
 		pVertices = reinterpret_cast<uint8_t*>(pBufferData + (m_pVertexBufferArray[i].DataOffset - BufferDataStart));
 
-		if (device) createVertexBuffer(&m_pVertexBufferArray[i], pVertices);
+		if (commandList) createVertexBuffer(commandList, &m_pVertexBufferArray[i], pVertices);
 
 		m_ppVertices[i] = pVertices;
 	}
@@ -842,13 +857,16 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 		uint8_t *pIndices = nullptr;
 		pIndices = reinterpret_cast<uint8_t*>(pBufferData + ( m_pIndexBufferArray[i].DataOffset - BufferDataStart));
 
-		if (device) createIndexBuffer(&m_pIndexBufferArray[i], pIndices);
+		if (commandList) createIndexBuffer(commandList, &m_pIndexBufferArray[i], pIndices);
 
 		m_ppIndices[i] = pIndices;
 	}
 
 	// Load Materials
-	if (device) loadMaterials(m_pMaterialArray, m_pMeshHeader->NumMaterials);
+	if (commandList) loadMaterials(m_pMaterialArray, m_pMeshHeader->NumMaterials);
+
+	// Execute commands
+	executeCommandList(commandList);
 
 	// Create a place to store our bind pose frame matrices
 	m_pBindPoseFrameMatrices = new (std::nothrow) XMFLOAT4X4[m_pMeshHeader->NumFrames];
@@ -994,6 +1012,49 @@ void SDKMesh::classifyMaterialType()
 
 		m_classifiedSubsets[SUBSET_OPAQUE - 1][m].shrink_to_fit();
 		m_classifiedSubsets[SUBSET_ALPHA - 1][m].shrink_to_fit();
+	}
+}
+
+void SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
+{
+	if (commandList)
+	{
+		// Describe and create the command queue.
+		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+		ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
+		ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
+
+		// Close the command list and execute it to begin the initial GPU setup.
+		ThrowIfFailed(commandList->Close());
+		ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+		commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+		// Create synchronization objects and wait until assets have been uploaded to the GPU.
+		{
+			HANDLE fenceEvent;
+			ComPtr<ID3D12Fence> fence;
+			uint64_t fenceValue = 0;
+
+			ThrowIfFailed(m_device->CreateFence(fenceValue++, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+
+			// Create an event handle to use for frame synchronization.
+			fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+			if (fenceEvent == nullptr)
+				ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
+
+			// Wait for the command list to execute; we are reusing the same command 
+			// list in our main loop but for now, we just want to wait for setup to 
+			// complete before continuing.
+			// Schedule a Signal command in the queue.
+			ThrowIfFailed(commandQueue->Signal(fence.Get(), fenceValue));
+
+			// Wait until the fence has been processed.
+			ThrowIfFailed(fence->SetEventOnCompletion(fenceValue++, fenceEvent));
+			WaitForSingleObjectEx(fenceEvent, INFINITE, FALSE);
+		}
 	}
 }
 

@@ -5,6 +5,7 @@
 #pragma once
 
 //#undef D3DCOLOR_ARGB
+#include "DXFramework.h"
 #include "Core/XUSGResource.h"
 
 //--------------------------------------------------------------------------------------
@@ -372,14 +373,17 @@ namespace XUSG
 	protected:
 		void loadMaterials(_In_reads_(NumMaterials) SDKMESH_MATERIAL *pMaterials, _In_ uint32_t NumMaterials);
 
-		HRESULT createVertexBuffer(_In_ SDKMESH_VERTEX_BUFFER_HEADER *pHeader, _In_reads_(pHeader->SizeBytes) void *pVertices);
-		HRESULT createIndexBuffer(_In_ SDKMESH_INDEX_BUFFER_HEADER *pHeader, _In_reads_(pHeader->SizeBytes) void *pIndices);
+		HRESULT createVertexBuffer(_In_ const GraphicsCommandList &commandList, _In_ SDKMESH_VERTEX_BUFFER_HEADER *pHeader,
+			_In_reads_(pHeader->SizeBytes) void *pVertices);
+		HRESULT createIndexBuffer(const GraphicsCommandList &commandList, _In_ SDKMESH_INDEX_BUFFER_HEADER *pHeader,
+			_In_reads_(pHeader->SizeBytes) void *pIndices);
 
 		virtual HRESULT createFromFile(_In_opt_ const Device &device, _In_z_ const wchar_t *szFileName);
 		virtual HRESULT createFromMemory(_In_opt_ const Device &device, _In_reads_(DataBytes) uint8_t *pData,
 			_In_ size_t DataBytes, _In_ bool bCopyStatic);
 
 		void classifyMaterialType();
+		void executeCommandList(const GraphicsCommandList &commandList);
 
 		// Frame manipulation
 		void transformBindPoseFrame(_In_ uint32_t iFrame, _In_ DirectX::CXMMATRIX parentWorld);
@@ -445,7 +449,7 @@ namespace XUSG
 		//HANDLE m_hFileMappingObject;
 		//std::vector<uint8_t*> m_mappedPointers;
 		Device m_device;
-		GraphicsCommandList m_commandList;
+		//GraphicsCommandList m_commandList;
 	};
 
 #endif

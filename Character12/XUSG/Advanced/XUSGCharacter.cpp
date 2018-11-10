@@ -8,8 +8,6 @@ using namespace std;
 using namespace DirectX;
 using namespace XUSG;
 
-bool Character::m_bDualQuat = true;
-
 Character::Character(const Device &device, const GraphicsCommandList &commandList) :
 	Model(device, commandList)
 {
@@ -109,13 +107,12 @@ FXMMATRIX Character::GetWorldMatrix() const
 	return XMLoadFloat4x4(&m_mWorld);
 }
 
-void Character::LoadSDKMesh(const Device &device, const wstring &meshFileName,
-	const wstring &animFileName, shared_ptr<SDKMesh> &mesh,
-	const shared_ptr<vector<MeshLink>> &meshLinks,
+shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &meshFileName,
+	const wstring &animFileName, const shared_ptr<vector<MeshLink>> &meshLinks,
 	vector<SDKMesh> *linkedMeshes)
 {
 	// Load the animated mesh
-	Model::LoadSDKMesh(device, meshFileName, mesh);
+	const auto mesh = Model::LoadSDKMesh(device, meshFileName);
 	ThrowIfFailed(mesh->LoadAnimation(animFileName.c_str()));
 	mesh->TransformBindPose(XMMatrixIdentity());
 
@@ -141,6 +138,8 @@ void Character::LoadSDKMesh(const Device &device, const wstring &meshFileName,
 			ThrowIfFailed(linkedMeshes->at(m).Create(device.Get(), meshInfo.szMeshName.c_str()));
 		}
 	}
+
+	return mesh;
 }
 
 void Character::createTransformedStates()

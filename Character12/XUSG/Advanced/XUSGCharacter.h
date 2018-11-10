@@ -47,9 +47,8 @@ namespace XUSG
 		const DirectX::XMFLOAT4 &GetPosition() const;
 		DirectX::FXMMATRIX GetWorldMatrix() const;
 
-		static void LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
-			const std::wstring &animFileName, std::shared_ptr<SDKMesh> &mesh,
-			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr,
+		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
+			const std::wstring &animFileName, const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr,
 			std::vector<SDKMesh> *pLinkedMeshes = nullptr);
 
 	protected:
@@ -86,7 +85,7 @@ namespace XUSG
 		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[2];
 #endif
 
-		double				m_time;
+		double m_time;
 
 		std::vector<StructuredBuffer> m_boneWorlds;
 		std::vector<ConstantBuffer> m_cbLinkedMatrices;
@@ -96,7 +95,5 @@ namespace XUSG
 		PipelineState	m_skinningPipeline;
 		std::vector<DescriptorTable> m_srvSkinningTables;
 		std::vector<DescriptorTable> m_uavSkinningTables[2];
-
-		static bool			m_bDualQuat;
 	};
 }

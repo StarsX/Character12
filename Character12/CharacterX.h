@@ -14,6 +14,7 @@
 #include "DXFramework.h"
 #include "Core/XUSGGraphicsState.h"
 #include "Core/XUSGResource.h"
+#include "Advanced/XUSGCharacter.h"
 
 using namespace DirectX;
 
@@ -46,16 +47,17 @@ private:
 		XMFLOAT2 uv;
 	};
 
-	XUSG::Shader::Pool				m_shaderPool;
-	XUSG::Graphics::Pipeline::Pool	m_pipelinePool;
-	XUSG::DescriptorTablePool		m_descriptorTablePool;
+	std::shared_ptr<XUSG::Shader::Pool>				m_shaderPool;
+	std::shared_ptr<XUSG::Graphics::Pipeline::Pool>	m_pipelinePool;
+	std::shared_ptr<XUSG::DescriptorTablePool>		m_descriptorTablePool;
 
 	XUSG::PipelineLayout			m_pipelineLayout;
 	XUSG::InputLayout 				m_inputLayout;
+	XUSG::InputLayout 				m_charInputLayout;
 
 	// Pipeline objects.
-	CD3DX12_VIEWPORT	m_viewport;
-	CD3DX12_RECT		m_scissorRect;
+	CD3DX12_VIEWPORT				m_viewport;
+	CD3DX12_RECT					m_scissorRect;
 
 	ComPtr<IDXGISwapChain3>			m_swapChain;
 	ComPtr<ID3D12CommandAllocator>	m_commandAllocators[FrameCount];
@@ -74,6 +76,7 @@ private:
 	XUSG::DescriptorTable	m_samplerTable;
 
 	// App resources.
+	std::unique_ptr<XUSG::Character> m_character;
 	XUSG::DepthStencil	m_depth;
 	XUSG::VertexBuffer	m_vertexBuffer;
 	XUSG::IndexBuffer	m_indexBuffer;

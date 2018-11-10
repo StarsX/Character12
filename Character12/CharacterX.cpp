@@ -184,8 +184,9 @@ void CharacterX::LoadAssets()
 		m_shaderPool->CreateShader(Shader::Stage::VS, VS_TRIANGLE, L"VertexShader.cso");
 		m_shaderPool->CreateShader(Shader::Stage::PS, PS_TRIANGLE, L"PixelShader.cso");
 
-		const auto vertexShader = m_shaderPool->GetShader(Shader::Stage::VS, VS_TRIANGLE);
-		const auto pixelShader = m_shaderPool->GetShader(Shader::Stage::PS, PS_TRIANGLE);
+		m_shaderPool->CreateShader(Shader::Stage::VS, VS_BASE_PASS, L"VSBasePass.cso");
+		m_shaderPool->CreateShader(Shader::Stage::PS, PS_BASE_PASS, L"PSBasePass.cso");
+		m_shaderPool->CreateShader(Shader::Stage::CS, CS_SKINNING, L"CSSkinning.cso");
 
 		// Define the vertex input layout.
 		InputElementTable inputElementDescs =
@@ -217,7 +218,7 @@ void CharacterX::LoadAssets()
 	m_charInputLayout = Character::InitLayout(*m_pipelinePool);
 	const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh", L"Media/Bright/Stars.sdkmesh_anim");
 	m_character = make_unique<Character>(m_device, m_commandList);
-	//m_character->Init(m_charInputLayout, characterMesh, m_shaderPool, m_pipelinePool, m_descriptorTablePool);
+	m_character->Init(m_charInputLayout, characterMesh, m_shaderPool, m_pipelinePool, m_descriptorTablePool);
 
 	// Create the vertex buffer.
 	Resource vertexUpload;

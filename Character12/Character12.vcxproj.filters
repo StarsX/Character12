@@ -49,6 +49,9 @@
     <Filter Include="XUSG\Core\Inc">
       <UniqueIdentifier>{99189be3-54e9-497f-9c45-4ddfea69de2e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="XUSG\Shaders">
+      <UniqueIdentifier>{a7e87b53-c6f7-4e4f-be00-ed8d3e071330}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common\d3dx12.h">
@@ -100,6 +103,9 @@
       <Filter>XUSG\Advanced\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="XUSG\Advanced\XUSGCharacter.h">
+      <Filter>XUSG\Advanced\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGSharedConst.h">
       <Filter>XUSG\Advanced\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -160,12 +166,33 @@
     <None Include="XUSG\Core\XUSGSampler.inl">
       <Filter>XUSG\Core\Inc</Filter>
     </None>
+    <None Include="XUSG\Shaders\CSSkinning.hlsli">
+      <Filter>XUSG\Shaders</Filter>
+    </None>
+    <None Include="XUSG\Shaders\VSBasePass.hlsli">
+      <Filter>XUSG\Shaders</Filter>
+    </None>
+    <None Include="XUSG\Shaders\SHCommon.hlsli">
+      <Filter>XUSG\Shaders</Filter>
+    </None>
+    <None Include="XUSG\Shaders\VHBasePass.hlsli">
+      <Filter>XUSG\Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="PixelShader.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="VertexShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="XUSG\Shaders\CSSkinning.hlsl">
+      <Filter>XUSG\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\VSBasePass.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Content\Shaders\PSBasePass.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

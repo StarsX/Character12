@@ -177,15 +177,16 @@ void Character::createBuffers()
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		m_boneWorlds[m].Create(m_device, UINT8_MAX, sizeof(XMFLOAT4X3),
-			D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD);
+			D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
+			D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
 
 	// Linked meshes
-	m_cbLinkedMatrices.resize(m_meshLinks->size());
+	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrices : m_cbLinkedMatrices)
 		cbLinkedMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices));
 
-	m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
+	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrix : m_cbLinkedShadowMatrices)
 		cbLinkedMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4));
 }

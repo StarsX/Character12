@@ -294,7 +294,7 @@ void Model::createDescriptorTables()
 	{
 		const auto pMaterial = m_mesh->GetMaterial(m);
 
-		if (pMaterial)
+		if (pMaterial && pMaterial->pAlbedo && pMaterial->pNormal)
 		{
 			Util::DescriptorTable srvTable;
 			const Descriptor srvs[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };

@@ -295,7 +295,6 @@ namespace XUSG
 		virtual HRESULT Create(_In_ const Device &device, _In_z_ const wchar_t *szFileName);
 		virtual HRESULT Create(_In_ const Device &device, uint8_t *pData, size_t DataBytes, _In_ bool bCopyStatic = false);
 		virtual HRESULT LoadAnimation(_In_z_ const wchar_t *szFileName);
-		virtual void ReleaseUploadResources();
 		virtual void Destroy();
 
 		//Frame manipulation
@@ -374,9 +373,9 @@ namespace XUSG
 		void loadMaterials(_In_reads_(NumMaterials) SDKMESH_MATERIAL *pMaterials, _In_ uint32_t NumMaterials);
 
 		HRESULT createVertexBuffer(_In_ const GraphicsCommandList &commandList, _In_ SDKMESH_VERTEX_BUFFER_HEADER *pHeader,
-			_In_reads_(pHeader->SizeBytes) void *pVertices);
+			_In_reads_(pHeader->SizeBytes) void *pVertices, std::vector<Resource> &uploaders);
 		HRESULT createIndexBuffer(const GraphicsCommandList &commandList, _In_ SDKMESH_INDEX_BUFFER_HEADER *pHeader,
-			_In_reads_(pHeader->SizeBytes) void *pIndices);
+			_In_reads_(pHeader->SizeBytes) void *pIndices, std::vector<Resource> &uploaders);
 
 		virtual HRESULT createFromFile(_In_opt_ const Device &device, _In_z_ const wchar_t *szFileName);
 		virtual HRESULT createFromMemory(_In_opt_ const Device &device, _In_reads_(DataBytes) uint8_t *pData,
@@ -438,8 +437,6 @@ namespace XUSG
 		DirectX::XMFLOAT4X4				*m_pBindPoseFrameMatrices;
 		DirectX::XMFLOAT4X4				*m_pTransformedFrameMatrices;
 		DirectX::XMFLOAT4X4				*m_pWorldPoseFrameMatrices;
-
-		std::vector<Resource>			m_resourceUploads;
 
 	private:
 		uint32_t m_numOutstandingResources;

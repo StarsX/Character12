@@ -135,13 +135,6 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 }
 
 //--------------------------------------------------------------------------------------
-void SDKMesh::ReleaseUploadResources()
-{
-	m_resourceUploads.clear();
-	m_resourceUploads.shrink_to_fit();
-}
-
-//--------------------------------------------------------------------------------------
 void SDKMesh::Destroy()
 {
 	if (!CheckLoadDone()) return;
@@ -674,7 +667,8 @@ void SDKMesh::loadMaterials(SDKMESH_MATERIAL *pMaterials, uint32_t numMaterials)
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, SDKMESH_VERTEX_BUFFER_HEADER *pHeader, void *pVertices)
+HRESULT SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, SDKMESH_VERTEX_BUFFER_HEADER *pHeader,
+	void *pVertices, vector<Resource> &uploaders)
 {
 	HRESULT hr = S_OK;
 	pHeader->DataOffset = 0;
@@ -685,8 +679,8 @@ HRESULT SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, SDKM
 		static_cast<uint32_t>(pHeader->StrideBytes), D3D12_RESOURCE_FLAG_NONE,
 		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST);
 
-	m_resourceUploads.push_back(Resource());
-	pHeader->pVertexBuffer->Upload(commandList, m_resourceUploads.back(), pVertices,
+	uploaders.push_back(Resource());
+	pHeader->pVertexBuffer->Upload(commandList, uploaders.back(), pVertices,
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
 	return hr;
@@ -694,7 +688,8 @@ HRESULT SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, SDKM
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, SDKMESH_INDEX_BUFFER_HEADER *pHeader, void *pIndices)
+HRESULT SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, SDKMESH_INDEX_BUFFER_HEADER *pHeader,
+	void *pIndices, std::vector<Resource> &uploaders)
 {
 	HRESULT hr = S_OK;
 	pHeader->DataOffset = 0;
@@ -707,8 +702,8 @@ HRESULT SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, SDKME
 		D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE, D3D12_HEAP_TYPE_DEFAULT,
 		D3D12_RESOURCE_STATE_COPY_DEST);
 
-	m_resourceUploads.push_back(Resource());
-	pHeader->pIndexBuffer->Upload(commandList, m_resourceUploads.back(), pIndices,
+	uploaders.push_back(Resource());
+	pHeader->pIndexBuffer->Upload(commandList, uploaders.back(), pIndices,
 		D3D12_RESOURCE_STATE_INDEX_BUFFER);
 
 	return hr;
@@ -834,6 +829,9 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 	// Get the start of the buffer data
 	uint64_t BufferDataStart = m_pMeshHeader->HeaderSize + m_pMeshHeader->NonBufferDataSize;
 
+	// Uploader buffers
+	vector<Resource> uploaders;
+
 	// Create VBs
 	m_ppVertices = new (std::nothrow) uint8_t*[m_pMeshHeader->NumVertexBuffers];
 	if (!m_ppVertices) return E_OUTOFMEMORY;
@@ -843,7 +841,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 		uint8_t *pVertices = nullptr;
 		pVertices = reinterpret_cast<uint8_t*>(pBufferData + (m_pVertexBufferArray[i].DataOffset - BufferDataStart));
 
-		if (commandList) createVertexBuffer(commandList, &m_pVertexBufferArray[i], pVertices);
+		if (commandList) createVertexBuffer(commandList, &m_pVertexBufferArray[i], pVertices, uploaders);
 
 		m_ppVertices[i] = pVertices;
 	}
@@ -857,7 +855,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 		uint8_t *pIndices = nullptr;
 		pIndices = reinterpret_cast<uint8_t*>(pBufferData + ( m_pIndexBufferArray[i].DataOffset - BufferDataStart));
 
-		if (commandList) createIndexBuffer(commandList, &m_pIndexBufferArray[i], pIndices);
+		if (commandList) createIndexBuffer(commandList, &m_pIndexBufferArray[i], pIndices, uploaders);
 
 		m_ppIndices[i] = pIndices;
 	}

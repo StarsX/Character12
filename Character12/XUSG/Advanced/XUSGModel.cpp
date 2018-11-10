@@ -32,7 +32,7 @@ void Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 	// Get SDKMesh
 	m_mesh = mesh;
 
-	// Create variable slots
+	// Create buffers, pipeline layouts, pipelines, and descriptor tables
 	createConstantBuffers();
 	createPipelineLayout();
 	createPipelines(inputLayout);

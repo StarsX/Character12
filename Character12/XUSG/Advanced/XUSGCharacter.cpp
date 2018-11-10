@@ -32,13 +32,16 @@ void Character::Init(const InputLayout &inputLayout,
 	// Get SDKMesh
 	Model::Init(inputLayout, mesh, shaderPool, pipelinePool, descriptorTablePool);
 
-	// Create variable slots
+	// Create buffers
 	createBuffers();
-	createPipelineLayout();
-	createPipelines();
 
 	// Create VBs that will hold all of the skinned vertices that need to be transformed output
 	createTransformedStates();
+
+	// Create pipeline layouts, pipelines, and descriptor tables
+	createPipelineLayout();
+	createPipelines();
+	createDescriptorTables();
 }
 
 void Character::InitPosition(const XMFLOAT4 &posRot)
@@ -163,7 +166,6 @@ void Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
 		const auto vertexCount = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 		const auto byteWidth = vertexCount * static_cast<uint32_t>(sizeof(Vertex));
 		vertexBuffers[m].Create(m_device, byteWidth, sizeof(Vertex),
-			D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE |
 			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 	}
 }
@@ -258,8 +260,11 @@ void Character::createDescriptorTables()
 		Util::DescriptorTable uavTables[_countof(m_transformedVBs)];
 		for (auto i = 0u; i < _countof(uavTables); ++i)
 		{
-			uavTables[i].SetDescriptors(0, 1, &m_transformedVBs[i][m].GetUAV());
-			m_uavSkinningTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			if (!m_transformedVBs[i].empty())
+			{
+				uavTables[i].SetDescriptors(0, 1, &m_transformedVBs[i][m].GetUAV());
+				m_uavSkinningTables[i][m] = uavTables[i].GetCbvSrvUavTable(*m_descriptorTablePool);
+			}
 		}
 	}
 }

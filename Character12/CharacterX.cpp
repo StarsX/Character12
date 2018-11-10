@@ -212,7 +212,7 @@ void CharacterX::LoadAssets()
 	}
 
 	// Create the command list.
-	ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+	ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 
 	// Load character asset
 	m_charInputLayout = Character::InitLayout(*m_pipelinePool);
@@ -366,6 +366,8 @@ void CharacterX::OnUpdate()
 	// app closes. Keeping things mapped for the lifetime of the resource is okay.
 	const auto pCbData = reinterpret_cast<XMFLOAT4*>(m_constantBuffer.Map());
 	*pCbData = m_cbData_Offset;
+
+	m_character->FrameMove(0.0);
 }
 
 // Render the scene.
@@ -403,9 +405,13 @@ void CharacterX::PopulateCommandList()
 	// However, when ExecuteCommandList() is called on a particular command 
 	// list, that command list can then be reset at any time and must be before 
 	// re-recording.
-	ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get()));
+	ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
+
+	// Skinning
+	m_character->Skinning(true);
 
 	// Set necessary state.
+	m_commandList->SetPipelineState(m_pipelineState.Get());
 	m_commandList->SetGraphicsRootSignature(m_pipelineLayout.Get());
 
 	DescriptorPool::InterfaceType* ppHeaps[] =

@@ -80,7 +80,7 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 
 void Model::SetPipelineState(SubsetFlag subsetFlags)
 {
-	assert(!(subsetFlags & SUBSET_FULL));
+	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
 
 	if (subsetFlags & SUBSET_ALPHA_TEST)
 		m_commandList->SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE].Get());

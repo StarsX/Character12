@@ -10,6 +10,7 @@
 //*********************************************************
 
 #include "CharacterX.h"
+#include "Advanced/XUSGSharedConst.h"
 
 using namespace std;
 using namespace XUSG;
@@ -101,7 +102,7 @@ void CharacterX::LoadPipeline()
 	swapChainDesc.BufferCount = FrameCount;
 	swapChainDesc.Width = m_width;
 	swapChainDesc.Height = m_height;
-	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
@@ -206,7 +207,7 @@ void CharacterX::LoadAssets()
 		//state.DSSetState(Graphics::DepthStencilPreset::DEPTH_STENCIL_NONE, m_pipelinePool);
 		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		state.OMSetNumRenderTargets(1);
-		state.OMSetRTVFormat(0, DXGI_FORMAT_R8G8B8A8_UNORM);
+		state.OMSetRTVFormat(0, DXGI_FORMAT_B8G8R8A8_UNORM);
 		state.OMSetDSVFormat(DXGI_FORMAT_D24_UNORM_S8_UINT);
 		m_pipelineState = state.GetPipeline(*m_pipelinePool);
 	}
@@ -311,6 +312,13 @@ void CharacterX::LoadAssets()
 		// complete before continuing.
 		WaitForGpu();
 	}
+
+	// Projection
+	{
+		const auto aspectRatio = m_width / static_cast<float>(m_height);
+		const auto proj = XMMatrixPerspectiveFovLH(g_FOVAngleY, aspectRatio, g_zNear, g_zFar);
+		XMStoreFloat4x4(&m_proj, proj);
+	}
 }
 
 // Generate a simple black and white checkerboard texture.
@@ -367,7 +375,16 @@ void CharacterX::OnUpdate()
 	const auto pCbData = reinterpret_cast<XMFLOAT4*>(m_constantBuffer.Map());
 	*pCbData = m_cbData_Offset;
 
-	m_character->FrameMove(0.0);
+	static double time = 0.0;
+	m_character->FrameMove(time);
+	time += 1.0 / 480.0;
+
+	// View
+	const auto focusPt = XMFLOAT4(0.0f, 8.0f, 0.0f, 25.0f);
+	const auto eyePt = XMVectorSet(focusPt.x, focusPt.y, focusPt.z - focusPt.w, 0.0f);
+	const auto view = XMMatrixLookAtLH(eyePt, XMLoadFloat4(&focusPt), XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f));
+	const auto proj = XMLoadFloat4x4(&m_proj);
+	m_character->SetMatrices(view * proj, &XMMatrixIdentity(), nullptr, false);
 }
 
 // Render the scene.
@@ -440,6 +457,8 @@ void CharacterX::PopulateCommandList()
 	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBuffer.GetVBV());
 	m_commandList->IASetIndexBuffer(&m_indexBuffer.GetIBV());
 	m_commandList->DrawIndexedInstanced(3, 2, 0, 0, 0);
+
+	m_character->RenderTransformed(SUBSET_FULL, false, true);
 
 	// Indicate that the back buffer will now be used to present.
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));

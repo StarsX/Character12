@@ -83,6 +83,7 @@ private:
 	XUSG::ConstantBuffer m_constantBuffer;
 	XUSG::Texture2D		m_textures[8];
 	XMFLOAT4 m_cbData_Offset;
+	XMFLOAT4X4 m_proj;
 
 	// Synchronization objects.
 	uint32_t m_frameIndex;

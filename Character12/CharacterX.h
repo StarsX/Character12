@@ -52,7 +52,7 @@ private:
 	std::shared_ptr<XUSG::DescriptorTablePool>		m_descriptorTablePool;
 
 	// Pipeline objects.
-	XUSG::InputLayout 				m_charInputLayout;
+	XUSG::InputLayout 				m_inputLayout;
 	CD3DX12_VIEWPORT				m_viewport;
 	CD3DX12_RECT					m_scissorRect;
 
@@ -63,14 +63,13 @@ private:
 	XUSG::Device m_device;
 	XUSG::Resource m_renderTargets[FrameCount];
 	XUSG::GraphicsCommandList m_commandList;
-	
-	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
-	XUSG::DescriptorPool	m_rtvPool;
 
 	// App resources.
 	std::unique_ptr<XUSG::Character> m_character;
-	XUSG::DepthStencil m_depth;
-	XMFLOAT4X4 m_proj;
+	XUSG::DescriptorPool	m_rtvPool;
+	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
+	XUSG::DepthStencil		m_depth;
+	XMFLOAT4X4				m_proj;
 
 	// Synchronization objects.
 	uint32_t m_frameIndex;

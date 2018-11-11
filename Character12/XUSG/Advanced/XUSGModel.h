@@ -76,7 +76,10 @@ namespace XUSG
 		void createDescriptorTables();
 		void render(uint32_t mesh, SubsetFlag subsetFlags, bool reset);
 
-		uint8_t	m_temporalIndex;
+		Device				m_device;
+		GraphicsCommandList	m_commandList;
+
+		uint8_t				m_temporalIndex;
 
 		std::shared_ptr<SDKMesh>					m_mesh;
 		std::shared_ptr<Shader::Pool>				m_shaderPool;
@@ -95,8 +98,5 @@ namespace XUSG
 		DescriptorTable		m_cbvTables[NUM_CBV];
 		DescriptorTable		m_samplerTable;
 		std::vector<DescriptorTable> m_srvTables;
-
-		Device				m_device;
-		GraphicsCommandList	m_commandList;
 	};
 }

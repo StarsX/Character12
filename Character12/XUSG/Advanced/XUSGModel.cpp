@@ -12,7 +12,16 @@ using namespace XUSG::Graphics;
 Model::Model(const Device &device, const GraphicsCommandList &commandList) :
 	m_device(device),
 	m_commandList(commandList),
-	m_temporalIndex(0)
+	m_temporalIndex(0),
+	m_mesh(nullptr),
+	m_shaderPool(nullptr),
+	m_pipelinePool(nullptr),
+	m_descriptorTablePool(nullptr),
+	m_pipelineLayout(nullptr),
+	m_pipelines(),
+	m_cbvTables(),
+	m_samplerTable(nullptr),
+	m_srvTables(0)
 {
 }
 

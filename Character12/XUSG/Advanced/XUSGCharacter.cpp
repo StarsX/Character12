@@ -9,7 +9,17 @@ using namespace DirectX;
 using namespace XUSG;
 
 Character::Character(const Device &device, const GraphicsCommandList &commandList) :
-	Model(device, commandList)
+	Model(device, commandList),
+	m_linkedMeshes(nullptr),
+	m_meshLinks(nullptr),
+	m_transformedVBs(),
+	m_boneWorlds(0),
+	m_cbLinkedMatrices(0),
+	m_cbLinkedShadowMatrices(0),
+	m_skinningPipelineLayout(nullptr),
+	m_skinningPipeline(nullptr),
+	m_srvSkinningTables(0),
+	m_uavSkinningTables()
 {
 }
 

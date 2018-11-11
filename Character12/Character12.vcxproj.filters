@@ -180,12 +180,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="PixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="VertexShader.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
     <FxCompile Include="XUSG\Shaders\CSSkinning.hlsl">
       <Filter>XUSG\Shaders</Filter>
     </FxCompile>

@@ -28,6 +28,7 @@
 #include "d3dx12.h"
 
 // C RunTime Header Files
+#include <fstream>
 #include <sstream>
 #include <iomanip>
 

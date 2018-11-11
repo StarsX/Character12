@@ -65,8 +65,6 @@ HRESULT SDKMesh::Create(const Device &device, uint8_t *pData, size_t DataBytes, 
 HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 {
 	HRESULT hr = E_FAIL;
-	DWORD dwBytesRead = 0;
-	LARGE_INTEGER liMove;
 	wchar_t strPath[MAX_PATH];
 
 	// Find the path for the file
@@ -74,46 +72,45 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 	//V_RETURN(DXUTFindDXSDKMediaFileCch(strPath, MAX_PATH, szFileName));
 
 	// Open the file
-	const auto fileHandle = CreateFile(strPath, FILE_READ_DATA, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
-		FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-	if (INVALID_HANDLE_VALUE == fileHandle)
-		return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
+	ifstream fileStream(strPath, ios::in | ios::binary);
+	const auto fileBuffer = fileStream ? fileStream.rdbuf() : nullptr;
+	if (!fileBuffer) return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
 
-	/////////////////////////
-	// Header
+	// Read header
 	SDKANIMATION_FILE_HEADER fileheader;
-	if (!ReadFile(fileHandle, &fileheader, sizeof( SDKANIMATION_FILE_HEADER ), &dwBytesRead, nullptr))
+	if (fileBuffer->sgetn(reinterpret_cast<char*>(&fileheader), sizeof(SDKANIMATION_FILE_HEADER)) < 0)
 	{
-		CloseHandle(fileHandle);
+		fileStream.close();
 
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
 
-	//allocate
+	// Allocate
 	m_pAnimationData = new (std::nothrow) uint8_t[static_cast<size_t>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize)];
 	if (!m_pAnimationData)
 	{
-		CloseHandle(fileHandle);
+		fileStream.close();
 
 		return E_OUTOFMEMORY;
 	}
 
-	// read it all in
-	liMove.QuadPart = 0;
-	if (!SetFilePointerEx(fileHandle, liMove, nullptr, FILE_BEGIN))
+	// Read it all in
+	if (fileBuffer->pubseekpos(0, fileStream.in) < 0)
 	{
-		CloseHandle(fileHandle);
+		fileStream.close();
 
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
 
-	if (!ReadFile(fileHandle, m_pAnimationData, static_cast<DWORD>(sizeof( SDKANIMATION_FILE_HEADER) +
-		fileheader.AnimationDataSize ),&dwBytesRead, nullptr))
+	const auto cBytes = static_cast<streamsize>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize);
+	if (fileBuffer->sgetn(reinterpret_cast<char*>(m_pAnimationData), cBytes) < cBytes)
 	{
-		CloseHandle(fileHandle);
+		fileStream.close();
 
 		return HRESULT_FROM_WIN32(GetLastError());
 	}
+
+	fileStream.close();
 
 	// pointer fixup
 	m_pAnimationHeader = reinterpret_cast<SDKANIMATION_FILE_HEADER*>(m_pAnimationData);
@@ -121,14 +118,14 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 
 	const auto BaseOffset = sizeof(SDKANIMATION_FILE_HEADER);
 
-	for (auto i = 0u; i < m_pAnimationHeader->NumFrames; i++ )
+	for (auto i = 0u; i < m_pAnimationHeader->NumFrames; ++i)
 	{
 		m_pAnimationFrameData[i].pAnimationData = reinterpret_cast<SDKANIMATION_DATA*>
 			(m_pAnimationData + m_pAnimationFrameData[i].DataOffset + BaseOffset);
 
 		const auto pFrame = FindFrame(m_pAnimationFrameData[i].FrameName);
 
-		if( pFrame ) pFrame->AnimationDataIndex = i;
+		if (pFrame) pFrame->AnimationDataIndex = i;
 	}
 
 	return S_OK;
@@ -721,39 +718,42 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName)
 	//V_RETURN(DXUTFindDXSDKMediaFileCch(m_strPathW, sizeof(m_strPathW) / sizeof(WCHAR), szFileName));
 
 	// Open the file
-	m_filehandle = CreateFile(m_strPathW, FILE_READ_DATA, FILE_SHARE_READ, nullptr,
-		OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-	if (INVALID_HANDLE_VALUE == m_filehandle)
-		return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
+	ifstream fileStream(m_strPathW, ios::in | ios::binary);
+	const auto fileBuffer = fileStream ? fileStream.rdbuf() : nullptr;
+	if (!fileBuffer) return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
 
 	// Change the path to just the directory
 	const auto pLastBSlash = wcsrchr(&m_strPathW[0], L'\\');
-	if (pLastBSlash) *(pLastBSlash + 1) = L'\0';
+	if (pLastBSlash) pLastBSlash[1] = L'\0';
 	else m_strPathW[0] = L'\0';
 
 	WideCharToMultiByte(CP_ACP, 0, m_strPathW, -1, m_strPath, MAX_PATH, nullptr, FALSE);
 
 	// Get the file size
-	LARGE_INTEGER fileSize;
-	GetFileSizeEx(m_filehandle, &fileSize);
-	const auto cBytes = fileSize.LowPart;
+	const auto cBytes = fileBuffer->pubseekoff(0, fileStream.end, fileStream.in);
+	if (fileBuffer->pubseekpos(0, fileStream.in) < 0)
+	{
+		fileStream.close();
+
+		return E_FAIL;
+	}
 
 	// Allocate memory
 	m_pStaticMeshData = new (std::nothrow) uint8_t[cBytes];
 	if (!m_pStaticMeshData)
 	{
-		CloseHandle( m_filehandle );
+		fileStream.close();
+
 		return E_OUTOFMEMORY;
 	}
 
 	// Read in the file
-	DWORD dwBytesRead;
-	if (!ReadFile( m_filehandle, m_pStaticMeshData, cBytes, &dwBytesRead, nullptr))
+	if (fileBuffer->sgetn(reinterpret_cast<char*>(m_pStaticMeshData), cBytes) < cBytes)
 		hr = E_FAIL;
 
-	CloseHandle( m_filehandle );
+	fileStream.close();
 
-	if( SUCCEEDED( hr ) )
+	if (SUCCEEDED(hr))
 	{
 		hr = createFromMemory(device, m_pStaticMeshData, cBytes, false);
 

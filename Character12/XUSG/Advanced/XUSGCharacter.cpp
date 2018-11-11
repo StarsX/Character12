@@ -55,14 +55,21 @@ void Character::FrameMove(double time)
 	m_time = time;
 }
 
-void Character::FrameMove(double time, CXMMATRIX world, CXMMATRIX viewProj)
+void Character::FrameMove(double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
+	FXMMATRIX *pShadow, bool isTemporal)
 {
+	Model::FrameMove();
+
+	// Set the bone matrices
+	const auto numMeshes = m_mesh->GetNumMeshes();
 	m_mesh->TransformMesh(XMMatrixIdentity(), time);
-	SetMatrices(viewProj, &world);
+	for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
+
+	SetMatrices(viewProj, pWorld, pShadow, isTemporal);
+	m_time = -1.0;
 }
 
-void Character::SetMatrices(CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld,
-	DirectX::FXMMATRIX *pShadow, bool isTemporal)
+void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld, FXMMATRIX *pShadow, bool isTemporal)
 {
 	XMMATRIX world;
 	if (!pWorld)
@@ -86,7 +93,7 @@ void Character::SetMatrices(CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld,
 
 void Character::Skinning(bool reset)
 {
-	m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
+	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
 	skinning(reset);
 }
 
@@ -178,7 +185,8 @@ void Character::createBuffers()
 
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
-		m_boneWorlds[m].Create(m_device, UINT8_MAX, sizeof(XMFLOAT4X3),
+		const auto numBones = m_mesh->GetNumInfluences(m);
+		m_boneWorlds[m].Create(m_device, numBones, sizeof(XMFLOAT4X3),
 			D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
 			D3D12_RESOURCE_STATE_GENERIC_READ);
 	}
@@ -269,8 +277,8 @@ void Character::createDescriptorTables()
 	}
 }
 
-void Character::setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world,
-	DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pShadow, bool isTemporal)
+void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX world,
+	CXMMATRIX viewProj, FXMMATRIX *pShadow, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).uBone);
@@ -313,13 +321,15 @@ void Character::skinning(bool reset)
 		m_commandList->SetPipelineState(m_skinningPipeline.Get());
 	}
 
-	// Skin the vertices and output them to buffers
 	const auto numMeshes = m_mesh->GetNumMeshes();
+
+	// Set the bone matrices
+	if (m_time >= 0.0)
+		for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
+
+	// Skin the vertices and output them to buffers
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
-		// Set the bone matrices
-		setBoneMatrices(m);
-		
 		// Setup descriptor tables
 		m_transformedVBs[m_temporalIndex][m].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m]);

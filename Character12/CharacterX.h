@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "DXFramework.h"
+#include "StepTimer.h"
 #include "Core/XUSGGraphicsState.h"
 #include "Core/XUSGResource.h"
 #include "Advanced/XUSGCharacter.h"
@@ -51,11 +51,8 @@ private:
 	std::shared_ptr<XUSG::Graphics::Pipeline::Pool>	m_pipelinePool;
 	std::shared_ptr<XUSG::DescriptorTablePool>		m_descriptorTablePool;
 
-	XUSG::PipelineLayout			m_pipelineLayout;
-	XUSG::InputLayout 				m_inputLayout;
-	XUSG::InputLayout 				m_charInputLayout;
-
 	// Pipeline objects.
+	XUSG::InputLayout 				m_charInputLayout;
 	CD3DX12_VIEWPORT				m_viewport;
 	CD3DX12_RECT					m_scissorRect;
 
@@ -63,26 +60,16 @@ private:
 	ComPtr<ID3D12CommandAllocator>	m_commandAllocators[FrameCount];
 	ComPtr<ID3D12CommandQueue>		m_commandQueue;
 
-	XUSG::DescriptorPool m_rtvPool;
-
 	XUSG::Device m_device;
 	XUSG::Resource m_renderTargets[FrameCount];
-	XUSG::PipelineState m_pipelineState;
 	XUSG::GraphicsCommandList m_commandList;
 	
 	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
-	XUSG::DescriptorTable	m_cbvTable;
-	XUSG::DescriptorTable	m_srvTable;
-	XUSG::DescriptorTable	m_samplerTable;
+	XUSG::DescriptorPool	m_rtvPool;
 
 	// App resources.
 	std::unique_ptr<XUSG::Character> m_character;
-	XUSG::DepthStencil	m_depth;
-	XUSG::VertexBuffer	m_vertexBuffer;
-	XUSG::IndexBuffer	m_indexBuffer;
-	XUSG::ConstantBuffer m_constantBuffer;
-	XUSG::Texture2D		m_textures[8];
-	XMFLOAT4 m_cbData_Offset;
+	XUSG::DepthStencil m_depth;
 	XMFLOAT4X4 m_proj;
 
 	// Synchronization objects.
@@ -91,10 +78,14 @@ private:
 	ComPtr<ID3D12Fence> m_fence;
 	uint64_t m_fenceValues[FrameCount];
 
+	// Application state
+	StepTimer m_timer;
+
 	void LoadPipeline();
 	void LoadAssets();
 	std::vector<uint8_t> GenerateTextureData(uint32_t subDivLevel);
 	void PopulateCommandList();
-	void MoveToNextFrame();
 	void WaitForGpu();
+	void MoveToNextFrame();
+	double CalculateFrameStats(float *fTimeStep = nullptr);
 };

@@ -38,7 +38,8 @@ namespace XUSG
 			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr);
 		void InitPosition(const DirectX::XMFLOAT4 &posRot);
 		void FrameMove(double time);
-		void FrameMove(double time, DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj);
+		void FrameMove(double time, DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
+			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
 		void Skinning(bool reset = false);

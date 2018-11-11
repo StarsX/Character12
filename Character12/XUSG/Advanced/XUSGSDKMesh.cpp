@@ -1049,7 +1049,7 @@ void SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 			// Schedule a Signal command in the queue.
 			ThrowIfFailed(commandQueue->Signal(fence.Get(), fenceValue));
 
-			// Wait until the fence has been processed.
+			// Wait until the fence has been processed, and increment the fence value for the current frame.
 			ThrowIfFailed(fence->SetEventOnCompletion(fenceValue++, fenceEvent));
 			WaitForSingleObjectEx(fenceEvent, INFINITE, FALSE);
 		}

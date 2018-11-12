@@ -28,8 +28,8 @@ namespace XUSG
 
 		void Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
 			const std::shared_ptr<Shader::Pool> &shaderPool,
-			const std::shared_ptr <Graphics::Pipeline::Pool> &pipelinePool,
-			const std::shared_ptr <DescriptorTablePool> &descriptorTablePool);
+			const std::shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
+			const std::shared_ptr<DescriptorTablePool> &descriptorTablePool);
 		void FrameMove();
 		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
@@ -38,7 +38,8 @@ namespace XUSG
 		void Render(SubsetFlag subsetFlags, bool isShadow, bool reset = false);
 
 		static InputLayout InitLayout(Graphics::Pipeline::Pool &pipelinePool);
-		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName);
+		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
+			const TextureCache &textureCache);
 		static void SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable);
 
 	protected:

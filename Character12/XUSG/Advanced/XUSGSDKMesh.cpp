@@ -3,7 +3,7 @@
 //--------------------------------------------------------------------------------------
 
 #include "XUSGSDKMesh.h"
-//#include "SDKMisc.h"
+#include "XUSGDDSLoader.h"
 
 using namespace std;
 using namespace DirectX;
@@ -11,19 +11,16 @@ using namespace XUSG;
 
 //--------------------------------------------------------------------------------------
 SDKMesh::SDKMesh() noexcept :
+	m_device(nullptr),
 	m_numOutstandingResources(0),
 	m_isLoading(false),
-	m_filehandle(0),
-	//m_hFileMappingObject(0),
-	m_device(nullptr),
-	//m_commandList(nullptr),
 	m_pStaticMeshData(nullptr),
 	m_pHeapData(nullptr),
 	m_pAnimationData(nullptr),
 	m_ppVertices(nullptr),
 	m_ppIndices(nullptr),
-	m_strPathW{},
-	m_strPath{},
+	m_strPathW(),
+	m_strPath(),
 	m_pMeshHeader(nullptr),
 	m_pVertexBufferArray(nullptr),
 	m_pIndexBufferArray(nullptr),
@@ -48,16 +45,18 @@ SDKMesh::~SDKMesh()
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT SDKMesh::Create(const Device &device, const wchar_t *szFileName)
+HRESULT SDKMesh::Create(const Device &device, const wchar_t *szFileName,
+	const TextureCache &textureCache)
 {
-	return createFromFile(device, szFileName);
+	return createFromFile(device, szFileName, textureCache);
 }
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT SDKMesh::Create(const Device &device, uint8_t *pData, size_t DataBytes, bool bCopyStatic)
+HRESULT SDKMesh::Create(const Device &device, uint8_t *pData,
+	const TextureCache &textureCache, size_t dataBytes, bool bCopyStatic)
 {
-	return createFromMemory(device, pData, DataBytes, bCopyStatic);
+	return createFromMemory(device, pData, textureCache, dataBytes, bCopyStatic);
 }
 
 
@@ -144,14 +143,9 @@ void SDKMesh::Destroy()
 			{
 				if (m_device)
 				{
-					if (m_pMaterialArray[m].pAlbedo && !IsErrorResource(m_pMaterialArray[m].pAlbedo->GetSRV().ptr))
-						SAFE_DELETE(m_pMaterialArray[m].pAlbedo);
-
-					if( m_pMaterialArray[m].pNormal && !IsErrorResource( m_pMaterialArray[m].pNormal->GetSRV().ptr))
-						SAFE_DELETE(m_pMaterialArray[m].pNormal);
-
-					if( m_pMaterialArray[m].pSpecular && !IsErrorResource( m_pMaterialArray[m].pSpecular->GetSRV().ptr))
-						SAFE_DELETE(m_pMaterialArray[m].pSpecular);
+					m_pMaterialArray[m].pAlbedo = nullptr;
+					m_pMaterialArray[m].pNormal = nullptr;
+					m_pMaterialArray[m].pSpecular = nullptr;
 				}
 			}
 		}
@@ -221,29 +215,6 @@ void SDKMesh::TransformMesh(CXMMATRIX world, double fTime)
 		for (auto i = 0u; i < m_pAnimationHeader->NumFrames; ++i)
 			transformFrameAbsolute(i, fTime);
 }
-
-
-#if 0
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-void CDXUTSDKMesh::Render( ID3D11DeviceContext* pd3dDeviceContext,
-						   UINT iDiffuseSlot,
-						   UINT iNormalSlot,
-						   UINT iSpecularSlot )
-{
-	RenderFrame( 0, false, pd3dDeviceContext, iDiffuseSlot, iNormalSlot, iSpecularSlot );
-}
-
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-void CDXUTSDKMesh::RenderAdjacent( ID3D11DeviceContext* pd3dDeviceContext,
-								   UINT iDiffuseSlot,
-								   UINT iNormalSlot,
-								   UINT iSpecularSlot )
-{
-	RenderFrame( 0, true, pd3dDeviceContext, iDiffuseSlot, iNormalSlot, iSpecularSlot );
-}
-#endif
 
 //--------------------------------------------------------------------------------------
 PrimitiveTopology SDKMesh::GetPrimitiveType(_In_ SDKMESH_PRIMITIVE_TYPE PrimType)
@@ -324,13 +295,13 @@ IndexBuffer *SDKMesh::GetAdjIndexBuffer(_In_ uint32_t iMesh) const
 //--------------------------------------------------------------------------------------
 const char *SDKMesh::GetMeshPathA() const
 {
-	return m_strPath;
+	return m_strPath.c_str();
 }
 
 //--------------------------------------------------------------------------------------
 const wchar_t *SDKMesh::GetMeshPathW() const
 {
-	return m_strPathW;
+	return m_strPathW.c_str();
 }
 
 //--------------------------------------------------------------------------------------
@@ -346,13 +317,13 @@ uint32_t SDKMesh::GetNumMaterials() const
 }
 
 //--------------------------------------------------------------------------------------
-uint32_t SDKMesh::GetNumVBs() const
+uint32_t SDKMesh::GetNumVertexBuffers() const
 {
 	return m_pMeshHeader ? m_pMeshHeader->NumVertexBuffers : 0;
 }
 
 //--------------------------------------------------------------------------------------
-uint32_t SDKMesh::GetNumIBs() const
+uint32_t SDKMesh::GetNumIndexBuffers() const
 {
 	return m_pMeshHeader ? m_pMeshHeader->NumIndexBuffers : 0;
 }
@@ -491,22 +462,20 @@ uint32_t SDKMesh::GetOutstandingResources() const
 
 	if (m_device)
 	{
-#if 0
 		for (auto i = 0u; i < m_pMeshHeader->NumMaterials; ++i)
 		{
 			if (m_pMaterialArray[i].DiffuseTexture[0] != 0)
-				if (!m_pMaterialArray[i].pAlbedo && !IsErrorResource(m_pMaterialArray[i].pAlbedo->GetSRV().ptr))
+				if (!m_pMaterialArray[i].pAlbedo && !IsErrorResource(m_pMaterialArray[i].Force64_Albedo))
 					++outstandingResources;
 
 			if (m_pMaterialArray[i].NormalTexture[0] != 0)
-				if (!m_pMaterialArray[i].pNormal && !IsErrorResource(m_pMaterialArray[i].pNormal->GetSRV().ptr))
+				if (!m_pMaterialArray[i].pNormal && !IsErrorResource(m_pMaterialArray[i].Force64_Normal))
 					++outstandingResources;
 
 			if (m_pMaterialArray[i].SpecularTexture[0] != 0)
-				if (!m_pMaterialArray[i].pSpecular && !IsErrorResource(m_pMaterialArray[i].pSpecular->GetSRV().ptr))
+				if (!m_pMaterialArray[i].pSpecular && !IsErrorResource(m_pMaterialArray[i].Force64_Specular))
 					++outstandingResources;
 		}
-#endif
 	}
 
 	return outstandingResources;
@@ -624,9 +593,12 @@ bool SDKMesh::GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) cons
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-void SDKMesh::loadMaterials(SDKMESH_MATERIAL *pMaterials, uint32_t numMaterials)
+void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATERIAL *pMaterials,
+	uint32_t numMaterials, vector<Resource> &uploaders)
 {
-	char strPath[MAX_PATH];
+	string strPath;
+	wstring strPathW;
+	DDS::Loader textureLoader;
 
 	for (auto m = 0u; m < numMaterials; ++m)
 	{
@@ -637,27 +609,72 @@ void SDKMesh::loadMaterials(SDKMESH_MATERIAL *pMaterials, uint32_t numMaterials)
 		// load textures
 		if (pMaterials[m].DiffuseTexture[0] != 0)
 		{
-			sprintf_s(strPath, MAX_PATH, "%s%s", m_strPath, pMaterials[m].DiffuseTexture);
-			/* if (FAILED(DXUTGetGlobalResourceCache().CreateTextureFromFile(pd3dDevice, DXUTGetD3D11DeviceContext(),
-			strPath, &pMaterials[m].pDiffuseRV11, true)))
-			pMaterials[m].pDiffuseRV11 = ( ID3D11ShaderResourceView* )ERROR_RESOURCE_VALUE;*/
+			strPath = m_strPath + pMaterials[m].DiffuseTexture;
+			const auto textureIter = m_textureCache->find(strPath);
+
+			if (textureIter != m_textureCache->end())
+				pMaterials[m].pAlbedo = textureIter->second.get();
+			else
+			{
+				shared_ptr<ResourceBase> texture;
+				uploaders.push_back(Resource());
+
+				strPathW.assign(strPath.begin(), strPath.end());
+				if (FAILED(textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
+					8192, true, texture, uploaders.back())))
+					pMaterials[m].Force64_Albedo = ERROR_RESOURCE_VALUE;
+				else
+				{
+					pMaterials[m].pAlbedo = texture.get();
+					(*m_textureCache)[strPath] = texture;
+				}
+			}
 		}
 		if (pMaterials[m].NormalTexture[0] != 0)
 		{
-			/*sprintf_s( strPath, MAX_PATH, "%s%s", m_strPath, pMaterials[m].NormalTexture );
-			if( FAILED( DXUTGetGlobalResourceCache().CreateTextureFromFile( pd3dDevice, DXUTGetD3D11DeviceContext(),
-			strPath,
-			&pMaterials[m].pNormalRV11 ) ) )
-			pMaterials[m].pNormalRV11 = ( ID3D11ShaderResourceView* )ERROR_RESOURCE_VALUE;*/
-		}
+			strPath = m_strPath + pMaterials[m].NormalTexture;
+			const auto textureIter = m_textureCache->find(strPath);
 
+			if (textureIter != m_textureCache->end())
+				pMaterials[m].pNormal = textureIter->second.get();
+			else
+			{
+				shared_ptr<ResourceBase> texture;
+				uploaders.push_back(Resource());
+
+				strPathW.assign(strPath.begin(), strPath.end());
+				if (FAILED(textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
+					8192, false, texture, uploaders.back())))
+					pMaterials[m].Force64_Normal = ERROR_RESOURCE_VALUE;
+				else
+				{
+					pMaterials[m].pNormal = texture.get();
+					(*m_textureCache)[strPath] = texture;
+				}
+			}
+		}
 		if (pMaterials[m].SpecularTexture[0] != 0)
 		{
-			sprintf_s(strPath, MAX_PATH, "%s%s", m_strPath, pMaterials[m].SpecularTexture);
-			/*if( FAILED( DXUTGetGlobalResourceCache().CreateTextureFromFile( pd3dDevice, DXUTGetD3D11DeviceContext(),
-			strPath,
-			&pMaterials[m].pSpecularRV11 ) ) )
-			pMaterials[m].pSpecularRV11 = ( ID3D11ShaderResourceView* )ERROR_RESOURCE_VALUE;*/
+			strPath = m_strPath + pMaterials[m].SpecularTexture;
+			const auto textureIter = m_textureCache->find(strPath);
+
+			if (textureIter != m_textureCache->end())
+				pMaterials[m].pSpecular = textureIter->second.get();
+			else
+			{
+				shared_ptr<ResourceBase> texture;
+				uploaders.push_back(Resource());
+
+				strPathW.assign(strPath.begin(), strPath.end());
+				if (FAILED(textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
+					8192, false, texture, uploaders.back())))
+					pMaterials[m].Force64_Specular = ERROR_RESOURCE_VALUE;
+				else
+				{
+					pMaterials[m].pSpecular = texture.get();
+					(*m_textureCache)[strPath] = texture;
+				}
+			}
 		}
 	}
 }
@@ -709,12 +726,13 @@ HRESULT SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, SDKME
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
-HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName)
+HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName,
+	const TextureCache &textureCache)
 {
 	HRESULT hr = S_OK;
 
 	// Find the path for the file
-	wcsncpy_s(m_strPathW, MAX_PATH, szFileName, wcslen(szFileName));
+	m_strPathW = szFileName;
 	//V_RETURN(DXUTFindDXSDKMediaFileCch(m_strPathW, sizeof(m_strPathW) / sizeof(WCHAR), szFileName));
 
 	// Open the file
@@ -723,11 +741,10 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName)
 	if (!fileBuffer) return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
 
 	// Change the path to just the directory
-	const auto pLastBSlash = wcsrchr(&m_strPathW[0], L'\\');
-	if (pLastBSlash) pLastBSlash[1] = L'\0';
-	else m_strPathW[0] = L'\0';
+	const auto found = m_strPathW.find_last_of(L"/\\");
+	m_strPathW = m_strPathW.substr(0, found + 1);
 
-	WideCharToMultiByte(CP_ACP, 0, m_strPathW, -1, m_strPath, MAX_PATH, nullptr, FALSE);
+	m_strPath.assign(m_strPathW.begin(), m_strPathW.end());
 
 	// Get the file size
 	const auto cBytes = fileBuffer->pubseekoff(0, fileStream.end, fileStream.in);
@@ -755,7 +772,7 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName)
 
 	if (SUCCEEDED(hr))
 	{
-		hr = createFromMemory(device, m_pStaticMeshData, cBytes, false);
+		hr = createFromMemory(device, m_pStaticMeshData, textureCache, cBytes, false);
 
 		if (FAILED(hr)) delete [] m_pStaticMeshData;
 	}
@@ -764,7 +781,8 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName)
 }
 
 _Use_decl_annotations_
-HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t DataBytes, bool bCopyStatic)
+HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
+	const TextureCache &textureCache, size_t dataBytes, bool bCopyStatic)
 {
 	XMFLOAT3 lower; 
 	XMFLOAT3 upper; 
@@ -778,7 +796,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 		ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
 	}
 
-	if (DataBytes < sizeof(SDKMESH_HEADER)) return E_FAIL;
+	if (dataBytes < sizeof(SDKMESH_HEADER)) return E_FAIL;
 
 	// Set outstanding resources to zero
 	m_numOutstandingResources = 0;
@@ -788,7 +806,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 		auto pHeader = reinterpret_cast<SDKMESH_HEADER*>( pData );
 
 		SIZE_T StaticSize = static_cast<SIZE_T>(pHeader->HeaderSize + pHeader->NonBufferDataSize);
-		if (DataBytes < StaticSize) return E_FAIL;
+		if (dataBytes < StaticSize) return E_FAIL;
 
 		m_pHeapData = new (std::nothrow) uint8_t[StaticSize];
 		if (!m_pHeapData) return E_OUTOFMEMORY;
@@ -861,7 +879,8 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData, size_t D
 	}
 
 	// Load Materials
-	if (commandList) loadMaterials(m_pMaterialArray, m_pMeshHeader->NumMaterials);
+	m_textureCache = textureCache;
+	if (commandList) loadMaterials(commandList, m_pMaterialArray, m_pMeshHeader->NumMaterials, uploaders);
 
 	// Execute commands
 	executeCommandList(commandList);
@@ -978,8 +997,7 @@ void SDKMesh::classifyMaterialType()
 			const auto pMaterial = GetMaterial(pSubset.MaterialID);
 			
 			auto subsetType = SUBSET_OPAQUE - 1;
-			
-			if (pMaterial && pMaterial->pAlbedo)
+			if (pMaterial && pMaterial->pAlbedo)// && !IsErrorResource(pMaterial->Force64_Albedo))
 			{
 				switch (pMaterial->pAlbedo->GetResource()->GetDesc().Format)
 				{
@@ -1150,140 +1168,3 @@ void SDKMesh::transformFrameAbsolute(uint32_t iFrame, double fTime)
 		XMStoreFloat4x4(&m_pTransformedFrameMatrices[iFrame], mOutput);
 	}
 }
-
-#if 0
-#define MAX_D3D11_VERTEX_STREAMS D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT
-
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-void CDXUTSDKMesh::RenderMesh( UINT iMesh,
-							   bool bAdjacent,
-							   ID3D11DeviceContext* pd3dDeviceContext,
-							   UINT iDiffuseSlot,
-							   UINT iNormalSlot,
-							   UINT iSpecularSlot )
-{
-	if( 0 < GetOutstandingBufferResources() )
-		return;
-
-	auto pMesh = &m_pMeshArray[iMesh];
-
-	UINT Strides[MAX_D3D11_VERTEX_STREAMS];
-	UINT Offsets[MAX_D3D11_VERTEX_STREAMS];
-	ID3D11Buffer* pVB[MAX_D3D11_VERTEX_STREAMS];
-
-	if( pMesh->NumVertexBuffers > MAX_D3D11_VERTEX_STREAMS )
-		return;
-
-	for( UINT64 i = 0; i < pMesh->NumVertexBuffers; i++ )
-	{
-		pVB[i] = m_pVertexBufferArray[ pMesh->VertexBuffers[i] ].pVB11;
-		Strides[i] = ( UINT )m_pVertexBufferArray[ pMesh->VertexBuffers[i] ].StrideBytes;
-		Offsets[i] = 0;
-	}
-
-	SDKMESH_INDEX_BUFFER_HEADER* pIndexBufferArray;
-	if( bAdjacent )
-		pIndexBufferArray = m_pAdjacencyIndexBufferArray;
-	else
-		pIndexBufferArray = m_pIndexBufferArray;
-
-	auto pIB = pIndexBufferArray[ pMesh->IndexBuffer ].pIB11;
-	DXGI_FORMAT ibFormat = DXGI_FORMAT_R16_UINT;
-	switch( pIndexBufferArray[ pMesh->IndexBuffer ].IndexType )
-	{
-	case IT_16BIT:
-		ibFormat = DXGI_FORMAT_R16_UINT;
-		break;
-	case IT_32BIT:
-		ibFormat = DXGI_FORMAT_R32_UINT;
-		break;
-	};
-
-	pd3dDeviceContext->IASetVertexBuffers( 0, pMesh->NumVertexBuffers, pVB, Strides, Offsets );
-	pd3dDeviceContext->IASetIndexBuffer( pIB, ibFormat, 0 );
-
-	SDKMESH_SUBSET* pSubset = nullptr;
-	SDKMESH_MATERIAL* pMat = nullptr;
-	D3D11_PRIMITIVE_TOPOLOGY PrimType;
-
-	for( UINT subset = 0; subset < pMesh->NumSubsets; subset++ )
-	{
-		pSubset = &m_pSubsetArray[ pMesh->pSubsets[subset] ];
-
-		PrimType = GetPrimitiveType11( ( SDKMESH_PRIMITIVE_TYPE )pSubset->PrimitiveType );
-		if( bAdjacent )
-		{
-			switch( PrimType )
-			{
-			case D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST:
-				PrimType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ;
-				break;
-			case D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP:
-				PrimType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ;
-				break;
-			case D3D11_PRIMITIVE_TOPOLOGY_LINELIST:
-				PrimType = D3D11_PRIMITIVE_TOPOLOGY_LINELIST_ADJ;
-				break;
-			case D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP:
-				PrimType = D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP_ADJ;
-				break;
-			}
-		}
-
-		pd3dDeviceContext->IASetPrimitiveTopology( PrimType );
-
-		pMat = &m_pMaterialArray[ pSubset->MaterialID ];
-		if( iDiffuseSlot != INVALID_SAMPLER_SLOT && !IsErrorResource( pMat->pDiffuseRV11 ) )
-			pd3dDeviceContext->PSSetShaderResources( iDiffuseSlot, 1, &pMat->pDiffuseRV11 );
-		if( iNormalSlot != INVALID_SAMPLER_SLOT && !IsErrorResource( pMat->pNormalRV11 ) )
-			pd3dDeviceContext->PSSetShaderResources( iNormalSlot, 1, &pMat->pNormalRV11 );
-		if( iSpecularSlot != INVALID_SAMPLER_SLOT && !IsErrorResource( pMat->pSpecularRV11 ) )
-			pd3dDeviceContext->PSSetShaderResources( iSpecularSlot, 1, &pMat->pSpecularRV11 );
-
-		UINT IndexCount = ( UINT )pSubset->IndexCount;
-		UINT IndexStart = ( UINT )pSubset->IndexStart;
-		UINT VertexStart = ( UINT )pSubset->VertexStart;
-		if( bAdjacent )
-		{
-			IndexCount *= 2;
-			IndexStart *= 2;
-		}
-
-		pd3dDeviceContext->DrawIndexed( IndexCount, IndexStart, VertexStart );
-	}
-}
-
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-void CDXUTSDKMesh::RenderFrame( UINT iFrame,
-								bool bAdjacent,
-								ID3D11DeviceContext* pd3dDeviceContext,
-								UINT iDiffuseSlot,
-								UINT iNormalSlot,
-								UINT iSpecularSlot )
-{
-	if( !m_pStaticMeshData || !m_pFrameArray )
-		return;
-
-	if( m_pFrameArray[iFrame].Mesh != INVALID_MESH )
-	{
-		RenderMesh( m_pFrameArray[iFrame].Mesh,
-					bAdjacent,
-					pd3dDeviceContext,
-					iDiffuseSlot,
-					iNormalSlot,
-					iSpecularSlot );
-	}
-
-	// Render our children
-	if( m_pFrameArray[iFrame].ChildFrame != INVALID_FRAME )
-		RenderFrame( m_pFrameArray[iFrame].ChildFrame, bAdjacent, pd3dDeviceContext, iDiffuseSlot, 
-					 iNormalSlot, iSpecularSlot );
-
-	// Render our siblings
-	if( m_pFrameArray[iFrame].SiblingFrame != INVALID_FRAME )
-		RenderFrame( m_pFrameArray[iFrame].SiblingFrame, bAdjacent, pd3dDeviceContext, iDiffuseSlot, 
-					 iNormalSlot, iSpecularSlot );
-}
-#endif

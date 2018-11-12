@@ -220,18 +220,18 @@ namespace XUSG
 
 		union
 		{
-			uint64_t Force64_1;			//Force the union to 64bits
-			Texture2D *pAlbedo;
+			uint64_t Force64_Albedo;	//Force the union to 64bits
+			ResourceBase *pAlbedo;
 		};
 		union
 		{
-			uint64_t Force64_2;			//Force the union to 64bits
-			Texture2D *pNormal;
+			uint64_t Force64_Normal;	//Force the union to 64bits
+			ResourceBase *pNormal;
 		};
 		union
 		{
-			uint64_t Force64_3;			//Force the union to 64bits
-			Texture2D *pSpecular;
+			uint64_t Force64_Specular;	//Force the union to 64bits
+			ResourceBase *pSpecular;
 		};
 		uint64_t Force64_4;				// Force the union to 64bits
 		uint64_t Force64_5;				// Force the union to 64bits
@@ -283,6 +283,8 @@ namespace XUSG
 
 #ifndef _CONVERTER_APP_
 
+	using TextureCache = std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<ResourceBase>>>;
+
 	//--------------------------------------------------------------------------------------
 	// SDKMesh class. This class reads the sdkmesh file format for use by the samples
 	//--------------------------------------------------------------------------------------
@@ -292,26 +294,16 @@ namespace XUSG
 		SDKMesh() noexcept;
 		virtual ~SDKMesh();
 
-		virtual HRESULT Create(_In_ const Device &device, _In_z_ const wchar_t *szFileName);
-		virtual HRESULT Create(_In_ const Device &device, uint8_t *pData, size_t DataBytes, _In_ bool bCopyStatic = false);
+		virtual HRESULT Create(_In_ const Device &device, _In_z_ const wchar_t *szFileName,
+			_In_ const TextureCache &textureCache);
+		virtual HRESULT Create(_In_ const Device &device, uint8_t *pData, _In_ const TextureCache &textureCache,
+			size_t dataBytes, _In_ bool bCopyStatic = false);
 		virtual HRESULT LoadAnimation(_In_z_ const wchar_t *szFileName);
 		virtual void Destroy();
 
 		//Frame manipulation
 		void TransformBindPose(_In_ DirectX::CXMMATRIX world);
 		void TransformMesh(_In_ DirectX::CXMMATRIX world, _In_ double fTime);
-
-#if 0
-		//Direct3D 11 Rendering
-		virtual void Render(_In_ ID3D11DeviceContext* pd3dDeviceContext,
-			_In_ UINT iDiffuseSlot = INVALID_SAMPLER_SLOT,
-			_In_ UINT iNormalSlot = INVALID_SAMPLER_SLOT,
-			_In_ UINT iSpecularSlot = INVALID_SAMPLER_SLOT);
-		virtual void RenderAdjacent(_In_ ID3D11DeviceContext* pd3dDeviceContext,
-			_In_ UINT iDiffuseSlot = INVALID_SAMPLER_SLOT,
-			_In_ UINT iNormalSlot = INVALID_SAMPLER_SLOT,
-			_In_ UINT iSpecularSlot = INVALID_SAMPLER_SLOT);
-#endif
 
 		// Helpers (Graphics API specific)
 		static PrimitiveTopology GetPrimitiveType(_In_ SDKMESH_PRIMITIVE_TYPE PrimType);
@@ -328,8 +320,8 @@ namespace XUSG
 		const wchar_t		*GetMeshPathW() const;
 		uint32_t			GetNumMeshes() const;
 		uint32_t			GetNumMaterials() const;
-		uint32_t			GetNumVBs() const;
-		uint32_t			GetNumIBs() const;
+		uint32_t			GetNumVertexBuffers() const;
+		uint32_t			GetNumIndexBuffers() const;
 
 		VertexBuffer		*GetVertexBufferAt(_In_ uint32_t iVB) const;
 		IndexBuffer			*GetIndexBufferAt(_In_ uint32_t iIB) const;
@@ -370,16 +362,19 @@ namespace XUSG
 		bool				GetAnimationProperties(_Out_ uint32_t *pNumKeys, _Out_ float* pFrameTime) const;
 
 	protected:
-		void loadMaterials(_In_reads_(NumMaterials) SDKMESH_MATERIAL *pMaterials, _In_ uint32_t NumMaterials);
+		void loadMaterials(_In_ const GraphicsCommandList &commandList,
+			_In_reads_(NumMaterials) SDKMESH_MATERIAL *pMaterials,
+			_In_ uint32_t NumMaterials, std::vector<Resource> &uploaders);
 
 		HRESULT createVertexBuffer(_In_ const GraphicsCommandList &commandList, _In_ SDKMESH_VERTEX_BUFFER_HEADER *pHeader,
 			_In_reads_(pHeader->SizeBytes) void *pVertices, std::vector<Resource> &uploaders);
 		HRESULT createIndexBuffer(const GraphicsCommandList &commandList, _In_ SDKMESH_INDEX_BUFFER_HEADER *pHeader,
 			_In_reads_(pHeader->SizeBytes) void *pIndices, std::vector<Resource> &uploaders);
 
-		virtual HRESULT createFromFile(_In_opt_ const Device &device, _In_z_ const wchar_t *szFileName);
+		virtual HRESULT createFromFile(_In_opt_ const Device &device, _In_z_ const wchar_t *szFileName,
+			_In_ const TextureCache &textureCache);
 		virtual HRESULT createFromMemory(_In_opt_ const Device &device, _In_reads_(DataBytes) uint8_t *pData,
-			_In_ size_t DataBytes, _In_ bool bCopyStatic);
+			_In_ const TextureCache &textureCache, _In_ size_t dataBytes, _In_ bool bCopyStatic);
 
 		void classifyMaterialType();
 		void executeCommandList(const GraphicsCommandList &commandList);
@@ -389,22 +384,6 @@ namespace XUSG
 		void transformFrame(_In_ uint32_t iFrame, _In_ DirectX::CXMMATRIX parentWorld, _In_ double fTime);
 		void transformFrameAbsolute(_In_ uint32_t iFrame, _In_ double fTime);
 
-#if 0
-		//Direct3D 11 rendering helpers
-		void RenderMesh(_In_ UINT iMesh,
-			_In_ bool bAdjacent,
-			_In_ ID3D11DeviceContext* pd3dDeviceContext,
-			_In_ UINT iDiffuseSlot,
-			_In_ UINT iNormalSlot,
-			_In_ UINT iSpecularSlot);
-			void RenderFrame(_In_ UINT iFrame,
-			_In_ bool bAdjacent,
-			_In_ ID3D11DeviceContext* pd3dDeviceContext,
-			_In_ UINT iDiffuseSlot,
-			_In_ UINT iNormalSlot,
-			_In_ UINT iSpecularSlot);
-#endif
-
 		// These are the pointers to the two chunks of data loaded in from the mesh file
 		uint8_t *m_pStaticMeshData;
 		uint8_t *m_pHeapData;
@@ -413,8 +392,8 @@ namespace XUSG
 		uint8_t **m_ppIndices;
 
 		// Keep track of the path
-		wchar_t	m_strPathW[MAX_PATH];
-		char	m_strPath[MAX_PATH];
+		std::wstring	m_strPathW;
+		std::string		m_strPath;
 
 		// General mesh info
 		SDKMESH_HEADER					*m_pMeshHeader;
@@ -428,6 +407,9 @@ namespace XUSG
 		// Classified subsets
 		std::vector<std::vector<uint32_t>> m_classifiedSubsets[NUM_SUBSET_TYPE];
 
+		// Texture cache
+		TextureCache					m_textureCache;
+
 		// Adjacency information (not part of the m_pStaticMeshData, so it must be created and destroyed separately )
 		SDKMESH_INDEX_BUFFER_HEADER		*m_pAdjacencyIndexBufferArray;
 
@@ -439,14 +421,9 @@ namespace XUSG
 		DirectX::XMFLOAT4X4				*m_pWorldPoseFrameMatrices;
 
 	private:
+		Device m_device;
 		uint32_t m_numOutstandingResources;
 		bool m_isLoading;
-		//uint8_t *m_pBufferData;
-		HANDLE m_filehandle;
-		//HANDLE m_hFileMappingObject;
-		//std::vector<uint8_t*> m_mappedPointers;
-		Device m_device;
-		//GraphicsCommandList m_commandList;
 	};
 
 #endif

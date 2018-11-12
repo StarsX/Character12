@@ -49,7 +49,8 @@ namespace XUSG
 		DirectX::FXMMATRIX GetWorldMatrix() const;
 
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
-			const std::wstring &animFileName, const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr,
+			const std::wstring &animFileName, const TextureCache &textureCache,
+			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr,
 			std::vector<SDKMesh> *pLinkedMeshes = nullptr);
 
 	protected:

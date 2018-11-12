@@ -128,11 +128,12 @@ FXMMATRIX Character::GetWorldMatrix() const
 }
 
 shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &meshFileName,
-	const wstring &animFileName, const shared_ptr<vector<MeshLink>> &meshLinks,
+	const wstring &animFileName, const TextureCache &textureCache,
+	const shared_ptr<vector<MeshLink>> &meshLinks,
 	vector<SDKMesh> *linkedMeshes)
 {
 	// Load the animated mesh
-	const auto mesh = Model::LoadSDKMesh(device, meshFileName);
+	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache);
 	ThrowIfFailed(mesh->LoadAnimation(animFileName.c_str()));
 	mesh->TransformBindPose(XMMatrixIdentity());
 
@@ -155,7 +156,7 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 		{
 			auto &meshInfo = meshLinks->at(m);
 			meshInfo.uBone = mesh->FindFrameIndex(meshInfo.szBoneName.c_str());
-			ThrowIfFailed(linkedMeshes->at(m).Create(device.Get(), meshInfo.szMeshName.c_str()));
+			ThrowIfFailed(linkedMeshes->at(m).Create(device.Get(), meshInfo.szMeshName.c_str(), textureCache));
 		}
 	}
 

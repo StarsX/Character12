@@ -91,7 +91,7 @@ void Model::SetPipelineState(SubsetFlag subsetFlags)
 {
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
 
-	if (subsetFlags & SUBSET_ALPHA_TEST)
+	if ((subsetFlags & SUBSET_ALPHA_TEST) == SUBSET_ALPHA_TEST)
 		m_commandList->SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE].Get());
 	else if (subsetFlags & SUBSET_ALPHA)
 		m_commandList->SetPipelineState(m_pipelines[ALPHA_TWO_SIDE].Get());
@@ -149,11 +149,12 @@ InputLayout Model::InitLayout(Pipeline::Pool &pipelinePool)
 	return pipelinePool.CreateInputLayout(inputElementDescs);
 }
 
-shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &meshFileName)
+shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &meshFileName,
+	const TextureCache &textureCache)
 {
 	// Load the mesh
 	const auto mesh = make_shared<SDKMesh>();
-	ThrowIfFailed(mesh->Create(device, meshFileName.c_str()));
+	ThrowIfFailed(mesh->Create(device, meshFileName.c_str(), textureCache));
 
 	return mesh;
 }
@@ -308,7 +309,7 @@ void Model::createDescriptorTables()
 			Util::DescriptorTable srvTable;
 			const Descriptor srvs[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };
 			srvTable.SetDescriptors(0, _countof(srvs), srvs);
-			m_srvTables[m] = samplerTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			m_srvTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 		}
 		else m_srvTables[m] = nullptr;
 	}

@@ -591,8 +591,10 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 			if (texture2D)
 			{
 				const auto fmt = forceSRGB ? MakeSRGB(format) : format;
-				success = texture2D->Create(device, width, height, fmt, arraySize, ResourceFlags(0), mipCount);
-				if (success) success = texture2D->Upload(commandList, uploader, initData.get(), subresourceCount);
+				success = texture2D->Create(device, width, height, fmt, arraySize, ResourceFlags(0), mipCount,
+					1, PoolType(1), D3D12_RESOURCE_STATE_COPY_DEST);
+				if (success) success = texture2D->Upload(commandList, uploader, initData.get(), subresourceCount,
+					D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			}
 			else if (texture3D)
 			{
@@ -617,8 +619,10 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 					{
 						const auto fmt = forceSRGB ? MakeSRGB(format) : format;
 						texture = make_shared<Texture2D>();
-						success = texture2D->Create(device, width, height, fmt, arraySize, ResourceFlags(0), mipCount);
-						if (success) success = texture2D->Upload(commandList, uploader, initData.get(), subresourceCount);
+						success = texture2D->Create(device, width, height, fmt, arraySize, ResourceFlags(0), mipCount,
+							1, PoolType(1), D3D12_RESOURCE_STATE_COPY_DEST);
+						if (success) success = texture2D->Upload(commandList, uploader, initData.get(), subresourceCount,
+							D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 					}
 					else if (texture3D)
 					{

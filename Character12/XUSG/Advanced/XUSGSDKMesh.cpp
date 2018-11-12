@@ -464,16 +464,16 @@ uint32_t SDKMesh::GetOutstandingResources() const
 	{
 		for (auto i = 0u; i < m_pMeshHeader->NumMaterials; ++i)
 		{
-			if (m_pMaterialArray[i].DiffuseTexture[0] != 0)
-				if (!m_pMaterialArray[i].pAlbedo && !IsErrorResource(m_pMaterialArray[i].Force64_Albedo))
+			if (m_pMaterialArray[i].AlbedoTexture[0] != 0)
+				if (!m_pMaterialArray[i].pAlbedo && !IsErrorResource(m_pMaterialArray[i].Albedo64))
 					++outstandingResources;
 
 			if (m_pMaterialArray[i].NormalTexture[0] != 0)
-				if (!m_pMaterialArray[i].pNormal && !IsErrorResource(m_pMaterialArray[i].Force64_Normal))
+				if (!m_pMaterialArray[i].pNormal && !IsErrorResource(m_pMaterialArray[i].Normal64))
 					++outstandingResources;
 
 			if (m_pMaterialArray[i].SpecularTexture[0] != 0)
-				if (!m_pMaterialArray[i].pSpecular && !IsErrorResource(m_pMaterialArray[i].Force64_Specular))
+				if (!m_pMaterialArray[i].pSpecular && !IsErrorResource(m_pMaterialArray[i].Specular64))
 					++outstandingResources;
 		}
 	}
@@ -599,21 +599,28 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 	string strPath;
 	wstring strPathW;
 	DDS::Loader textureLoader;
+	DDS::AlphaMode alphaMode;
 
 	for (auto m = 0u; m < numMaterials; ++m)
 	{
 		pMaterials[m].pAlbedo = nullptr;
 		pMaterials[m].pNormal = nullptr;
 		pMaterials[m].pSpecular = nullptr;
+		pMaterials[m].AlphaModeAlbedo = 0;
+		pMaterials[m].AlphaModeNormal = 0;
+		pMaterials[m].AlphaModeSpecular = 0;
 
 		// load textures
-		if (pMaterials[m].DiffuseTexture[0] != 0)
+		if (pMaterials[m].AlbedoTexture[0] != 0)
 		{
-			strPath = m_strPath + pMaterials[m].DiffuseTexture;
+			strPath = m_strPath + pMaterials[m].AlbedoTexture;
 			const auto textureIter = m_textureCache->find(strPath);
 
 			if (textureIter != m_textureCache->end())
-				pMaterials[m].pAlbedo = textureIter->second.get();
+			{
+				pMaterials[m].pAlbedo = textureIter->second.Texture.get();
+				pMaterials[m].AlphaModeAlbedo = textureIter->second.AlphaMode;
+			}
 			else
 			{
 				shared_ptr<ResourceBase> texture;
@@ -621,12 +628,13 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 
 				strPathW.assign(strPath.begin(), strPath.end());
 				if (FAILED(textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
-					8192, true, texture, uploaders.back())))
-					pMaterials[m].Force64_Albedo = ERROR_RESOURCE_VALUE;
+					8192, true, texture, uploaders.back(), &alphaMode)))
+					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
 				else
 				{
 					pMaterials[m].pAlbedo = texture.get();
-					(*m_textureCache)[strPath] = texture;
+					pMaterials[m].AlphaModeAlbedo = alphaMode;
+					(*m_textureCache)[strPath] = { texture, alphaMode };
 				}
 			}
 		}
@@ -636,7 +644,10 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 			const auto textureIter = m_textureCache->find(strPath);
 
 			if (textureIter != m_textureCache->end())
-				pMaterials[m].pNormal = textureIter->second.get();
+			{
+				pMaterials[m].pNormal = textureIter->second.Texture.get();
+				pMaterials[m].AlphaModeNormal = textureIter->second.AlphaMode;
+			}
 			else
 			{
 				shared_ptr<ResourceBase> texture;
@@ -644,12 +655,13 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 
 				strPathW.assign(strPath.begin(), strPath.end());
 				if (FAILED(textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
-					8192, false, texture, uploaders.back())))
-					pMaterials[m].Force64_Normal = ERROR_RESOURCE_VALUE;
+					8192, false, texture, uploaders.back(), &alphaMode)))
+					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
 				else
 				{
 					pMaterials[m].pNormal = texture.get();
-					(*m_textureCache)[strPath] = texture;
+					pMaterials[m].AlphaModeNormal = alphaMode;
+					(*m_textureCache)[strPath] = { texture, alphaMode };
 				}
 			}
 		}
@@ -659,7 +671,10 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 			const auto textureIter = m_textureCache->find(strPath);
 
 			if (textureIter != m_textureCache->end())
-				pMaterials[m].pSpecular = textureIter->second.get();
+			{
+				pMaterials[m].pSpecular = textureIter->second.Texture.get();
+				pMaterials[m].AlphaModeSpecular = textureIter->second.AlphaMode;
+			}
 			else
 			{
 				shared_ptr<ResourceBase> texture;
@@ -668,11 +683,12 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 				strPathW.assign(strPath.begin(), strPath.end());
 				if (FAILED(textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
 					8192, false, texture, uploaders.back())))
-					pMaterials[m].Force64_Specular = ERROR_RESOURCE_VALUE;
+					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
 				else
 				{
 					pMaterials[m].pSpecular = texture.get();
-					(*m_textureCache)[strPath] = texture;
+					pMaterials[m].AlphaModeNormal = alphaMode;
+					(*m_textureCache)[strPath] = { texture, alphaMode };
 				}
 			}
 		}
@@ -997,7 +1013,7 @@ void SDKMesh::classifyMaterialType()
 			const auto pMaterial = GetMaterial(pSubset.MaterialID);
 			
 			auto subsetType = SUBSET_OPAQUE - 1;
-			if (pMaterial && pMaterial->pAlbedo)// && !IsErrorResource(pMaterial->Force64_Albedo))
+			if (pMaterial && pMaterial->pAlbedo && !IsErrorResource(pMaterial->Albedo64))
 			{
 				switch (pMaterial->pAlbedo->GetResource()->GetDesc().Format)
 				{

@@ -208,11 +208,11 @@ namespace XUSG
 		char MaterialInstancePath[MAX_MATERIAL_PATH];
 
 		// Or fall back to d3d8-type materials
-		char DiffuseTexture[MAX_TEXTURE_NAME];
+		char AlbedoTexture[MAX_TEXTURE_NAME];
 		char NormalTexture[MAX_TEXTURE_NAME];
 		char SpecularTexture[MAX_TEXTURE_NAME];
 
-		DirectX::XMFLOAT4 Diffuse;
+		DirectX::XMFLOAT4 Albedo;
 		DirectX::XMFLOAT4 Ambient;
 		DirectX::XMFLOAT4 Specular;
 		DirectX::XMFLOAT4 Emissive;
@@ -220,22 +220,22 @@ namespace XUSG
 
 		union
 		{
-			uint64_t Force64_Albedo;	//Force the union to 64bits
+			uint64_t Albedo64;			//Force the union to 64bits
 			ResourceBase *pAlbedo;
 		};
 		union
 		{
-			uint64_t Force64_Normal;	//Force the union to 64bits
+			uint64_t Normal64;			//Force the union to 64bits
 			ResourceBase *pNormal;
 		};
 		union
 		{
-			uint64_t Force64_Specular;	//Force the union to 64bits
+			uint64_t Specular64;		//Force the union to 64bits
 			ResourceBase *pSpecular;
 		};
-		uint64_t Force64_4;				// Force the union to 64bits
-		uint64_t Force64_5;				// Force the union to 64bits
-		uint64_t Force64_6;				// Force the union to 64bits
+		uint64_t AlphaModeAlbedo;		// Force the union to 64bits
+		uint64_t AlphaModeNormal;		// Force the union to 64bits
+		uint64_t AlphaModeSpecular;		// Force the union to 64bits
 	};
 
 	struct SDKANIMATION_FILE_HEADER
@@ -283,7 +283,12 @@ namespace XUSG
 
 #ifndef _CONVERTER_APP_
 
-	using TextureCache = std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<ResourceBase>>>;
+	struct TextureCacheEntry
+	{
+		std::shared_ptr<ResourceBase> Texture;
+		uint8_t AlphaMode;
+	};
+	using TextureCache = std::shared_ptr<std::unordered_map<std::string, TextureCacheEntry>>;
 
 	//--------------------------------------------------------------------------------------
 	// SDKMesh class. This class reads the sdkmesh file format for use by the samples

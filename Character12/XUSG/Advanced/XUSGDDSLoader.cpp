@@ -658,19 +658,19 @@ static AlphaMode GetAlphaMode(_In_ const DDS_HEADER *header)
 			auto mode = static_cast<AlphaMode>(d3d10ext->miscFlags2 & DDS_MISC_FLAGS2_ALPHA_MODE_MASK);
 			switch (mode)
 			{
-			case DDS_ALPHA_MODE_STRAIGHT:
-			case DDS_ALPHA_MODE_PREMULTIPLIED:
-			case DDS_ALPHA_MODE_OPAQUE:
-			case DDS_ALPHA_MODE_CUSTOM:
+			case ALPHA_MODE_STRAIGHT:
+			case ALPHA_MODE_PREMULTIPLIED:
+			case ALPHA_MODE_OPAQUE:
+			case ALPHA_MODE_CUSTOM:
 				return mode;
 			}
 		}
 		else if ((MAKEFOURCC('D', 'X', 'T', '2') == header->ddspf.fourCC) ||
 			(MAKEFOURCC('D', 'X', 'T', '4') == header->ddspf.fourCC))
-			return DDS_ALPHA_MODE_PREMULTIPLIED;
+			return ALPHA_MODE_PREMULTIPLIED;
 	}
 
-	return DDS_ALPHA_MODE_UNKNOWN;
+	return ALPHA_MODE_UNKNOWN;
 }
 
 Loader::Loader()
@@ -686,8 +686,7 @@ HRESULT Loader::CreateTextureFromFile(const Device &device, const GraphicsComman
 	const wchar_t *fileName, size_t maxsize, bool forceSRGB, shared_ptr<ResourceBase> &texture,
 	Resource &uploader, AlphaMode *alphaMode)
 {
-	//if (texture) *texture = nullptr;
-	if (alphaMode) *alphaMode = DDS_ALPHA_MODE_UNKNOWN;
+	if (alphaMode) *alphaMode = ALPHA_MODE_UNKNOWN;
 
 	if (!device || !fileName) return E_INVALIDARG;
 

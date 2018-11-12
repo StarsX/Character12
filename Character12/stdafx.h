@@ -28,10 +28,12 @@
 #include "d3dx12.h"
 
 // C RunTime Header Files
+#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <unordered_map>

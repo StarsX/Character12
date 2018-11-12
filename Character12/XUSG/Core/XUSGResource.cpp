@@ -66,20 +66,32 @@ ConstantBuffer::~ConstantBuffer()
 {
 }
 
-void ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t cbvSize)
+bool ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t cbvSize)
 {
+	if (!device)
+	{
+		cerr << "The device is NULL." << endl;
+
+		return false;
+	}
 	m_device = device;
 
-	ThrowIfFailed(m_device->CreateCommittedResource(
+	const auto hr = m_device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(byteWidth),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&m_resource)));
+		IID_PPV_ARGS(&m_resource));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Allocate descriptor pool
-	allocateDescriptorPool(1);
+	if (!allocateDescriptorPool(1)) return false;
 
 	// Describe and create a constant buffer view.
 	D3D12_CONSTANT_BUFFER_VIEW_DESC desc;
@@ -89,6 +101,8 @@ void ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t c
 	// Create CBV
 	m_CBV = m_cbvPool->GetCPUDescriptorHandleForHeapStart();
 	m_device->CreateConstantBufferView(&desc, m_CBV);
+
+	return true;
 }
 
 void *ConstantBuffer::Map()
@@ -98,7 +112,13 @@ void *ConstantBuffer::Map()
 		// Map and initialize the constant buffer. We don't unmap this until the
 		// app closes. Keeping things mapped for the lifetime of the resource is okay.
 		CD3DX12_RANGE readRange(0, 0);	// We do not intend to read from this resource on the CPU.
-		ThrowIfFailed(m_resource->Map(0, &readRange, &m_pDataBegin));
+		const auto hr = m_resource->Map(0, &readRange, &m_pDataBegin);
+		if (FAILED(hr))
+		{
+			cerr << HrToString(hr) << endl;
+
+			return nullptr;
+		}
 	}
 
 	return m_pDataBegin;
@@ -120,12 +140,21 @@ const Descriptor &ConstantBuffer::GetCBV() const
 	return m_CBV;
 }
 
-void ConstantBuffer::allocateDescriptorPool(uint32_t numDescriptors)
+bool ConstantBuffer::allocateDescriptorPool(uint32_t numDescriptors)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = numDescriptors;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	ThrowIfFailed(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_cbvPool)));
+
+	const auto hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_cbvPool));
+	if (FAILED(hr))
+	{
+		cerr << HrToString(hr) << endl;
+
+		return false;
+	}
+
+	return true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -178,14 +207,23 @@ void ResourceBase::setDevice(const Device & device)
 		m_strideSrvUav = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
-void ResourceBase::allocateDescriptorPool(uint32_t numDescriptors)
+bool ResourceBase::allocateDescriptorPool(uint32_t numDescriptors)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = numDescriptors;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	ThrowIfFailed(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_srvUavPool)));
+
+	const auto hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_srvUavPool));
+	if (FAILED(hr))
+	{
+		cerr << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	m_srvUavCurrent = m_srvUavPool->GetCPUDescriptorHandleForHeapStart();
+
+	return true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -205,10 +243,16 @@ Texture2D::~Texture2D()
 {
 }
 
-void Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Format format,
+bool Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Format format,
 	uint32_t arraySize, ResourceFlags resourceFlags, uint8_t numMips, uint8_t sampleCount,
 	PoolType poolType, ResourceState state)
 {
+	if (!device)
+	{
+		cerr << "The device is NULL." << endl;
+
+		return false;
+	}
 	setDevice(device);
 
 	const auto isPacked = static_cast<bool>(resourceFlags & BIND_PACKED_UAV);
@@ -234,15 +278,21 @@ void Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Fo
 		m_state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : m_state;
 	}
 
-	ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
-		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)));
+	const auto hr = m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
+		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 : 0;
 	numDescriptors += hasUAV ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV && numMips > 1 ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV ? max(numMips, 1) - 1 : 0;	// Sub SRVs
-	allocateDescriptorPool(numDescriptors);
+	if (!allocateDescriptorPool(numDescriptors)) return false;
 
 	// Create SRV
 	if (hasSRV) CreateSRV(arraySize, format, numMips, sampleCount);
@@ -252,34 +302,59 @@ void Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Fo
 
 	// Create SRV for each level
 	if (hasSRV && hasUAV) CreateSRVs(arraySize, numMips, format, sampleCount);
+
+	return true;
 }
 
-void Texture2D::Upload(const GraphicsCommandList &commandList, Resource &resourceUpload,
-	const void *pData, uint8_t stride, ResourceState dstState)
+bool Texture2D::Upload(const GraphicsCommandList &commandList, Resource &resourceUpload,
+	SubresourceData *pSubresourceData, uint32_t numSubresources, ResourceState dstState)
 {
-	const auto desc = m_resource->GetDesc();
-	const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.Get(), 0, 1);
+	if (!pSubresourceData) return false;
+
+	const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.Get(), 0, numSubresources);
 
 	// Create the GPU upload buffer.
-	ThrowIfFailed(m_device->CreateCommittedResource(
+	const auto hr = m_device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&resourceUpload)));
+		IID_PPV_ARGS(&resourceUpload));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Copy data to the intermediate upload heap and then schedule a copy 
 	// from the upload heap to the Texture2D.
-	D3D12_SUBRESOURCE_DATA subresourceData;
+	dstState = dstState ? dstState : m_state;
+	if (m_state != D3D12_RESOURCE_STATE_COPY_DEST) Barrier(commandList, D3D12_RESOURCE_STATE_COPY_DEST);
+	if (UpdateSubresources(commandList.Get(), m_resource.Get(), resourceUpload.Get(),
+		0, 0, numSubresources, pSubresourceData) <= 0)
+	{
+		clog << "Failed to upload the resource." << endl;
+
+		return false;
+	}
+	Barrier(commandList, dstState);
+
+	return true;
+}
+
+bool Texture2D::Upload(const GraphicsCommandList &commandList, Resource &resourceUpload,
+	const uint8_t *pData, uint8_t stride, ResourceState dstState)
+{
+	const auto desc = m_resource->GetDesc();
+
+	SubresourceData subresourceData;
 	subresourceData.pData = pData;
 	subresourceData.RowPitch = stride * static_cast<uint32_t>(desc.Width);
 	subresourceData.SlicePitch = subresourceData.RowPitch * desc.Height;
 
-	dstState = dstState ? dstState : m_state;
-	if (m_state != D3D12_RESOURCE_STATE_COPY_DEST) Barrier(commandList, D3D12_RESOURCE_STATE_COPY_DEST);
-	UpdateSubresources(commandList.Get(), m_resource.Get(), resourceUpload.Get(), 0, 0, 1, &subresourceData);
-	Barrier(commandList, dstState);
+	return Upload(commandList, resourceUpload, &subresourceData, 1, dstState);
 }
 
 void Texture2D::CreateSRV(uint32_t arraySize, Format format, uint8_t numMips, uint8_t sampleCount)
@@ -454,14 +529,15 @@ RenderTarget::~RenderTarget()
 {
 }
 
-void RenderTarget::Create(const Device &device, uint32_t width, uint32_t height, Format format,
+bool RenderTarget::Create(const Device &device, uint32_t width, uint32_t height, Format format,
 	uint32_t arraySize, ResourceFlags resourceFlags, uint8_t numMips, uint8_t sampleCount,
 	ResourceState state)
 {
-	create(device, width, height, arraySize, format, numMips, sampleCount, resourceFlags, state);
+	if (!create(device, width, height, arraySize, format, numMips, sampleCount, resourceFlags, state))
+		return false;
 
 	numMips = max(numMips, 1);
-	allocateRtvPool(numMips * arraySize);
+	if (!allocateRtvPool(numMips * arraySize)) return false;
 
 	m_RTVs.resize(arraySize);
 	for (auto i = 0u; i < arraySize; ++i)
@@ -508,16 +584,19 @@ void RenderTarget::Create(const Device &device, uint32_t width, uint32_t height,
 			m_rtvCurrent.Offset(m_strideRtv);
 		}
 	}
+
+	return true;
 }
 
-void RenderTarget::CreateArray(const Device &device, uint32_t width, uint32_t height,
+bool RenderTarget::CreateArray(const Device &device, uint32_t width, uint32_t height,
 	uint32_t arraySize, Format format, ResourceFlags resourceFlags, uint8_t numMips,
 	uint8_t sampleCount, ResourceState state)
 {
-	create(device, width, height, arraySize, format, numMips, sampleCount, resourceFlags, state);
+	if (!create(device, width, height, arraySize, format, numMips, sampleCount, resourceFlags, state))
+		return false;
 
 	numMips = max(numMips, 1);
-	allocateRtvPool(numMips);
+	if (!allocateRtvPool(numMips)) return false;
 
 	m_RTVs.resize(1);
 	m_RTVs[0].resize(numMips);
@@ -546,6 +625,8 @@ void RenderTarget::CreateArray(const Device &device, uint32_t width, uint32_t he
 		m_device->CreateRenderTargetView(m_resource.Get(), &desc, descriptor);
 		m_rtvCurrent.Offset(m_strideRtv);
 	}
+
+	return true;
 }
 
 Descriptor RenderTarget::GetRTV(uint32_t slice, uint8_t mipLevel) const
@@ -564,14 +645,19 @@ uint8_t RenderTarget::GetNumMips(uint32_t slice) const
 	return m_RTVs.size() > slice ? static_cast<uint8_t>(m_RTVs[slice].size()) : 0;
 }
 
-void RenderTarget::create(const Device &device, uint32_t width, uint32_t height,
+bool RenderTarget::create(const Device &device, uint32_t width, uint32_t height,
 	uint32_t arraySize, Format format, uint8_t numMips, uint8_t sampleCount,
 	ResourceFlags resourceFlags, ResourceState state)
 {
+	if (!device)
+	{
+		cerr << "The device is NULL." << endl;
+
+		return false;
+	}
 	setDevice(device);
 
-	if (m_device)
-		m_strideRtv = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_strideRtv = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 	const auto isPacked = static_cast<bool>(resourceFlags & BIND_PACKED_UAV);
 	resourceFlags &= REMOVE_PACKED_UAV;
@@ -591,30 +677,47 @@ void RenderTarget::create(const Device &device, uint32_t width, uint32_t height,
 	m_state = state ? state : D3D12_RESOURCE_STATE_RENDER_TARGET;
 
 	// Create the render target texture.
-	ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)));
+	const auto hr = m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 + (numMips > 1 ? numMips : 0) : 0;
 	numDescriptors += hasUAV ? numMips : 0;
 	numDescriptors += hasSRV ? max(numMips, 1) - 1 : 0;	// Sub SRVs
-	allocateDescriptorPool(numDescriptors);
+	if (!allocateDescriptorPool(numDescriptors)) return false;
 
 	// Create SRV
 	if (hasSRV) CreateSRV(arraySize, format, numMips, sampleCount);
 
 	// Create UAV
 	if (hasUAV) CreateUAVs(arraySize, formatUAV, numMips);
+
+	return true;
 }
 
-void RenderTarget::allocateRtvPool(uint32_t numDescriptors)
+bool RenderTarget::allocateRtvPool(uint32_t numDescriptors)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = numDescriptors;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	ThrowIfFailed(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_rtvPool)));
+
+	const auto hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_rtvPool));
+	if (FAILED(hr))
+	{
+		cerr << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	m_rtvCurrent = m_rtvPool->GetCPUDescriptorHandleForHeapStart();
+
+	return true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -635,14 +738,19 @@ DepthStencil::~DepthStencil()
 {
 }
 
-void DepthStencil::Create(const Device &device, uint32_t width, uint32_t height, Format format,
+bool DepthStencil::Create(const Device &device, uint32_t width, uint32_t height, Format format,
 	ResourceFlags resourceFlags, uint32_t arraySize, uint8_t numMips, uint8_t sampleCount,
 	ResourceState state, uint8_t clearStencil, float clearDepth)
 {
-	setDevice(device);
+	if (!device)
+	{
+		cerr << "The device is NULL." << endl;
 
-	if (m_device)
-		m_strideDsv = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+		return false;
+	}
+	setDevice(device);
+	
+	m_strideDsv = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 
@@ -693,15 +801,21 @@ void DepthStencil::Create(const Device &device, uint32_t width, uint32_t height,
 		clearValue.DepthStencil.Stencil = clearStencil;
 
 		// Create the depth stencil texture.
-		ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE, &desc, m_state, &clearValue, IID_PPV_ARGS(&m_resource)));
+		const auto hr = m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE, &desc, m_state, &clearValue, IID_PPV_ARGS(&m_resource));
+		if (FAILED(hr))
+		{
+			clog << HrToString(hr) << endl;
+
+			return false;
+		}
 	}
 
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 + (numMips > 1 ? numMips : 0) : 0;
 	numDescriptors += formatStencil ? 1 : 0;			// Stencil SRV
 	numDescriptors += hasSRV ? max(numMips, 1) - 1 : 0;	// Sub SRVs
-	allocateDescriptorPool(numDescriptors);
+	if (!allocateDescriptorPool(numDescriptors)) return false;
 
 	if (hasSRV)
 	{
@@ -750,7 +864,7 @@ void DepthStencil::Create(const Device &device, uint32_t width, uint32_t height,
 	}
 
 	numMips = max(numMips, 1);
-	allocateDsvPool(hasSRV ? numMips * 2 : numMips);
+	if (!allocateDsvPool(hasSRV ? numMips * 2 : numMips)) return false;
 
 	m_DSVs.resize(numMips);
 	m_DSVROs.resize(numMips);
@@ -805,6 +919,8 @@ void DepthStencil::Create(const Device &device, uint32_t width, uint32_t height,
 		}
 		else m_DSVROs[i] = m_DSVs[i];
 	}
+
+	return true;
 }
 
 Descriptor DepthStencil::GetDSV(uint8_t mipLevel) const
@@ -827,14 +943,23 @@ const uint8_t DepthStencil::GetNumMips() const
 	return static_cast<uint8_t>(m_DSVs.size());
 }
 
-void DepthStencil::allocateDsvPool(uint32_t numDescriptors)
+bool DepthStencil::allocateDsvPool(uint32_t numDescriptors)
 {
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.NumDescriptors = numDescriptors;
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	ThrowIfFailed(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_dsvPool)));
+
+	const auto hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_dsvPool));
+	if (FAILED(hr))
+	{
+		cerr << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	m_dsvCurrent = m_dsvPool->GetCPUDescriptorHandleForHeapStart();
+
+	return true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -854,10 +979,16 @@ Texture3D::~Texture3D()
 {
 }
 
-void Texture3D::Create(const Device &device, uint32_t width, uint32_t height,
+bool Texture3D::Create(const Device &device, uint32_t width, uint32_t height,
 	uint32_t depth, Format format, ResourceFlags resourceFlags, uint8_t numMips,
 	PoolType poolType, ResourceState state)
 {
+	if (!device)
+	{
+		cerr << "The device is NULL." << endl;
+
+		return false;
+	}
 	setDevice(device);
 
 	const auto isPacked = static_cast<bool>(resourceFlags & BIND_PACKED_UAV);
@@ -883,15 +1014,21 @@ void Texture3D::Create(const Device &device, uint32_t width, uint32_t height,
 		m_state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : m_state;
 	}
 
-	ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
-		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)));
+	const auto hr = m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
+		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 : 0;
 	numDescriptors += hasUAV ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV && numMips > 1 ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV ? max(numMips, 1) - 1 : 0;	// Sub SRVs
-	allocateDescriptorPool(numDescriptors);
+	if (!allocateDescriptorPool(numDescriptors)) return false;
 
 	// Create SRV
 	if (hasSRV) CreateSRV(format, numMips);
@@ -901,6 +1038,8 @@ void Texture3D::Create(const Device &device, uint32_t width, uint32_t height,
 
 	// Create SRV for each level
 	if (hasSRV && hasUAV) CreateSRVs(numMips, format);
+
+	return true;
 }
 
 void Texture3D::CreateSRV(Format format, uint8_t numMips)
@@ -1021,20 +1160,26 @@ BufferBase::~BufferBase()
 {
 }
 
-void BufferBase::Upload(const GraphicsCommandList &commandList, Resource &resourceUpload,
+bool BufferBase::Upload(const GraphicsCommandList &commandList, Resource &resourceUpload,
 	const void *pData, ResourceState dstState)
 {
 	const auto desc = m_resource->GetDesc();
 	const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.Get(), 0, 1);
 
 	// Create the GPU upload buffer.
-	ThrowIfFailed(m_device->CreateCommittedResource(
+	const auto hr = m_device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&resourceUpload)));
+		IID_PPV_ARGS(&resourceUpload));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Copy data to the intermediate upload heap and then schedule a copy 
 	// from the upload heap to the buffer.
@@ -1045,8 +1190,16 @@ void BufferBase::Upload(const GraphicsCommandList &commandList, Resource &resour
 
 	dstState = dstState ? dstState : m_state;
 	if (m_state != D3D12_RESOURCE_STATE_COPY_DEST) Barrier(commandList, D3D12_RESOURCE_STATE_COPY_DEST);
-	UpdateSubresources(commandList.Get(), m_resource.Get(), resourceUpload.Get(), 0, 0, 1, &subresourceData);
+	if (UpdateSubresources(commandList.Get(), m_resource.Get(), resourceUpload.Get(),
+		0, 0, 1, &subresourceData) <= 0)
+	{
+		clog << "Failed to upload the resource." << endl;
+
+		return false;
+	}
 	Barrier(commandList, dstState);
+
+	return true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -1064,20 +1217,23 @@ RawBuffer::~RawBuffer()
 {
 }
 
-void RawBuffer::Create(const Device &device, uint32_t byteWidth, ResourceFlags resourceFlags,
+bool RawBuffer::Create(const Device &device, uint32_t byteWidth, ResourceFlags resourceFlags,
 	PoolType poolType, ResourceState state)
 {
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// Create buffer
-	create(device, byteWidth, resourceFlags, poolType, state, hasSRV, hasUAV);
+	if (!create(device, byteWidth, resourceFlags, poolType, state, hasSRV, hasUAV))
+		return false;
 
 	// Create SRV
 	if (hasSRV) CreateSRV(byteWidth);
 
 	// Create UAV
 	if (hasUAV) CreateUAV(byteWidth);
+
+	return true;
 }
 
 void RawBuffer::CreateSRV(uint32_t byteWidth)
@@ -1114,9 +1270,15 @@ const Descriptor &RawBuffer::GetUAV() const
 	return m_UAV;
 }
 
-void RawBuffer::create(const Device &device, uint32_t byteWidth, ResourceFlags resourceFlags,
+bool RawBuffer::create(const Device &device, uint32_t byteWidth, ResourceFlags resourceFlags,
 	PoolType poolType, ResourceState state, bool hasSRV, bool hasUAV)
 {
+	if (!device)
+	{
+		cerr << "The device is NULL." << endl;
+
+		return false;
+	}
 	setDevice(device);
 
 	// Setup the buffer description.
@@ -1131,13 +1293,21 @@ void RawBuffer::create(const Device &device, uint32_t byteWidth, ResourceFlags r
 		m_state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : m_state;
 	}
 
-	ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
-		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)));
+	const auto hr = m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
+		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 : 0;
 	numDescriptors += hasUAV ? 1 : 0;
-	allocateDescriptorPool(numDescriptors);
+	if (!allocateDescriptorPool(numDescriptors)) return false;
+
+	return true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -1154,7 +1324,7 @@ VertexBuffer::~VertexBuffer()
 {
 }
 
-void VertexBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t stride,
+bool VertexBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t stride,
 	ResourceFlags resourceFlags, PoolType poolType, ResourceState state)
 {
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
@@ -1168,12 +1338,15 @@ void VertexBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t str
 		state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : state;
 	}
 
-	RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state);
+	if (!RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state))
+		return false;
 
 	// Create vertex buffer view
 	m_VBV.BufferLocation = m_resource->GetGPUVirtualAddress();
 	m_VBV.StrideInBytes = stride;
 	m_VBV.SizeInBytes = byteWidth;
+
+	return true;
 }
 
 const VertexBufferView &VertexBuffer::GetVBV() const
@@ -1195,7 +1368,7 @@ IndexBuffer::~IndexBuffer()
 {
 }
 
-void IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format,
+bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format,
 	ResourceFlags resourceFlags, PoolType poolType, ResourceState state)
 {
 	setDevice(device);
@@ -1211,12 +1384,15 @@ void IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format
 	else m_state = hasSRV ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE :
 		D3D12_RESOURCE_STATE_INDEX_BUFFER;
 	
-	RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state);
+	if (!RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state))
+		return false;
 
 	// Create index buffer view
 	m_IBV.BufferLocation = m_resource->GetGPUVirtualAddress();
 	m_IBV.SizeInBytes = byteWidth;
 	m_IBV.Format = format;
+
+	return true;
 }
 
 const IndexBufferView &IndexBuffer::GetIBV() const
@@ -1237,9 +1413,15 @@ TypedBuffer::~TypedBuffer()
 {
 }
 
-void TypedBuffer::Create(const Device &device, uint32_t numElements, uint32_t stride,
+bool TypedBuffer::Create(const Device &device, uint32_t numElements, uint32_t stride,
 	Format format, ResourceFlags resourceFlags, PoolType poolType, ResourceState state)
 {
+	if (!device)
+	{
+		cerr << "The device is NULL." << endl;
+
+		return false;
+	}
 	setDevice(device);
 
 	const auto isPacked = static_cast<bool>(resourceFlags & BIND_PACKED_UAV);
@@ -1265,19 +1447,27 @@ void TypedBuffer::Create(const Device &device, uint32_t numElements, uint32_t st
 		m_state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : m_state;
 	}
 
-	ThrowIfFailed(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
-		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)));
+	const auto hr = m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
+		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource));
+	if (FAILED(hr))
+	{
+		clog << HrToString(hr) << endl;
+
+		return false;
+	}
 
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 : 0;
 	numDescriptors += hasUAV ? 1 : 0;
-	allocateDescriptorPool(numDescriptors);
+	if (!allocateDescriptorPool(numDescriptors)) return false;
 
 	// Create SRV
 	if (hasSRV) CreateSRV(numElements, format);
 
 	// Create UAV
 	if (hasUAV) CreateUAV(numElements, formatUAV);
+
+	return true;
 }
 
 void TypedBuffer::CreateSRV(uint32_t numElements, Format format)
@@ -1320,20 +1510,23 @@ StructuredBuffer::~StructuredBuffer()
 {
 }
 
-void StructuredBuffer::Create(const Device &device, uint32_t numElements, uint32_t stride,
+bool StructuredBuffer::Create(const Device &device, uint32_t numElements, uint32_t stride,
 	ResourceFlags resourceFlags, PoolType poolType, ResourceState state)
 {
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// Create buffer
-	create(device, stride * numElements, resourceFlags, poolType, state, hasSRV, hasUAV);
+	if (!create(device, stride * numElements, resourceFlags, poolType, state, hasSRV, hasUAV))
+		return false;
 
 	// Create SRV
 	if (hasSRV) CreateSRV(numElements, stride);
 
 	// Create UAV
 	if (hasUAV) CreateUAV(numElements, stride);
+
+	return true;
 }
 
 void StructuredBuffer::CreateSRV(uint32_t numElements, uint32_t stride)

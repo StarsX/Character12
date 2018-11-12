@@ -53,6 +53,7 @@ namespace XUSG
 	using Format = DXGI_FORMAT;
 	using PoolType = D3D12_HEAP_TYPE;
 	using ResourceFlags = D3D12_RESOURCE_FLAGS;
+	using SubresourceData = D3D12_SUBRESOURCE_DATA;
 
 	// Pipeline layouts related
 	struct RootParameter : CD3DX12_ROOT_PARAMETER1

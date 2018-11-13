@@ -29,7 +29,7 @@ Model::~Model()
 {
 }
 
-void Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh,
+bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh,
 	const shared_ptr<Shader::Pool> &shaderPool, const shared_ptr<Pipeline::Pool> &pipelinePool,
 	const shared_ptr <DescriptorTablePool> &descriptorTablePool)
 {
@@ -42,10 +42,12 @@ void Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 	m_mesh = mesh;
 
 	// Create buffers, pipeline layouts, pipelines, and descriptor tables
-	createConstantBuffers();
+	N_RETURN(createConstantBuffers(), false);
 	createPipelineLayout();
 	createPipelines(inputLayout);
 	createDescriptorTables();
+
+	return true;
 }
 
 void Model::FrameMove()
@@ -171,10 +173,12 @@ void Model::SetShadowMap(const GraphicsCommandList &commandList, const Descripto
 	commandList->SetGraphicsRootDescriptorTable(SHADOW_MAP, *shadowTable);
 }
 
-void Model::createConstantBuffers()
+bool Model::createConstantBuffers()
 {
-	m_cbMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices));
-	m_cbShadowMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4));
+	N_RETURN(m_cbMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices)), false);
+	N_RETURN(m_cbShadowMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4)), false);
+
+	return true;
 }
 
 void Model::createPipelineLayout()

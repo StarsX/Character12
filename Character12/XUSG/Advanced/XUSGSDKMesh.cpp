@@ -85,7 +85,7 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 	}
 
 	// Allocate
-	m_pAnimationData = new (std::nothrow) uint8_t[static_cast<size_t>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize)];
+	m_pAnimationData = new uint8_t[static_cast<size_t>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize)];
 	if (!m_pAnimationData)
 	{
 		fileStream.close();
@@ -772,7 +772,7 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName,
 	}
 
 	// Allocate memory
-	m_pStaticMeshData = new (std::nothrow) uint8_t[cBytes];
+	m_pStaticMeshData = new uint8_t[cBytes];
 	if (!m_pStaticMeshData)
 	{
 		fileStream.close();
@@ -824,7 +824,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 		SIZE_T StaticSize = static_cast<SIZE_T>(pHeader->HeaderSize + pHeader->NonBufferDataSize);
 		if (dataBytes < StaticSize) return E_FAIL;
 
-		m_pHeapData = new (std::nothrow) uint8_t[StaticSize];
+		m_pHeapData = new uint8_t[StaticSize];
 		if (!m_pHeapData) return E_OUTOFMEMORY;
 
 		m_pStaticMeshData = m_pHeapData;
@@ -867,7 +867,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	vector<Resource> uploaders;
 
 	// Create VBs
-	m_ppVertices = new (std::nothrow) uint8_t*[m_pMeshHeader->NumVertexBuffers];
+	m_ppVertices = new uint8_t*[m_pMeshHeader->NumVertexBuffers];
 	if (!m_ppVertices) return E_OUTOFMEMORY;
 
 	for(auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
@@ -881,7 +881,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	}
 
 	// Create IBs
-	m_ppIndices = new (std::nothrow) uint8_t*[m_pMeshHeader->NumIndexBuffers];
+	m_ppIndices = new uint8_t*[m_pMeshHeader->NumIndexBuffers];
 	if (!m_ppIndices) return E_OUTOFMEMORY;
 
 	for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
@@ -902,14 +902,14 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	executeCommandList(commandList);
 
 	// Create a place to store our bind pose frame matrices
-	m_pBindPoseFrameMatrices = new (std::nothrow) XMFLOAT4X4[m_pMeshHeader->NumFrames];
+	m_pBindPoseFrameMatrices = new XMFLOAT4X4[m_pMeshHeader->NumFrames];
 	if (!m_pBindPoseFrameMatrices) return E_OUTOFMEMORY;
 
 	// Create a place to store our transformed frame matrices
-	m_pTransformedFrameMatrices = new (std::nothrow) XMFLOAT4X4[m_pMeshHeader->NumFrames];
+	m_pTransformedFrameMatrices = new XMFLOAT4X4[m_pMeshHeader->NumFrames];
 	if (!m_pTransformedFrameMatrices) return E_OUTOFMEMORY;
 
-	m_pWorldPoseFrameMatrices = new (std::nothrow) XMFLOAT4X4[m_pMeshHeader->NumFrames];
+	m_pWorldPoseFrameMatrices = new XMFLOAT4X4[m_pMeshHeader->NumFrames];
 	if (!m_pWorldPoseFrameMatrices) return E_OUTOFMEMORY;
 
 	SDKMESH_SUBSET* pSubset = nullptr;

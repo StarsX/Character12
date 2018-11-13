@@ -27,7 +27,7 @@ Character::~Character(void)
 {
 }
 
-void Character::Init(const InputLayout &inputLayout,
+bool Character::Init(const InputLayout &inputLayout,
 	const shared_ptr<SDKMesh> &mesh,
 	const shared_ptr<Shader::Pool> &shaderPool,
 	const shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
@@ -40,18 +40,20 @@ void Character::Init(const InputLayout &inputLayout,
 	m_linkedMeshes = linkedMeshes;
 
 	// Get SDKMesh
-	Model::Init(inputLayout, mesh, shaderPool, pipelinePool, descriptorTablePool);
+	N_RETURN(Model::Init(inputLayout, mesh, shaderPool, pipelinePool, descriptorTablePool), false);
 
 	// Create buffers
-	createBuffers();
+	N_RETURN(createBuffers(), false);
 
 	// Create VBs that will hold all of the skinned vertices that need to be transformed output
-	createTransformedStates();
+	N_RETURN(createTransformedStates(), false);
 
 	// Create pipeline layouts, pipelines, and descriptor tables
 	createPipelineLayout();
 	createPipelines();
 	createDescriptorTables();
+
+	return true;
 }
 
 void Character::InitPosition(const XMFLOAT4 &posRot)
@@ -163,17 +165,19 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 	return mesh;
 }
 
-void Character::createTransformedStates()
+bool Character::createTransformedStates()
 {
 #if	TEMPORAL
 	for (auto &vertexBuffers : m_transformedVBs)
-		createTransformedVBs(vertexBuffers);
+		N_RETURN(createTransformedVBs(vertexBuffers), false);
+
+	return true;
 #else
-	createTransformedVBs(m_transformedVBs[0]);
+	return createTransformedVBs(m_transformedVBs[0]);
 #endif
 }
 
-void Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
+bool Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -183,12 +187,14 @@ void Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
 	{
 		const auto vertexCount = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 		const auto byteWidth = vertexCount * static_cast<uint32_t>(sizeof(Vertex));
-		vertexBuffers[m].Create(m_device, byteWidth, sizeof(Vertex),
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		N_RETURN(vertexBuffers[m].Create(m_device, byteWidth, sizeof(Vertex),
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS), false);
 	}
+
+	return true;
 }
 
-void Character::createBuffers()
+bool Character::createBuffers()
 {
 	// Bone world matrices
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -197,19 +203,21 @@ void Character::createBuffers()
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		const auto numBones = m_mesh->GetNumInfluences(m);
-		m_boneWorlds[m].Create(m_device, numBones, sizeof(XMFLOAT4X3),
+		N_RETURN(m_boneWorlds[m].Create(m_device, numBones, sizeof(XMFLOAT4X3),
 			D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
-			D3D12_RESOURCE_STATE_GENERIC_READ);
+			D3D12_RESOURCE_STATE_GENERIC_READ), false);
 	}
 
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrices : m_cbLinkedMatrices)
-		cbLinkedMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices));
+		N_RETURN(cbLinkedMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices)), false);
 
 	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrix : m_cbLinkedShadowMatrices)
-		cbLinkedMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4));
+		N_RETURN(cbLinkedMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4)), false);
+
+	return true;
 }
 
 void Character::createPipelineLayout()

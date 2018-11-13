@@ -54,7 +54,7 @@ static HRESULT LoadTextureDataFromFile(const wchar_t *fileName,
 	if (FileSize.LowPart < (sizeof(DDS_HEADER) + sizeof(uint32_t))) return E_FAIL;
 
 	// create enough space for the file data
-	ddsData.reset(new (nothrow) uint8_t[FileSize.LowPart]);
+	ddsData.reset(new uint8_t[FileSize.LowPart]);
 	if (!ddsData) return E_OUTOFMEMORY;
 
 	// read the data in
@@ -368,7 +368,7 @@ static bool FillInitData(uint32_t width, uint32_t height, uint32_t depth,
 	uint32_t &twidth, uint32_t &theight, uint32_t &tdepth, uint8_t &skipMip,
 	SubresourceData *initData)
 {
-	M_RETURN(!bitData || !initData, cerr, HrToString(E_POINTER), false);
+	F_RETURN(!bitData || !initData, cerr, E_POINTER, false);
 
 	skipMip = 0;
 	twidth = 0;
@@ -409,7 +409,7 @@ static bool FillInitData(uint32_t width, uint32_t height, uint32_t depth,
 			else if (!j) ++skipMip;	// Count number of skipped mipmaps (first item only)
 
 			pSrcBits += NumBytes * d;
-			M_RETURN(pSrcBits > pEndBits, cerr, HrToString(ERROR_HANDLE_EOF), false);
+			F_RETURN(pSrcBits > pEndBits, cerr, ERROR_HANDLE_EOF, false);
 			
 			w = (max)(w >> 1, 1u);
 			h = (max)(h >> 1, 1u);
@@ -441,7 +441,7 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 			(reinterpret_cast<const char*>(header) + sizeof(DDS_HEADER));
 
 		arraySize = d3d10ext->arraySize;
-		M_RETURN(arraySize == 0, cerr, HrToString(ERROR_INVALID_DATA), false);
+		F_RETURN(arraySize == 0, cerr, ERROR_INVALID_DATA, false);
 
 		switch (d3d10ext->dxgiFormat)
 		{
@@ -451,8 +451,7 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 		case DXGI_FORMAT_A8P8:
 			V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 		default:
-			M_RETURN(Loader::BitsPerPixel(d3d10ext->dxgiFormat) == 0,
-				cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+			F_RETURN(Loader::BitsPerPixel(d3d10ext->dxgiFormat) == 0, cerr, ERROR_NOT_SUPPORTED, false);
 		}
 
 		format = d3d10ext->dxgiFormat;
@@ -461,8 +460,7 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 		{
 		case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
 			// D3DX writes 1D textures with a fixed Height of 1
-			M_RETURN((header->flags & DDS_HEIGHT) && height != 1,
-				cerr, HrToString(ERROR_INVALID_DATA), false);
+			F_RETURN((header->flags & DDS_HEIGHT) && height != 1, cerr, ERROR_INVALID_DATA, false);
 			height = depth = 1;
 			break;
 
@@ -476,9 +474,8 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 			break;
 
 		case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
-			M_RETURN(!(header->flags & DDS_HEADER_FLAGS_VOLUME),
-				cerr, HrToString(ERROR_INVALID_DATA), false);
-			M_RETURN(arraySize > 1, cerr, HrToString(ERROR_INVALID_DATA), false);
+			F_RETURN(!(header->flags & DDS_HEADER_FLAGS_VOLUME), cerr, ERROR_INVALID_DATA, false);
+			F_RETURN(arraySize > 1, cerr, ERROR_INVALID_DATA, false);
 			break;
 
 		default:
@@ -490,7 +487,7 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 	else
 	{
 		format = GetDXGIFormat(header->ddspf);
-		M_RETURN(format == DXGI_FORMAT_UNKNOWN, cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+		F_RETURN(format == DXGI_FORMAT_UNKNOWN, cerr, ERROR_NOT_SUPPORTED, false);
 
 		if (header->flags & DDS_HEADER_FLAGS_VOLUME)
 			resDim = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
@@ -499,8 +496,8 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 			if (header->caps2 & DDS_CUBEMAP)
 			{
 				// We require all six faces to be defined
-				M_RETURN((header->caps2 & DDS_CUBEMAP_ALLFACES) != DDS_CUBEMAP_ALLFACES,
-					cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+				F_RETURN((header->caps2 & DDS_CUBEMAP_ALLFACES) != DDS_CUBEMAP_ALLFACES,
+					cerr, ERROR_NOT_SUPPORTED, false);
 
 				arraySize = 6;
 				isCubeMap = true;
@@ -516,39 +513,38 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 	}
 
 	// Bound sizes (for security purposes we don't trust DDS file metadata larger than the D3D 11.x hardware requirements)
-	M_RETURN(mipCount > D3D12_REQ_MIP_LEVELS, cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+	F_RETURN(mipCount > D3D12_REQ_MIP_LEVELS, cerr, ERROR_NOT_SUPPORTED, false);
 
 	switch (resDim)
 	{
 	case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
-		M_RETURN(arraySize > D3D12_REQ_TEXTURE1D_ARRAY_AXIS_DIMENSION ||
-			width > D3D12_REQ_TEXTURE1D_U_DIMENSION,
-			cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+		F_RETURN(arraySize > D3D12_REQ_TEXTURE1D_ARRAY_AXIS_DIMENSION ||
+			width > D3D12_REQ_TEXTURE1D_U_DIMENSION, cerr, ERROR_NOT_SUPPORTED, false);
 		texture = make_shared<Texture2D>();
 		break;
 
 	case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
 		if (isCubeMap)
 		{
-			// This is the right bound because we set arraySize to (NumCubes*6) above
-			M_RETURN(arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
+			// This is the right bound because we set arraySize to (NumCubes * 6) above
+			F_RETURN(arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
 				width > D3D12_REQ_TEXTURECUBE_DIMENSION ||
 				height > D3D12_REQ_TEXTURECUBE_DIMENSION,
-				cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+				cerr, ERROR_NOT_SUPPORTED, false);
 		}
-		else M_RETURN(arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
+		else F_RETURN(arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
 			width > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION ||
 			height > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION,
-			cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+			cerr, ERROR_NOT_SUPPORTED, false);
 		texture = make_shared<Texture2D>();
 		break;
 
 	case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
-		M_RETURN(arraySize > 1 ||
+		F_RETURN(arraySize > 1 ||
 			width > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
 			height > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
 			depth > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION,
-			cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+			cerr, ERROR_NOT_SUPPORTED, false);
 		texture = make_shared<Texture3D>();
 		break;
 
@@ -559,8 +555,8 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 	{
 		// Create the texture
 		const auto subresourceCount = static_cast<uint32_t>(mipCount) * arraySize;
-		unique_ptr<SubresourceData[]> initData(new (std::nothrow) SubresourceData[subresourceCount]);
-		M_RETURN(!initData, cerr, HrToString(E_OUTOFMEMORY), false);
+		unique_ptr<SubresourceData[]> initData(new SubresourceData[subresourceCount]);
+		F_RETURN(!initData, cerr, E_OUTOFMEMORY, false);
 
 		auto skipMip = 0ui8;
 		auto twidth = 0u;
@@ -622,7 +618,7 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 				}
 			}
 
-			M_RETURN(!success, cerr, "Fauked to the create texture.", false);
+			M_RETURN(!success, cerr, "Failed to the create texture.", false);
 		}
 	}
 
@@ -670,7 +666,7 @@ bool Loader::CreateTextureFromFile(const Device &device, const GraphicsCommandLi
 	Resource &uploader, AlphaMode *alphaMode)
 {
 	if (alphaMode) *alphaMode = ALPHA_MODE_UNKNOWN;
-	M_RETURN(!device || !fileName, cerr, HrToString(E_INVALIDARG), false);
+	F_RETURN(!device || !fileName, cerr, E_INVALIDARG, false);
 
 	DDS_HEADER *header = nullptr;
 	uint8_t *bitData = nullptr;
@@ -679,9 +675,8 @@ bool Loader::CreateTextureFromFile(const Device &device, const GraphicsCommandLi
 	unique_ptr<uint8_t[]> ddsData;
 	V_RETURN(LoadTextureDataFromFile(fileName, ddsData, &header, &bitData, &bitSize), cerr, false);
 
-	auto hr = CreateTexture(device, commandList, header, bitData, bitSize,
-		maxsize, forceSRGB, texture, uploader);
-	if (FAILED(hr)) return false;
+	N_RETURN(CreateTexture(device, commandList, header, bitData, bitSize,
+		maxsize, forceSRGB, texture, uploader), false);
 
 	if (alphaMode) *alphaMode = GetAlphaMode(header);
 

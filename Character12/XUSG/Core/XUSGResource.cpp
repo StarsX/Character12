@@ -80,7 +80,7 @@ bool ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t c
 		IID_PPV_ARGS(&m_resource)), clog, false);
 
 	// Allocate descriptor pool
-	if (!allocateDescriptorPool(1)) return false;
+	N_RETURN(allocateDescriptorPool(1), false);
 
 	// Describe and create a constant buffer view.
 	D3D12_CONSTANT_BUFFER_VIEW_DESC desc;
@@ -250,7 +250,7 @@ bool Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Fo
 	numDescriptors += hasUAV ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV && numMips > 1 ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV ? (max)(numMips, 1ui8) - 1 : 0;	// Sub SRVs
-	if (!allocateDescriptorPool(numDescriptors)) return false;
+	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(arraySize, format, numMips, sampleCount);
@@ -267,7 +267,7 @@ bool Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Fo
 bool Texture2D::Upload(const GraphicsCommandList &commandList, Resource &resourceUpload,
 	SubresourceData *pSubresourceData, uint32_t numSubresources, ResourceState dstState)
 {
-	if (!pSubresourceData) return false;
+	N_RETURN(pSubresourceData, false);
 
 	const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.Get(), 0, numSubresources);
 
@@ -480,11 +480,11 @@ bool RenderTarget::Create(const Device &device, uint32_t width, uint32_t height,
 	uint32_t arraySize, ResourceFlags resourceFlags, uint8_t numMips, uint8_t sampleCount,
 	ResourceState state)
 {
-	if (!create(device, width, height, arraySize, format, numMips, sampleCount, resourceFlags, state))
-		return false;
+	N_RETURN(create(device, width, height, arraySize, format, numMips,
+		sampleCount, resourceFlags, state), false);
 
 	numMips = (max)(numMips, 1ui8);
-	if (!allocateRtvPool(numMips * arraySize)) return false;
+	N_RETURN(allocateRtvPool(numMips * arraySize), false);
 
 	m_RTVs.resize(arraySize);
 	for (auto i = 0u; i < arraySize; ++i)
@@ -539,11 +539,11 @@ bool RenderTarget::CreateArray(const Device &device, uint32_t width, uint32_t he
 	uint32_t arraySize, Format format, ResourceFlags resourceFlags, uint8_t numMips,
 	uint8_t sampleCount, ResourceState state)
 {
-	if (!create(device, width, height, arraySize, format, numMips, sampleCount, resourceFlags, state))
-		return false;
+	N_RETURN(create(device, width, height, arraySize, format, numMips,
+		sampleCount, resourceFlags, state), false);
 
 	numMips = (max)(numMips, 1ui8);
-	if (!allocateRtvPool(numMips)) return false;
+	N_RETURN(allocateRtvPool(numMips), false);
 
 	m_RTVs.resize(1);
 	m_RTVs[0].resize(numMips);
@@ -626,7 +626,7 @@ bool RenderTarget::create(const Device &device, uint32_t width, uint32_t height,
 	auto numDescriptors = hasSRV ? 1 + (numMips > 1 ? numMips : 0) : 0u;
 	numDescriptors += hasUAV ? numMips : 0;
 	numDescriptors += hasSRV ? (max)(numMips, 1ui8) - 1 : 0;	// Sub SRVs
-	if (!allocateDescriptorPool(numDescriptors)) return false;
+	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(arraySize, format, numMips, sampleCount);
@@ -733,7 +733,7 @@ bool DepthStencil::Create(const Device &device, uint32_t width, uint32_t height,
 	auto numDescriptors = hasSRV ? 1 + (numMips > 1 ? numMips : 0) : 0u;
 	numDescriptors += formatStencil ? 1 : 0;			// Stencil SRV
 	numDescriptors += hasSRV ? (max)(numMips, 1ui8) - 1 : 0;	// Sub SRVs
-	if (!allocateDescriptorPool(numDescriptors)) return false;
+	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	if (hasSRV)
 	{
@@ -782,7 +782,7 @@ bool DepthStencil::Create(const Device &device, uint32_t width, uint32_t height,
 	}
 
 	numMips = (max)(numMips, 1ui8);
-	if (!allocateDsvPool(hasSRV ? numMips * 2 : numMips)) return false;
+	N_RETURN(allocateDsvPool(hasSRV ? numMips * 2 : numMips), false);
 
 	m_DSVs.resize(numMips);
 	m_DSVROs.resize(numMips);
@@ -928,7 +928,7 @@ bool Texture3D::Create(const Device &device, uint32_t width, uint32_t height,
 	numDescriptors += hasUAV ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV && numMips > 1 ? numMips : 0;
 	numDescriptors += hasSRV && hasUAV ? (max)(numMips, 1ui8) - 1 : 0;	// Sub SRVs
-	if (!allocateDescriptorPool(numDescriptors)) return false;
+	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(format, numMips);
@@ -1113,8 +1113,7 @@ bool RawBuffer::Create(const Device &device, uint32_t byteWidth, ResourceFlags r
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// Create buffer
-	if (!create(device, byteWidth, resourceFlags, poolType, state, hasSRV, hasUAV))
-		return false;
+	N_RETURN(create(device, byteWidth, resourceFlags, poolType, state, hasSRV, hasUAV), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(byteWidth);
@@ -1183,7 +1182,7 @@ bool RawBuffer::create(const Device &device, uint32_t byteWidth, ResourceFlags r
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 : 0u;
 	numDescriptors += hasUAV ? 1 : 0;
-	if (!allocateDescriptorPool(numDescriptors)) return false;
+	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	return true;
 }
@@ -1216,8 +1215,7 @@ bool VertexBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t str
 		state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : state;
 	}
 
-	if (!RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state))
-		return false;
+	N_RETURN(RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state), false);
 
 	// Create vertex buffer view
 	m_VBV.BufferLocation = m_resource->GetGPUVirtualAddress();
@@ -1262,8 +1260,7 @@ bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format
 	else m_state = hasSRV ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE :
 		D3D12_RESOURCE_STATE_INDEX_BUFFER;
 	
-	if (!RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state))
-		return false;
+	N_RETURN(RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state), false);
 
 	// Create index buffer view
 	m_IBV.BufferLocation = m_resource->GetGPUVirtualAddress();
@@ -1326,7 +1323,7 @@ bool TypedBuffer::Create(const Device &device, uint32_t numElements, uint32_t st
 	// Allocate descriptor pool
 	auto numDescriptors = hasSRV ? 1 : 0u;
 	numDescriptors += hasUAV ? 1 : 0;
-	if (!allocateDescriptorPool(numDescriptors)) return false;
+	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(numElements, format);
@@ -1384,8 +1381,8 @@ bool StructuredBuffer::Create(const Device &device, uint32_t numElements, uint32
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// Create buffer
-	if (!create(device, stride * numElements, resourceFlags, poolType, state, hasSRV, hasUAV))
-		return false;
+	N_RETURN(create(device, stride * numElements, resourceFlags,
+		poolType, state, hasSRV, hasUAV), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(numElements, stride);

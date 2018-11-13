@@ -4,9 +4,14 @@
 
 #pragma once
 
-#define V_RETURN(x, o, r)		{ const auto hr = x; if (FAILED(hr)) { o << HrToString(hr) << endl; return r; } }
-#define VM_RETURN(x, o, m, r)	{ const auto hr = x; if (FAILED(hr)) { o << m << endl; return r; } }
+#define H_RETURN(x, o, m, r)	{ const auto hr = x; if (FAILED(hr)) { o << m << endl; return r; } }
+#define V_RETURN(x, o, r)		H_RETURN(x, o, HrToString(hr), r)
+
 #define M_RETURN(x, o, m, r)	if (x) { o << m << endl; return r; }
+#define F_RETURN(x, o, h, r)	M_RETURN(x, o, HrToString(h), r)
+
+#define C_RETURN(x, r)			if (x) return r;
+#define N_RETURN(x, r)			C_RETURN(!(x), r)
 
 namespace XUSG
 {

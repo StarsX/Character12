@@ -170,11 +170,11 @@ PipelineLayout PipelineLayoutPool::createPipelineLayout(const string &key) const
 	layoutDesc.Init_1_1(numLayouts, descriptorTableLayouts.data(), 0, nullptr, static_cast<D3D12_ROOT_SIGNATURE_FLAGS>(flags));
 
 	Blob signature, error;
-	VM_RETURN(D3DX12SerializeVersionedRootSignature(&layoutDesc, featureData.HighestVersion, &signature, &error),
+	H_RETURN(D3DX12SerializeVersionedRootSignature(&layoutDesc, featureData.HighestVersion, &signature, &error),
 		cerr, reinterpret_cast<char*>(error->GetBufferPointer()), nullptr);
 
 	PipelineLayout layout;
-	VM_RETURN(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
+	H_RETURN(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
 		IID_PPV_ARGS(&layout)), cerr, reinterpret_cast<char*>(error->GetBufferPointer()), nullptr);
 
 	return layout;

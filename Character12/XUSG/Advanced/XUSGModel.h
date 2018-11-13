@@ -26,7 +26,7 @@ namespace XUSG
 		Model(const Device &device, const GraphicsCommandList &commandList);
 		virtual ~Model();
 
-		void Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
+		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
 			const std::shared_ptr<Shader::Pool> &shaderPool,
 			const std::shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
 			const std::shared_ptr<DescriptorTablePool> &descriptorTablePool);
@@ -70,7 +70,7 @@ namespace XUSG
 #endif
 		};
 
-		void createConstantBuffers();
+		bool createConstantBuffers();
 		void createPipelineLayout();
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));

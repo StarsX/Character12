@@ -174,8 +174,11 @@ void CharacterX::LoadAssets()
 		const auto textureCache = make_shared<TextureCache::element_type>(0);
 		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
 			L"Media/Bright/Stars.sdkmesh_anim", textureCache);
+		if (!characterMesh) ThrowIfFailed(E_FAIL);
 		m_character = make_unique<Character>(m_device, m_commandList);
-		m_character->Init(m_inputLayout, characterMesh, m_shaderPool, m_pipelinePool, m_descriptorTablePool);
+		if (!m_character) ThrowIfFailed(E_FAIL);
+		if (!m_character->Init(m_inputLayout, characterMesh, m_shaderPool, m_pipelinePool, m_descriptorTablePool))
+			ThrowIfFailed(E_FAIL);
 	}
 
 	// Close the command list and execute it to begin the initial GPU setup.

@@ -245,7 +245,7 @@ bool DescriptorTablePool::reallocateCbvSrvUavPool(const string &key)
 
 	// Allocate a new pool
 	m_numCbvSrvUavs += numDescriptors;
-	if (!allocateCbvSrvUavPool(m_numCbvSrvUavs)) return false;
+	N_RETURN(allocateCbvSrvUavPool(m_numCbvSrvUavs), false);
 
 	// Recreate descriptor tables
 	for (auto &tableIter : m_cbvSrvUavTables)
@@ -264,7 +264,7 @@ bool DescriptorTablePool::reallocateSamplerPool(const string &key)
 
 	// Allocate a new pool
 	m_numSamplers += numDescriptors;
-	if (!allocateSamplerPool(m_numSamplers)) return false;
+	N_RETURN(allocateSamplerPool(m_numSamplers), false);
 
 	// Recreate descriptor tables
 	for (auto &tableIter : m_samplerTables)
@@ -283,7 +283,7 @@ bool DescriptorTablePool::reallocateRtvPool(const string &key)
 
 	// Allocate a new pool
 	m_numRtvs += numDescriptors;
-	if (!allocateRtvPool(m_numRtvs)) return false;
+	N_RETURN(allocateRtvPool(m_numRtvs), false);
 
 	// Recreate descriptor tables
 	for (auto &tableIter : m_rtvTables)

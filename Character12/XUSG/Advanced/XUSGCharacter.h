@@ -29,7 +29,7 @@ namespace XUSG
 		Character(const Device &device, const GraphicsCommandList &commandList);
 		virtual ~Character();
 
-		void Init(const InputLayout &inputLayout,
+		bool Init(const InputLayout &inputLayout,
 			const std::shared_ptr<SDKMesh> &mesh,
 			const std::shared_ptr<Shader::Pool> &shaderPool,
 			const std::shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
@@ -60,9 +60,9 @@ namespace XUSG
 			OUTPUT
 		};
 
-		void createTransformedStates();
-		void createTransformedVBs(std::vector<VertexBuffer> &vertexBuffers);
-		void createBuffers();
+		bool createTransformedStates();
+		bool createTransformedVBs(std::vector<VertexBuffer> &vertexBuffers);
+		bool createBuffers();
 		void createPipelineLayout();
 		void createPipelines();
 		void createDescriptorTables();

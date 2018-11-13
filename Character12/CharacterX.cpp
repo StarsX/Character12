@@ -19,8 +19,7 @@ CharacterX::CharacterX(uint32_t width, uint32_t height, std::wstring name) :
 	DXFramework(width, height, name),
 	m_frameIndex(0),
 	m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
-	m_scissorRect(0, 0, static_cast<long>(width), static_cast<long>(height))//,
-	//m_rtvDescriptorSize(0)
+	m_scissorRect(0, 0, static_cast<long>(width), static_cast<long>(height))
 {
 }
 
@@ -33,7 +32,7 @@ void CharacterX::OnInit()
 // Load the rendering pipeline dependencies.
 void CharacterX::LoadPipeline()
 {
-	UINT dxgiFactoryFlags = 0;
+	auto dxgiFactoryFlags = 0u;
 
 #if defined(_DEBUG)
 	// Enable the debug layer (requires the Graphics Tools "optional feature").
@@ -128,7 +127,7 @@ void CharacterX::LoadPipeline()
 		Descriptor rtv(m_rtvPool->GetCPUDescriptorHandleForHeapStart());
 
 		// Create a RTV and a command allocator for each frame.
-		for (UINT n = 0; n < FrameCount; n++)
+		for (auto n = 0u; n < FrameCount; n++)
 		{
 			ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
 			m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtv);
@@ -344,7 +343,7 @@ void CharacterX::WaitForGpu()
 void CharacterX::MoveToNextFrame()
 {
 	// Schedule a Signal command in the queue.
-	const UINT64 currentFenceValue = m_fenceValues[m_frameIndex];
+	const auto currentFenceValue = m_fenceValues[m_frameIndex];
 	ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), currentFenceValue));
 
 	// Update the frame index.

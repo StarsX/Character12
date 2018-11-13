@@ -158,7 +158,11 @@ void CharacterX::LoadAssets()
 	{
 		m_shaderPool->CreateShader(Shader::Stage::VS, VS_BASE_PASS, L"VSBasePass.cso");
 		m_shaderPool->CreateShader(Shader::Stage::PS, PS_BASE_PASS, L"PSBasePass.cso");
+		m_shaderPool->CreateShader(Shader::Stage::PS, PS_ALPHA_TEST, L"PSAlphaTest.cso");
 		m_shaderPool->CreateShader(Shader::Stage::CS, CS_SKINNING, L"CSSkinning.cso");
+		m_shaderPool->SetShader(Shader::Stage::VS, VS_ALPHA_TEST,
+			m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS),
+			m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS));
 	}
 
 	// Create the command list.

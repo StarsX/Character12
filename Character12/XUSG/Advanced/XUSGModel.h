@@ -33,9 +33,9 @@ namespace XUSG
 		void FrameMove();
 		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
-		void SetPipelineState(SubsetFlag subsetFlags);
+		void SetPipelineState(SubsetFlags subsetFlags);
 		void SetPipelineState(PipelineIndex pipeline);
-		void Render(SubsetFlag subsetFlags, bool isShadow, bool reset = false);
+		void Render(SubsetFlags subsetFlags, bool isShadow, bool reset = false);
 
 		static InputLayout InitLayout(Graphics::Pipeline::Pool &pipelinePool);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
@@ -75,7 +75,8 @@ namespace XUSG
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
-		void render(uint32_t mesh, SubsetFlag subsetFlags, bool reset);
+		void render(uint32_t mesh, SubsetFlags subsetFlags, bool reset);
+		void render(uint32_t mesh, SubsetFlags subsetFlags, SubsetFlags materialType, bool reset);
 
 		Device				m_device;
 		GraphicsCommandList	m_commandList;

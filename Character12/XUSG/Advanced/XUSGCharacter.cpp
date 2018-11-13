@@ -107,7 +107,7 @@ void Character::Skinning(bool reset)
 	skinning(reset);
 }
 
-void Character::RenderTransformed(SubsetFlag subsetFlags, bool isShadow, bool reset)
+void Character::RenderTransformed(SubsetFlags subsetFlags, bool isShadow, bool reset)
 {
 	renderTransformed(subsetFlags, isShadow, reset);
 	if (m_meshLinks)
@@ -352,7 +352,7 @@ void Character::skinning(bool reset)
 	}
 }
 
-void Character::renderTransformed(SubsetFlag subsetFlags, bool isShadow, bool reset)
+void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool reset)
 {
 	if (reset)
 	{

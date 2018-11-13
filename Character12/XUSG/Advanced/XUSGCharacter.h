@@ -43,7 +43,7 @@ namespace XUSG
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
 		void Skinning(bool reset = false);
-		void RenderTransformed(SubsetFlag subsetFlags = SUBSET_FULL, bool isShadow = false, bool reset = false);
+		void RenderTransformed(SubsetFlags subsetFlags = SUBSET_FULL, bool isShadow = false, bool reset = false);
 
 		const DirectX::XMFLOAT4 &GetPosition() const;
 		DirectX::FXMMATRIX GetWorldMatrix() const;
@@ -69,7 +69,7 @@ namespace XUSG
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world,
 			DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pShadow, bool isTemporal);
 		void skinning(bool reset);
-		void renderTransformed(SubsetFlag subsetFlags, bool isShadow, bool reset);
+		void renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool reset);
 		void renderLinked(uint32_t mesh, bool isShadow, bool reset);
 		void setBoneMatrices(uint32_t mesh);
 		void convertToDQ(DirectX::XMFLOAT4 &dqTran, DirectX::CXMVECTOR quat,

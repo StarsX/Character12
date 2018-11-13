@@ -370,7 +370,7 @@ uint32_t SDKMesh::GetNumSubsets(_In_ uint32_t iMesh) const
 	return m_pMeshArray[iMesh].NumSubsets;
 }
 
-uint32_t SDKMesh::GetNumSubsets(_In_ uint32_t iMesh, _In_ SubsetFlag materialType) const
+uint32_t SDKMesh::GetNumSubsets(_In_ uint32_t iMesh, _In_ SubsetFlags materialType) const
 {
 	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
 
@@ -383,7 +383,7 @@ SDKMESH_SUBSET *SDKMesh::GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset) c
 	return &m_pSubsetArray[m_pMeshArray[iMesh].pSubsets[iSubset]];
 }
 
-SDKMESH_SUBSET *SDKMesh::GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset, _In_ SubsetFlag materialType) const
+SDKMESH_SUBSET *SDKMesh::GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset, _In_ SubsetFlags materialType) const
 {
 	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
 

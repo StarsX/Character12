@@ -50,16 +50,17 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Enumerated Types.
 	//--------------------------------------------------------------------------------------
-	enum SubsetFlag : uint8_t
+	enum SubsetFlags : uint8_t
 	{
 		SUBSET_OPAQUE		= 0x1,
 		SUBSET_ALPHA		= 0x2,
-		SUBSET_ALPHA_TEST	= 0x4 | SUBSET_ALPHA,
+		SUBSET_ALPHA_TEST	= 0x4,
 		SUBSET_REFLECTED	= 0x8,
-		SUBSET_FULL = SUBSET_OPAQUE | SUBSET_ALPHA,
+		SUBSET_FULL = SUBSET_OPAQUE | SUBSET_ALPHA | SUBSET_ALPHA_TEST,
 
 		NUM_SUBSET_TYPE = 2
 	};
+	DEFINE_ENUM_FLAG_OPERATORS(SubsetFlags);
 
 	enum SDKMESH_PRIMITIVE_TYPE
 	{
@@ -337,9 +338,9 @@ namespace XUSG
 		SDKMESH_MATERIAL	*GetMaterial(_In_ uint32_t iMaterial) const;
 		SDKMESH_MESH		*GetMesh(_In_ uint32_t iMesh) const;
 		uint32_t			GetNumSubsets(_In_ uint32_t iMesh) const;
-		uint32_t			GetNumSubsets(_In_ uint32_t iMesh, _In_ SubsetFlag materialType) const;
+		uint32_t			GetNumSubsets(_In_ uint32_t iMesh, _In_ SubsetFlags materialType) const;
 		SDKMESH_SUBSET		*GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset) const;
-		SDKMESH_SUBSET		*GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset, _In_ SubsetFlag materialType) const;
+		SDKMESH_SUBSET		*GetSubset(_In_ uint32_t iMesh, _In_ uint32_t iSubset, _In_ SubsetFlags materialType) const;
 		uint32_t			GetVertexStride(_In_ uint32_t iMesh, _In_ uint32_t iVB) const;
 		uint32_t			GetNumFrames() const;
 		SDKMESH_FRAME		*GetFrame(_In_ uint32_t iFrame) const;

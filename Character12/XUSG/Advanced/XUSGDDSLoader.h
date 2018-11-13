@@ -31,12 +31,11 @@ namespace XUSG
 				_Out_opt_ AlphaMode* alphaMode = nullptr
 			);
 
-			HRESULT __cdecl CreateTextureFromFile(_In_ const Device &device, _In_ const GraphicsCommandList &commandList,
-				_In_z_ const wchar_t* fileName, _In_ size_t maxsize, _In_ bool forceSRGB,
-				_Outptr_opt_ std::shared_ptr<ResourceBase> &texture, Resource &uploader,
-				_Out_opt_ AlphaMode* alphaMode = nullptr);
+			bool CreateTextureFromFile(const Device &device, const GraphicsCommandList &commandList,
+				const wchar_t* fileName, size_t maxsize, bool forceSRGB, std::shared_ptr<ResourceBase> &texture,
+				Resource &uploader, AlphaMode* alphaMode = nullptr);
 
-			static size_t BitsPerPixel(_In_ DXGI_FORMAT fmt);
+			static size_t BitsPerPixel(DXGI_FORMAT fmt);
 		};
 	}
 }

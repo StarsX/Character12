@@ -370,22 +370,30 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
 		*m_cbvTables[isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 
-	const auto numMeshes = m_mesh->GetNumMeshes();
-	for (auto m = 0u; m < numMeshes; ++m)
-	{
-		// Set IA parameters
-		auto &vertexBuffer = m_transformedVBs[m_temporalIndex][m];
-		vertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-		m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV());
+	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 
-		// Set historical motion states, if neccessary
+	const auto numMeshes = m_mesh->GetNumMeshes();
+	for (const auto &subsetMask : subsetMasks)
+	{
+		if (subsetFlags & subsetMask)
+		{
+			for (auto m = 0u; m < numMeshes; ++m)
+			{
+				// Set IA parameters
+				auto &vertexBuffer = m_transformedVBs[m_temporalIndex][m];
+				vertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+				m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV());
+
+				// Set historical motion states, if neccessary
 #if	TEMPORAL
-		m_pDXContext->VSSetShaderResources(m_uSRVertices, 1,
-			m_pvpTransformedVBs[!m_temporalIndex][m]->GetSRV().GetAddressOf());
+				m_pDXContext->VSSetShaderResources(m_uSRVertices, 1,
+					m_pvpTransformedVBs[!m_temporalIndex][m]->GetSRV().GetAddressOf());
 #endif
 
-		// Render mesh
-		render(m, subsetFlags, reset);
+				// Render mesh
+				render(m, ~SUBSET_FULL & subsetFlags | subsetMask, reset);
+			}
+		}
 	}
 
 	// Clear out the vb bindings for the next pass

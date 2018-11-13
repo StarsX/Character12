@@ -90,7 +90,7 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 void Model::SetPipelineState(SubsetFlags subsetFlags)
 {
 	subsetFlags = subsetFlags & SUBSET_FULL;
-	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
+	assert(subsetFlags != SUBSET_FULL);
 
 	switch (subsetFlags)
 	{
@@ -140,7 +140,7 @@ void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 	if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
-InputLayout Model::InitLayout(Pipeline::Pool &pipelinePool)
+InputLayout Model::CreateInputLayout(Pipeline::Pool &pipelinePool)
 {
 	// Define vertex data layout for post-transformed objects
 	const auto offset = 0xffffffff;
@@ -260,51 +260,30 @@ void Model::createPipelines(const InputLayout &inputLayout, const Format *rtvFor
 	rtvFormats = rtvFormats ? rtvFormats : defaultRtvFormats;
 	numRTVs = numRTVs > 0 ? numRTVs : _countof(defaultRtvFormats);
 
-	// Get opaque pipeline
-	{
-		Graphics::State state;
-		state.IASetInputLayout(inputLayout);
-		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		state.SetPipelineLayout(m_pipelineLayout);
-		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS));
-		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
-		state.OMSetRTVFormats(rtvFormats, numRTVs);
-		state.OMSetNumRenderTargets(numRTVs);
-		state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
-		m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelinePool);
-	}
+	Graphics::State state;
 
-	// Get alpha-test pipeline
-	{
-		Graphics::State state;
-		state.IASetInputLayout(inputLayout);
-		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		state.SetPipelineLayout(m_pipelineLayout);
-		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_ALPHA_TEST));
-		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_ALPHA_TEST));
-		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelinePool);
-		state.OMSetRTVFormats(rtvFormats, numRTVs);
-		state.OMSetNumRenderTargets(numRTVs);
-		state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
-		m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelinePool);
-	}
+	// Get opaque pipeline
+	state.IASetInputLayout(inputLayout);
+	state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+	state.SetPipelineLayout(m_pipelineLayout);
+	state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS));
+	state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
+	state.OMSetRTVFormats(rtvFormats, numRTVs);
+	state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
+	m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelinePool);
 
 	// Get transparent pipeline
-	{
-		Graphics::State state;
-		state.IASetInputLayout(inputLayout);
-		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		state.SetPipelineLayout(m_pipelineLayout);
-		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS));
-		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
-		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelinePool);
-		state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS_EQUAL, *m_pipelinePool);
-		state.OMSetBlendState(BlendPreset::AUTO_NON_PREMUL, *m_pipelinePool);
-		state.OMSetRTVFormats(rtvFormats, numRTVs);
-		state.OMSetNumRenderTargets(numRTVs);
-		state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
-		m_pipelines[ALPHA_TWO_SIDE] = state.GetPipeline(*m_pipelinePool);
-	}
+	state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelinePool);
+	state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS_EQUAL, *m_pipelinePool);
+	state.OMSetBlendState(BlendPreset::AUTO_NON_PREMUL, *m_pipelinePool);
+	m_pipelines[ALPHA_TWO_SIDE] = state.GetPipeline(*m_pipelinePool);
+
+	// Get alpha-test pipeline
+	state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_ALPHA_TEST));
+	state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_ALPHA_TEST));
+	state.DSSetState(Graphics::DepthStencilPreset::DEFAULT, *m_pipelinePool);
+	state.OMSetBlendState(BlendPreset::DEFAULT_OPAQUE, *m_pipelinePool);
+	m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelinePool);
 	
 	// Get reflected pipeline
 	//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelinePool);
@@ -348,27 +327,15 @@ void Model::createDescriptorTables()
 
 void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 {
+	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
+
 	// Set IA parameters
 	m_commandList->IASetIndexBuffer(&m_mesh->GetIndexBuffer(mesh)->GetIBV());
 
-	// Opaque subsets
-	if (subsetFlags & SUBSET_OPAQUE)
-		render(mesh, ~SUBSET_FULL & subsetFlags | SUBSET_OPAQUE, SUBSET_OPAQUE, reset);
-
-	// Alpha test subsets
-	if (subsetFlags & SUBSET_ALPHA_TEST)
-		render(mesh, ~SUBSET_FULL & subsetFlags | SUBSET_ALPHA_TEST, SUBSET_ALPHA, reset);
-
-	// Transparent subsets
-	if (subsetFlags & SUBSET_ALPHA)
-		render(mesh, ~SUBSET_FULL & subsetFlags | SUBSET_ALPHA, SUBSET_ALPHA, reset);
-}
-
-void Model::render(uint32_t mesh, SubsetFlags subsetFlags, SubsetFlags materialType, bool reset)
-{
 	// Set pipeline state
 	if (reset) SetPipelineState(subsetFlags);
 
+	const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
 	const auto numSubsets = m_mesh->GetNumSubsets(mesh, materialType);
 	for (auto subset = 0u; subset < numSubsets; ++subset)
 	{

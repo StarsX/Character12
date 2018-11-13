@@ -170,7 +170,7 @@ void CharacterX::LoadAssets()
 
 	// Load character asset
 	{
-		m_inputLayout = Character::InitLayout(*m_pipelinePool);
+		m_inputLayout = Character::CreateInputLayout(*m_pipelinePool);
 		const auto textureCache = make_shared<TextureCache::element_type>(0);
 		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
 			L"Media/Bright/Stars.sdkmesh_anim", textureCache);

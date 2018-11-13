@@ -37,7 +37,7 @@ namespace XUSG
 		void SetPipelineState(PipelineIndex pipeline);
 		void Render(SubsetFlags subsetFlags, bool isShadow, bool reset = false);
 
-		static InputLayout InitLayout(Graphics::Pipeline::Pool &pipelinePool);
+		static InputLayout CreateInputLayout(Graphics::Pipeline::Pool &pipelinePool);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
 			const TextureCache &textureCache);
 		static void SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable);
@@ -76,7 +76,6 @@ namespace XUSG
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
 		void render(uint32_t mesh, SubsetFlags subsetFlags, bool reset);
-		void render(uint32_t mesh, SubsetFlags subsetFlags, SubsetFlags materialType, bool reset);
 
 		Device				m_device;
 		GraphicsCommandList	m_commandList;

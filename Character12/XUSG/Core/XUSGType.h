@@ -4,6 +4,10 @@
 
 #pragma once
 
+#define V_RETURN(x, o, r)		{ const auto hr = x; if (FAILED(hr)) { o << HrToString(hr) << endl; return r; } }
+#define VM_RETURN(x, o, m, r)	{ const auto hr = x; if (FAILED(hr)) { o << m << endl; return r; } }
+#define M_RETURN(x, o, m, r)	if (x) { o << m << endl; return r; }
+
 namespace XUSG
 {
 	using Microsoft::WRL::ComPtr;

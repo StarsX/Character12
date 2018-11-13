@@ -2,6 +2,7 @@
 // By Stars XU Tianchen
 //--------------------------------------------------------------------------------------
 
+#include "DXFramework.h"
 #include "XUSGDDSLoader.h"
 #include "dds.h"
 
@@ -17,8 +18,7 @@ struct handle_closer
 typedef public unique_ptr<void, handle_closer> ScopedHandle;
 inline HANDLE safe_handle(HANDLE h) { return (h == INVALID_HANDLE_VALUE) ? 0 : h; }
 
-//--------------------------------------------------------------------------------------
-static HRESULT LoadTextureDataFromFile(_In_z_ const wchar_t *fileName,
+static HRESULT LoadTextureDataFromFile(const wchar_t *fileName,
 	unique_ptr<uint8_t[]> &ddsData, DDS_HEADER **header,
 	uint8_t **bitData, size_t *bitSize)
 {
@@ -65,16 +65,16 @@ static HRESULT LoadTextureDataFromFile(_In_z_ const wchar_t *fileName,
 	if (BytesRead < FileSize.LowPart)return E_FAIL;
 
 	// DDS files always start with the same magic number ("DDS ")
-	uint32_t dwMagicNumber = *(const uint32_t*)(ddsData.get());
+	const auto dwMagicNumber = *(const uint32_t*)(ddsData.get());
 	if (dwMagicNumber != DDS_MAGIC) return E_FAIL;
 
-	auto hdr = reinterpret_cast<DDS_HEADER*>(ddsData.get() + sizeof(uint32_t));
+	const auto hdr = reinterpret_cast<DDS_HEADER*>(ddsData.get() + sizeof(uint32_t));
 
 	// Verify header to validate DDS file
 	if (hdr->size != sizeof(DDS_HEADER) || hdr->ddspf.size != sizeof(DDS_PIXELFORMAT))
 		return E_FAIL;
 
-	size_t offset = sizeof(uint32_t) + sizeof(DDS_HEADER);
+	auto offset = sizeof(uint32_t) + sizeof(DDS_HEADER);
 
 	// Check for extensions
 	if (hdr->ddspf.flags & DDS_FOURCC)
@@ -95,12 +95,8 @@ static HRESULT LoadTextureDataFromFile(_In_z_ const wchar_t *fileName,
 //--------------------------------------------------------------------------------------
 // Get surface information for a particular format
 //--------------------------------------------------------------------------------------
-static void GetSurfaceInfo(_In_ size_t width,
-	_In_ size_t height,
-	_In_ DXGI_FORMAT fmt,
-	_Out_opt_ size_t* outNumBytes,
-	_Out_opt_ size_t* outRowBytes,
-	_Out_opt_ size_t* outNumRows)
+static void GetSurfaceInfo(uint32_t width, uint32_t height, Format fmt,
+	size_t* outNumBytes, size_t* outRowBytes, size_t* outNumRows)
 {
 	size_t numBytes = 0;
 	size_t rowBytes = 0;
@@ -165,9 +161,9 @@ static void GetSurfaceInfo(_In_ size_t width,
 	if (bc)
 	{
 		size_t numBlocksWide = 0;
-		if (width > 0) numBlocksWide = std::max<size_t>(1, (width + 3) / 4);
+		if (width > 0) numBlocksWide = max<size_t>(1, (width + 3) / 4);
 		size_t numBlocksHigh = 0;
-		if (height > 0) numBlocksHigh = std::max<size_t>(1, (height + 3) / 4);
+		if (height > 0) numBlocksHigh = max<size_t>(1, (height + 3) / 4);
 		rowBytes = numBlocksWide * bpe;
 		numRows = numBlocksHigh;
 		numBytes = rowBytes * numBlocksHigh;
@@ -203,7 +199,6 @@ static void GetSurfaceInfo(_In_ size_t width,
 	if (outNumRows) *outNumRows = numRows;
 }
 
-//--------------------------------------------------------------------------------------
 #define ISBITMASK(r,g,b,a) (ddpf.RBitMask == r && ddpf.GBitMask == g && ddpf.BBitMask == b && ddpf.ABitMask == a)
 
 static Format GetDXGIFormat(const DDS_PIXELFORMAT& ddpf)
@@ -344,8 +339,7 @@ static Format GetDXGIFormat(const DDS_PIXELFORMAT& ddpf)
 	return DXGI_FORMAT_UNKNOWN;
 }
 
-//--------------------------------------------------------------------------------------
-static Format MakeSRGB(_In_ Format format)
+static Format MakeSRGB(Format format)
 {
 	switch (format)
 	{
@@ -368,14 +362,13 @@ static Format MakeSRGB(_In_ Format format)
 	}
 }
 
-//--------------------------------------------------------------------------------------
-static HRESULT FillInitData(_In_ size_t width, _In_ size_t height, _In_ size_t depth,
-	_In_ size_t mipCount, _In_ size_t arraySize, _In_ DXGI_FORMAT format,
-	_In_ size_t maxsize, _In_ size_t bitSize, _In_reads_bytes_(bitSize) const uint8_t *bitData,
-	_Out_ size_t &twidth, _Out_ size_t &theight, _Out_ size_t &tdepth, _Out_ size_t &skipMip,
-	_Out_writes_(mipCount * arraySize) D3D12_SUBRESOURCE_DATA *initData)
+static bool FillInitData(uint32_t width, uint32_t height, uint32_t depth,
+	uint8_t mipCount, uint8_t arraySize, Format format,
+	size_t maxsize, size_t bitSize, const uint8_t *bitData,
+	uint32_t &twidth, uint32_t &theight, uint32_t &tdepth, uint8_t &skipMip,
+	SubresourceData *initData)
 {
-	if (!bitData || !initData) return E_POINTER;
+	M_RETURN(!bitData || !initData, cerr, HrToString(E_POINTER), false);
 
 	skipMip = 0;
 	twidth = 0;
@@ -388,16 +381,16 @@ static HRESULT FillInitData(_In_ size_t width, _In_ size_t height, _In_ size_t d
 	const auto pEndBits = bitData + bitSize;
 
 	size_t index = 0;
-	for (size_t j = 0; j < arraySize; j++)
+	for (auto j = 0u; j < arraySize; j++)
 	{
-		size_t w = width;
-		size_t h = height;
-		size_t d = depth;
-		for (size_t i = 0; i < mipCount; i++)
+		auto w = width;
+		auto h = height;
+		auto d = depth;
+		for (auto i = 0u; i < mipCount; i++)
 		{
 			GetSurfaceInfo(w, h, format, &NumBytes, &RowBytes, nullptr);
 
-			if ((mipCount <= 1) || !maxsize || (w <= maxsize && h <= maxsize && d <= maxsize))
+			if (mipCount <= 1 || !maxsize || (w <= maxsize && h <= maxsize && d <= maxsize))
 			{
 				if (!twidth)
 				{
@@ -416,25 +409,21 @@ static HRESULT FillInitData(_In_ size_t width, _In_ size_t height, _In_ size_t d
 			else if (!j) ++skipMip;	// Count number of skipped mipmaps (first item only)
 
 			pSrcBits += NumBytes * d;
-			if (pSrcBits > pEndBits) return HRESULT_FROM_WIN32(ERROR_HANDLE_EOF);
+			M_RETURN(pSrcBits > pEndBits, cerr, HrToString(ERROR_HANDLE_EOF), false);
 			
-			w = max(w >> 1, 1);
-			h = max(h >> 1, 1);
-			d = max(d >> 1, 1);
+			w = (max)(w >> 1, 1u);
+			h = (max)(h >> 1, 1u);
+			d = (max)(d >> 1, 1u);
 		}
 	}
 
-	return (index > 0) ? S_OK : E_FAIL;
+	return index > 0;
 }
 
-//--------------------------------------------------------------------------------------
-static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandList &commandList,
-	_In_ const DDS_HEADER* header, _In_reads_bytes_(bitSize) const uint8_t *bitData, _In_ size_t bitSize,
-	_In_ size_t maxsize, _In_ bool forceSRGB, _Outptr_opt_ shared_ptr<ResourceBase> &texture,
-	Resource &uploader)
+static bool CreateTexture(const Device &device, const GraphicsCommandList &commandList,
+	const DDS_HEADER* header, const uint8_t *bitData, size_t bitSize, size_t maxsize,
+	bool forceSRGB,shared_ptr<ResourceBase> &texture, Resource &uploader)
 {
-	HRESULT hr = S_OK;
-
 	const auto width = header->width;
 	auto height = header->height;
 	auto depth = header->depth;
@@ -444,7 +433,7 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 	auto format = DXGI_FORMAT_UNKNOWN;
 	bool isCubeMap = false;
 
-	const auto mipCount = max(header->mipMapCount, 1);
+	const auto mipCount = (max)(header->mipMapCount, 1u);
 
 	if ((header->ddspf.flags & DDS_FOURCC) && (MAKEFOURCC('D', 'X', '1', '0') == header->ddspf.fourCC))
 	{
@@ -452,7 +441,7 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 			(reinterpret_cast<const char*>(header) + sizeof(DDS_HEADER));
 
 		arraySize = d3d10ext->arraySize;
-		if (arraySize == 0) return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+		M_RETURN(arraySize == 0, cerr, HrToString(ERROR_INVALID_DATA), false);
 
 		switch (d3d10ext->dxgiFormat)
 		{
@@ -460,11 +449,10 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 		case DXGI_FORMAT_IA44:
 		case DXGI_FORMAT_P8:
 		case DXGI_FORMAT_A8P8:
-			return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-
+			V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 		default:
-			if (Loader::BitsPerPixel(d3d10ext->dxgiFormat) == 0)
-				return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+			M_RETURN(Loader::BitsPerPixel(d3d10ext->dxgiFormat) == 0,
+				cerr, HrToString(ERROR_NOT_SUPPORTED), false);
 		}
 
 		format = d3d10ext->dxgiFormat;
@@ -473,8 +461,8 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 		{
 		case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
 			// D3DX writes 1D textures with a fixed Height of 1
-			if ((header->flags & DDS_HEIGHT) && height != 1)
-				return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+			M_RETURN((header->flags & DDS_HEIGHT) && height != 1,
+				cerr, HrToString(ERROR_INVALID_DATA), false);
 			height = depth = 1;
 			break;
 
@@ -488,14 +476,13 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 			break;
 
 		case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
-			if (!(header->flags & DDS_HEADER_FLAGS_VOLUME))
-				return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
-			if (arraySize > 1)
-				return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+			M_RETURN(!(header->flags & DDS_HEADER_FLAGS_VOLUME),
+				cerr, HrToString(ERROR_INVALID_DATA), false);
+			M_RETURN(arraySize > 1, cerr, HrToString(ERROR_INVALID_DATA), false);
 			break;
 
 		default:
-			return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+			V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 		}
 
 		resDim = d3d10ext->resourceDimension;
@@ -503,9 +490,7 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 	else
 	{
 		format = GetDXGIFormat(header->ddspf);
-
-		if (format == DXGI_FORMAT_UNKNOWN)
-			return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+		M_RETURN(format == DXGI_FORMAT_UNKNOWN, cerr, HrToString(ERROR_NOT_SUPPORTED), false);
 
 		if (header->flags & DDS_HEADER_FLAGS_VOLUME)
 			resDim = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
@@ -514,8 +499,8 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 			if (header->caps2 & DDS_CUBEMAP)
 			{
 				// We require all six faces to be defined
-				if ((header->caps2 & DDS_CUBEMAP_ALLFACES) != DDS_CUBEMAP_ALLFACES)
-					return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+				M_RETURN((header->caps2 & DDS_CUBEMAP_ALLFACES) != DDS_CUBEMAP_ALLFACES,
+					cerr, HrToString(ERROR_NOT_SUPPORTED), false);
 
 				arraySize = 6;
 				isCubeMap = true;
@@ -531,59 +516,59 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 	}
 
 	// Bound sizes (for security purposes we don't trust DDS file metadata larger than the D3D 11.x hardware requirements)
-	if (mipCount > D3D12_REQ_MIP_LEVELS)
-		return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+	M_RETURN(mipCount > D3D12_REQ_MIP_LEVELS, cerr, HrToString(ERROR_NOT_SUPPORTED), false);
 
 	switch (resDim)
 	{
 	case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
-		if ((arraySize > D3D12_REQ_TEXTURE1D_ARRAY_AXIS_DIMENSION) ||
-			(width > D3D12_REQ_TEXTURE1D_U_DIMENSION))
-			return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+		M_RETURN(arraySize > D3D12_REQ_TEXTURE1D_ARRAY_AXIS_DIMENSION ||
+			width > D3D12_REQ_TEXTURE1D_U_DIMENSION,
+			cerr, HrToString(ERROR_NOT_SUPPORTED), false);
 		texture = make_shared<Texture2D>();
 		break;
 
 	case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
 		if (isCubeMap)
+		{
 			// This is the right bound because we set arraySize to (NumCubes*6) above
-			if ((arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION) ||
-				(width > D3D12_REQ_TEXTURECUBE_DIMENSION) ||
-				(height > D3D12_REQ_TEXTURECUBE_DIMENSION))
-				return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
-		else if ((arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION) ||
-			(width > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION) ||
-			(height > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION))
-				return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+			M_RETURN(arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
+				width > D3D12_REQ_TEXTURECUBE_DIMENSION ||
+				height > D3D12_REQ_TEXTURECUBE_DIMENSION,
+				cerr, HrToString(ERROR_NOT_SUPPORTED), false);
+		}
+		else M_RETURN(arraySize > D3D12_REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
+			width > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION ||
+			height > D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION,
+			cerr, HrToString(ERROR_NOT_SUPPORTED), false);
 		texture = make_shared<Texture2D>();
 		break;
 
 	case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
-		if ((arraySize > 1) ||
-			(width > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION) ||
-			(height > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION) ||
-			(depth > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION))
-			return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+		M_RETURN(arraySize > 1 ||
+			width > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
+			height > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
+			depth > D3D12_REQ_TEXTURE3D_U_V_OR_W_DIMENSION,
+			cerr, HrToString(ERROR_NOT_SUPPORTED), false);
 		texture = make_shared<Texture3D>();
 		break;
 
 	default:
-		return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+		V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 	}
 
 	{
 		// Create the texture
 		const auto subresourceCount = static_cast<uint32_t>(mipCount) * arraySize;
 		unique_ptr<SubresourceData[]> initData(new (std::nothrow) SubresourceData[subresourceCount]);
-		if (!initData) return E_OUTOFMEMORY;
+		M_RETURN(!initData, cerr, HrToString(E_OUTOFMEMORY), false);
 
-		size_t skipMip = 0;
-		size_t twidth = 0;
-		size_t theight = 0;
-		size_t tdepth = 0;
-		hr = FillInitData(width, height, depth, mipCount, arraySize, format, maxsize, bitSize, bitData,
-			twidth, theight, tdepth, skipMip, initData.get());
+		auto skipMip = 0ui8;
+		auto twidth = 0u;
+		auto theight = 0u;
+		auto tdepth = 0u;
 
-		if (SUCCEEDED(hr))
+		if (FillInitData(width, height, depth, mipCount, arraySize, format, maxsize, bitSize, bitData,
+			twidth, theight, tdepth, skipMip, initData.get()))
 		{
 			bool success;
 			const auto texture2D = dynamic_pointer_cast<Texture2D, ResourceBase>(texture);
@@ -591,17 +576,17 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 			if (texture2D)
 			{
 				const auto fmt = forceSRGB ? MakeSRGB(format) : format;
-				success = texture2D->Create(device, width, height, fmt, arraySize, ResourceFlags(0), mipCount,
-					1, PoolType(1), D3D12_RESOURCE_STATE_COPY_DEST);
+				success = texture2D->Create(device, twidth, theight, fmt, arraySize, ResourceFlags(0),
+					mipCount - skipMip, 1, PoolType(1), D3D12_RESOURCE_STATE_COPY_DEST);
 				if (success) success = texture2D->Upload(commandList, uploader, initData.get(), subresourceCount,
 					D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			}
 			else if (texture3D)
 			{
 				const auto fmt = forceSRGB ? MakeSRGB(format) : format;
-				success = texture3D->Create(device, width, height, depth, fmt, ResourceFlags(0), mipCount);
+				success = texture3D->Create(device, twidth, theight, tdepth, fmt, ResourceFlags(0), mipCount - skipMip);
 			}
-			else return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+			else V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 
 			if (!success && !maxsize && (mipCount > 1))
 			{
@@ -610,10 +595,8 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 					? 2048 /*D3D10_REQ_TEXTURE3D_U_V_OR_W_DIMENSION*/
 					: 8192 /*D3D10_REQ_TEXTURE2D_U_OR_V_DIMENSION*/;
 
-				hr = FillInitData(width, height, depth, mipCount, arraySize, format, maxsize, bitSize, bitData,
-					twidth, theight, tdepth, skipMip, initData.get());
-
-				if (SUCCEEDED(hr))
+				if (FillInitData(width, height, depth, mipCount, arraySize, format, maxsize, bitSize, bitData,
+					twidth, theight, tdepth, skipMip, initData.get()))
 				{
 					if (texture2D)
 					{
@@ -630,7 +613,7 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 						texture = make_shared<Texture3D>();
 						success = texture3D->Create(device, width, height, depth, fmt, ResourceFlags(0), mipCount);
 					}
-					else return HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+					else V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 #if 0
 					hr = CreateD3DResources(d3dDevice, resDim, twidth, theight, tdepth, mipCount - skipMip, arraySize,
 						format, forceSRGB,
@@ -639,15 +622,14 @@ static HRESULT CreateTexture(_In_ const Device &device, const GraphicsCommandLis
 				}
 			}
 
-			if (!success) HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+			M_RETURN(!success, cerr, "Fauked to the create texture.", false);
 		}
 	}
 
-	return hr;
+	return true;
 }
 
-//--------------------------------------------------------------------------------------
-static AlphaMode GetAlphaMode(_In_ const DDS_HEADER *header)
+static AlphaMode GetAlphaMode(const DDS_HEADER *header)
 {
 	if (header->ddspf.flags & DDS_FOURCC)
 	{
@@ -673,6 +655,8 @@ static AlphaMode GetAlphaMode(_In_ const DDS_HEADER *header)
 	return ALPHA_MODE_UNKNOWN;
 }
 
+//--------------------------------------------------------------------------------------
+
 Loader::Loader()
 {
 }
@@ -681,29 +665,27 @@ Loader::~Loader()
 {
 }
 
-_Use_decl_annotations_
-HRESULT Loader::CreateTextureFromFile(const Device &device, const GraphicsCommandList &commandList,
+bool Loader::CreateTextureFromFile(const Device &device, const GraphicsCommandList &commandList,
 	const wchar_t *fileName, size_t maxsize, bool forceSRGB, shared_ptr<ResourceBase> &texture,
 	Resource &uploader, AlphaMode *alphaMode)
 {
 	if (alphaMode) *alphaMode = ALPHA_MODE_UNKNOWN;
-
-	if (!device || !fileName) return E_INVALIDARG;
+	M_RETURN(!device || !fileName, cerr, HrToString(E_INVALIDARG), false);
 
 	DDS_HEADER *header = nullptr;
 	uint8_t *bitData = nullptr;
 	size_t bitSize = 0;
 
 	unique_ptr<uint8_t[]> ddsData;
-	auto hr = LoadTextureDataFromFile(fileName, ddsData, &header, &bitData, &bitSize);
-	if (FAILED(hr)) return hr;
+	V_RETURN(LoadTextureDataFromFile(fileName, ddsData, &header, &bitData, &bitSize), cerr, false);
 
-	hr = CreateTexture(device, commandList, header, bitData, bitSize,
+	auto hr = CreateTexture(device, commandList, header, bitData, bitSize,
 		maxsize, forceSRGB, texture, uploader);
+	if (FAILED(hr)) return false;
 
 	if (alphaMode) *alphaMode = GetAlphaMode(header);
 
-	return hr;
+	return true;
 }
 
 size_t Loader::BitsPerPixel(DXGI_FORMAT fmt)

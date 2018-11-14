@@ -31,7 +31,7 @@ struct Vertex
 //--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
-// Raw buffers for historical moition states
+// Buffer for the historical moition state
 StructuredBuffer<Vertex>	g_roVertices	: register (t0);
 #endif
 
@@ -46,7 +46,7 @@ VS_Output main(const uint vid : SV_VERTEXID, const VS_Input input)
 #if defined(_BASEPASS_) && TEMPORAL	// Temporal tracking
 
 #ifdef	_CHARACTER_
-	const float4 vHPos = { g_roVertices[uIdx], 1.0 };
+	const float4 vHPos = { g_roVertices[uIdx].Pos, 1.0 };
 #elif	defined(_VEGETATION_)
 	float4 vHPos = vPos;
 	VegetationWave(vHPos, 1.0);

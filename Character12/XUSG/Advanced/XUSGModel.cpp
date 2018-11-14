@@ -84,7 +84,7 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 	{
 		XMStoreFloat4x4(&m_worldViewProjs[m_temporalIndex], worldViewProj);
 		const auto worldViewProjPrev = XMLoadFloat4x4(&m_worldViewProjs[!m_temporalIndex]);
-		pCBDataMatrices->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
+		pCBData->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
 	}
 #endif
 }
@@ -183,69 +183,7 @@ bool Model::createConstantBuffers()
 
 void Model::createPipelineLayout()
 {
-	auto cbMatrices = 0u;
-	auto txDiffuse = 0u;
-	auto txNormal = txDiffuse + 1;
-	auto txShadow = txNormal + 1;
-	auto smpAnisoWrap = 0u;
-	auto smpLinearCmp = smpAnisoWrap + 2;
-
-	// Get constant buffer slots
-	auto desc = D3D12_SHADER_INPUT_BIND_DESC();
-	auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
-	if (reflector)
-	{
-		const auto hr = reflector->GetResourceBindingDescByName("cbMatrices", &desc);
-		if (SUCCEEDED(hr)) cbMatrices = desc.BindPoint;
-	}
-
-	reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS);
-	if (reflector)
-	{
-		// Get shader resource slots
-		auto hr = reflector->GetResourceBindingDescByName("g_txAlbedo", &desc);
-		if (SUCCEEDED(hr)) txDiffuse = desc.BindPoint;
-		hr = reflector->GetResourceBindingDescByName("g_txNormal", &desc);
-		if (SUCCEEDED(hr)) txNormal = desc.BindPoint;
-		hr = reflector->GetResourceBindingDescByName("g_txShadow", &desc);
-		if (SUCCEEDED(hr)) txShadow = desc.BindPoint;
-
-		// Get sampler slots
-		hr = reflector->GetResourceBindingDescByName("g_smpLinear", &desc);
-		if (SUCCEEDED(hr)) smpAnisoWrap = desc.BindPoint;
-		hr = reflector->GetResourceBindingDescByName("g_smpCmpLinear", &desc);
-		if (SUCCEEDED(hr)) smpLinearCmp = desc.BindPoint;
-	}
-
-	// Get pipeline layout
-	Util::PipelineLayout utilPipelineLayout;
-	// Constant buffers
-	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices);
-	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
-
-	// Textures (material and shadow)
-	if (txNormal == txDiffuse + 1)
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 2, txDiffuse);
-	else
-	{
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txDiffuse);
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txNormal);
-	}
-	utilPipelineLayout.SetShaderStage(MATERIAL, Shader::Stage::PS);
-
-	utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow);
-	utilPipelineLayout.SetShaderStage(SHADOW_MAP, Shader::Stage::PS);
-
-	// Samplers
-	if (smpLinearCmp == smpAnisoWrap + 2)
-		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 3, smpAnisoWrap);
-	else
-	{
-		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 2, smpAnisoWrap);
-		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 1, smpLinearCmp);
-	}
-	utilPipelineLayout.SetShaderStage(SAMPLERS, Shader::Stage::PS);
-
+	auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 	m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 }
@@ -356,4 +294,72 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 		m_commandList->DrawIndexedInstanced(static_cast<uint32_t>(pSubset->IndexCount), 1,
 			static_cast<uint32_t>(pSubset->IndexStart), static_cast<int32_t>(pSubset->VertexStart), 0);
 	}
+}
+
+Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
+{
+	auto cbMatrices = 0u;
+	auto txDiffuse = 0u;
+	auto txNormal = txDiffuse + 1;
+	auto txShadow = txNormal + 1;
+	auto smpAnisoWrap = 0u;
+	auto smpLinearCmp = smpAnisoWrap + 2;
+
+	// Get constant buffer slots
+	auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+	auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, vs);
+	if (reflector)
+	{
+		const auto hr = reflector->GetResourceBindingDescByName("cbMatrices", &desc);
+		if (SUCCEEDED(hr)) cbMatrices = desc.BindPoint;
+	}
+
+	reflector = m_shaderPool->GetReflector(Shader::Stage::PS, ps);
+	if (reflector)
+	{
+		// Get shader resource slots
+		auto hr = reflector->GetResourceBindingDescByName("g_txAlbedo", &desc);
+		if (SUCCEEDED(hr)) txDiffuse = desc.BindPoint;
+		hr = reflector->GetResourceBindingDescByName("g_txNormal", &desc);
+		if (SUCCEEDED(hr)) txNormal = desc.BindPoint;
+		hr = reflector->GetResourceBindingDescByName("g_txShadow", &desc);
+		if (SUCCEEDED(hr)) txShadow = desc.BindPoint;
+
+		// Get sampler slots
+		hr = reflector->GetResourceBindingDescByName("g_smpLinear", &desc);
+		if (SUCCEEDED(hr)) smpAnisoWrap = desc.BindPoint;
+		hr = reflector->GetResourceBindingDescByName("g_smpCmpLinear", &desc);
+		if (SUCCEEDED(hr)) smpLinearCmp = desc.BindPoint;
+	}
+
+	// Get pipeline layout
+	Util::PipelineLayout utilPipelineLayout;
+	// Constant buffers
+	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices);
+	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
+
+	// Textures (material and shadow)
+	if (txNormal == txDiffuse + 1)
+		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 2, txDiffuse);
+	else
+	{
+		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txDiffuse);
+		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txNormal);
+	}
+	utilPipelineLayout.SetShaderStage(MATERIAL, Shader::Stage::PS);
+
+	utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow);
+	utilPipelineLayout.SetShaderStage(SHADOW_MAP, Shader::Stage::PS);
+
+	// Samplers
+	if (smpLinearCmp == smpAnisoWrap + 2)
+		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 3, smpAnisoWrap);
+	else
+	{
+		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 2, smpAnisoWrap);
+		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 1, smpLinearCmp);
+	}
+	utilPipelineLayout.SetShaderStage(SAMPLERS, Shader::Stage::PS);
+
+	return utilPipelineLayout;
 }

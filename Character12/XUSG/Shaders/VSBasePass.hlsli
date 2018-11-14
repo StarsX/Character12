@@ -4,7 +4,6 @@
 
 #include "VHBasePass.hlsli"
 #include "SHCommon.hlsli"
-#include "CHDataSize.hlsli"
 
 //--------------------------------------------------------------------------------------
 // Constant buffers
@@ -18,19 +17,22 @@ cbuffer cbTempBias	: register (b3)
 
 #if	TEMPORAL
 //--------------------------------------------------------------------------------------
+// Input/Output structures
+//--------------------------------------------------------------------------------------
+struct Vertex
+{
+	float3	Pos;		// Position
+	uint2	Norm;		// Normal
+	uint	Tex;		// Texture coordinate
+	uint2	Tan;		// Normalized Tangent vector
+	uint2	BiNorm;		// Normalized BiNormal vector
+};
+
+//--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
 // Raw buffers for historical moition states
-ByteAddressBuffer	g_roVertices	: register (t0);
-
-//--------------------------------------------------------------------------------------
-// Constants
-//--------------------------------------------------------------------------------------		
-static const uint	g_uNorm		= APPEND_OFFSET(0, SIZE_OF_FLOAT3);
-static const uint	g_uTex		= APPEND_OFFSET(g_uNorm, SIZE_OF_HALF4);
-static const uint	g_uTan		= APPEND_OFFSET(g_uTex, SIZE_OF_HALF2);
-static const uint	g_uBiNrm	= APPEND_OFFSET(g_uTan, SIZE_OF_HALF4);
-static const uint	g_uStride	= APPEND_OFFSET(g_uBiNrm, SIZE_OF_HALF4);
+StructuredBuffer<Vertex>	g_roVertices	: register (t0);
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -44,9 +46,7 @@ VS_Output main(const uint vid : SV_VERTEXID, const VS_Input input)
 #if defined(_BASEPASS_) && TEMPORAL	// Temporal tracking
 
 #ifdef	_CHARACTER_
-	const uint uIdx = g_uStride * vid;
-	const uint3 vPosu = g_roVertices.Load3(uIdx);
-	const float4 vHPos = { asfloat(vPosu), 1.0 };
+	const float4 vHPos = { g_roVertices[uIdx], 1.0 };
 #elif	defined(_VEGETATION_)
 	float4 vHPos = vPos;
 	VegetationWave(vHPos, 1.0);

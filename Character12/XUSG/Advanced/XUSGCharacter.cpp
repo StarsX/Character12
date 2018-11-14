@@ -186,8 +186,7 @@ bool Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		const auto vertexCount = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
-		const auto byteWidth = vertexCount * static_cast<uint32_t>(sizeof(Vertex));
-		N_RETURN(vertexBuffers[m].Create(m_device, byteWidth, sizeof(Vertex),
+		N_RETURN(vertexBuffers[m].Create(m_device, vertexCount, sizeof(Vertex),
 			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS), false);
 	}
 
@@ -222,44 +221,83 @@ bool Character::createBuffers()
 
 void Character::createPipelineLayout()
 {
-	auto rwVertices = 0u;
-	auto roVertices = 0u;
-	auto roBoneWorld = roVertices + 1;
-
-	// Get shader resource slots
-	auto desc = D3D12_SHADER_INPUT_BIND_DESC();
-	const auto pReflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
-	if (pReflector)
+	// Skinning
 	{
-		auto hr = pReflector->GetResourceBindingDescByName("g_rwVertices", &desc);
-		if (SUCCEEDED(hr)) rwVertices = desc.BindPoint;
+		auto rwVertices = 0u;
+		auto roVertices = 0u;
+		auto roBoneWorld = roVertices + 1;
 
-		hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
-		if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
+		// Get shader resource slots
+		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+		const auto pReflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
+		if (pReflector)
+		{
+			auto hr = pReflector->GetResourceBindingDescByName("g_rwVertices", &desc);
+			if (SUCCEEDED(hr)) rwVertices = desc.BindPoint;
 
-		hr = pReflector->GetResourceBindingDescByName("g_roDualQuat", &desc);
-		if (SUCCEEDED(hr)) roBoneWorld = desc.BindPoint;
+			hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
+			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
+
+			hr = pReflector->GetResourceBindingDescByName("g_roDualQuat", &desc);
+			if (SUCCEEDED(hr)) roBoneWorld = desc.BindPoint;
+		}
+
+		// Get pipeline layout
+		Util::PipelineLayout utilPipelineLayout;
+
+		// Input vertices and bone matrices
+		if (roBoneWorld == roVertices + 1)
+			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 2, roVertices);
+		else
+		{
+			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
+			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld);
+		}
+		utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
+
+		// Output vertices
+		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices);
+		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
+
+		m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
+			D3D12_ROOT_SIGNATURE_FLAG_NONE);
 	}
 
-	// Get pipeline layout
-	Util::PipelineLayout utilPipelineLayout;
-
-	// Input vertices and bone matrices
-	if (roBoneWorld == roVertices + 1)
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 2, roVertices);
-	else
+	// Rendering
 	{
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld);
+#if	TEMPORAL
+		auto roVertices = 0u;
+#if TEMPORAL_AA
+		auto cbTempBias = 3u;
+#endif
+
+		// Get shader resource slots
+		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+		const auto pReflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
+		if (pReflector)
+		{
+			auto hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
+			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
+#if TEMPORAL_AA
+			hr = pReflector->GetResourceBindingDescByName("cbTempBias", &desc);
+			cbTempBias = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
+#endif
+		}
+#endif
+
+		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
+
+#if	TEMPORAL
+		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
+#endif
+#if TEMPORAL_AA
+		if (cbTempBias != UINT32_MAX)
+			utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias);
+#endif
+
+		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 	}
-	utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
-
-	// Output vertices
-	utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices);
-	utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
-
-	m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
-		D3D12_ROOT_SIGNATURE_FLAG_NONE);
 }
 
 void Character::createPipelines()
@@ -274,8 +312,12 @@ void Character::createDescriptorTables()
 {
 	const auto numMeshes = m_mesh->GetNumMeshes();
 	m_srvSkinningTables.resize(numMeshes);
-	for (auto &uavSkinningTables : m_uavSkinningTables)
-		uavSkinningTables.resize(numMeshes);
+	for (auto &uavTables : m_uavSkinningTables)
+		uavTables.resize(numMeshes);
+#if	TEMPORAL
+	for (auto &srvTables : m_srvSkinnedTables)
+		srvTables.resize(numMeshes);
+#endif
 
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
@@ -284,13 +326,19 @@ void Character::createDescriptorTables()
 		srvTable.SetDescriptors(0, _countof(srvs), srvs);
 		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 
-		Util::DescriptorTable uavTables[_countof(m_transformedVBs)];
-		for (auto i = 0u; i < _countof(uavTables); ++i)
+		for (auto i = 0u; i < _countof(m_transformedVBs); ++i)
 		{
 			if (!m_transformedVBs[i].empty())
 			{
-				uavTables[i].SetDescriptors(0, 1, &m_transformedVBs[i][m].GetUAV());
-				m_uavSkinningTables[i][m] = uavTables[i].GetCbvSrvUavTable(*m_descriptorTablePool);
+				Util::DescriptorTable uavTable;
+				uavTable.SetDescriptors(0, 1, &m_transformedVBs[i][m].GetUAV());
+				m_uavSkinningTables[i][m] = uavTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+
+#if	TEMPORAL
+				Util::DescriptorTable srvTable;
+				srvTable.SetDescriptors(0, 1, &m_transformedVBs[i][m].GetSRV());
+				m_srvSkinnedTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+#endif
 			}
 		}
 	}
@@ -326,7 +374,7 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX world,
 	{
 		XMStoreFloat4x4(&m_linkedWorldViewProjs[m_temporalIndex][mesh], worldViewProj);
 		const auto worldViewProjPrev = XMLoadFloat4x4(&m_linkedWorldViewProjs[!m_temporalIndex][mesh]);
-		pCBDataMatrices->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
+		pCBData->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
 	}
 #endif
 }
@@ -394,8 +442,9 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 
 				// Set historical motion states, if neccessary
 #if	TEMPORAL
-				m_pDXContext->VSSetShaderResources(m_uSRVertices, 1,
-					m_pvpTransformedVBs[!m_temporalIndex][m]->GetSRV().GetAddressOf());
+				auto &prevVertexBuffer = m_transformedVBs[!m_temporalIndex][m];
+				prevVertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				m_commandList->SetGraphicsRootDescriptorTable(HISTORY, *m_srvSkinnedTables[!m_temporalIndex][m]);
 #endif
 
 				// Render mesh
@@ -405,13 +454,7 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 	}
 
 	// Clear out the vb bindings for the next pass
-#if	TEMPORAL
-	const auto pNullSRV = LPDXShaderResourceView(nullptr);	// Helper to Clear SRVs
-	m_pDXContext->VSSetShaderResources(m_uSRVertices, 1, &pNullSRV);
-#endif
-
-	// Clear out the vb bindings for the next pass
-	if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
+	//if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
 #if 0

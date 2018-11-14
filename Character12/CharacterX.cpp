@@ -10,7 +10,6 @@
 //*********************************************************
 
 #include "CharacterX.h"
-#include "Advanced/XUSGSharedConst.h"
 
 using namespace std;
 using namespace XUSG;

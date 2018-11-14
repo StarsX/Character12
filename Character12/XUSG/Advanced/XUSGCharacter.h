@@ -57,7 +57,9 @@ namespace XUSG
 		enum DescriptorTableSlot : uint8_t
 		{
 			INPUT,
-			OUTPUT
+			OUTPUT,
+			HISTORY = SAMPLERS + 1,
+			TEMPORAL_BIAS
 		};
 
 		bool createTransformedStates();
@@ -97,5 +99,8 @@ namespace XUSG
 		PipelineState	m_skinningPipeline;
 		std::vector<DescriptorTable> m_srvSkinningTables;
 		std::vector<DescriptorTable> m_uavSkinningTables[2];
+#if	TEMPORAL
+		std::vector<DescriptorTable> m_srvSkinnedTables[2];
+#endif
 	};
 }

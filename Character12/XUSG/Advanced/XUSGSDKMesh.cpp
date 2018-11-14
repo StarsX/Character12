@@ -72,12 +72,11 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 
 	// Open the file
 	ifstream fileStream(strPath, ios::in | ios::binary);
-	const auto fileBuffer = fileStream ? fileStream.rdbuf() : nullptr;
-	if (!fileBuffer) return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
+	N_RETURN(fileStream, MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903));
 
 	// Read header
 	SDKANIMATION_FILE_HEADER fileheader;
-	if (fileBuffer->sgetn(reinterpret_cast<char*>(&fileheader), sizeof(SDKANIMATION_FILE_HEADER)) < 0)
+	if (!fileStream.read(reinterpret_cast<char*>(&fileheader), sizeof(SDKANIMATION_FILE_HEADER)))
 	{
 		fileStream.close();
 
@@ -94,7 +93,7 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 	}
 
 	// Read it all in
-	if (fileBuffer->pubseekpos(0, fileStream.in) < 0)
+	if (!fileStream.seekg(0))
 	{
 		fileStream.close();
 
@@ -102,7 +101,7 @@ HRESULT SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
 	}
 
 	const auto cBytes = static_cast<streamsize>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize);
-	if (fileBuffer->sgetn(reinterpret_cast<char*>(m_pAnimationData), cBytes) < cBytes)
+	if (!fileStream.read(reinterpret_cast<char*>(m_pAnimationData), cBytes))
 	{
 		fileStream.close();
 
@@ -704,9 +703,10 @@ HRESULT SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, SDKM
 	pHeader->DataOffset = 0;
 
 	//Vertex Buffer
+	const auto stride = static_cast<uint32_t>(pHeader->StrideBytes);
+	const auto numVertices = static_cast<uint32_t>(pHeader->SizeBytes) / stride;
 	pHeader->pVertexBuffer = new VertexBuffer();
-	pHeader->pVertexBuffer->Create(m_device, static_cast<uint32_t>(pHeader->SizeBytes),
-		static_cast<uint32_t>(pHeader->StrideBytes), D3D12_RESOURCE_FLAG_NONE,
+	pHeader->pVertexBuffer->Create(m_device, numVertices, stride, D3D12_RESOURCE_FLAG_NONE,
 		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST);
 
 	uploaders.push_back(Resource());
@@ -753,18 +753,22 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName,
 
 	// Open the file
 	ifstream fileStream(m_strPathW, ios::in | ios::binary);
-	const auto fileBuffer = fileStream ? fileStream.rdbuf() : nullptr;
-	if (!fileBuffer) return MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903);
+	N_RETURN(fileStream, MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903));
 
 	// Change the path to just the directory
 	const auto found = m_strPathW.find_last_of(L"/\\");
 	m_strPathW = m_strPathW.substr(0, found + 1);
-
 	m_strPath.assign(m_strPathW.begin(), m_strPathW.end());
 
 	// Get the file size
-	const auto cBytes = fileBuffer->pubseekoff(0, fileStream.end, fileStream.in);
-	if (fileBuffer->pubseekpos(0, fileStream.in) < 0)
+	if (!fileStream.seekg(0, fileStream.end))
+	{
+		fileStream.close();
+
+		return E_FAIL;
+	}
+	const auto cBytes = static_cast<uint32_t>(fileStream.tellg());
+	if (!fileStream.seekg(0))
 	{
 		fileStream.close();
 
@@ -781,7 +785,7 @@ HRESULT SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName,
 	}
 
 	// Read in the file
-	if (fileBuffer->sgetn(reinterpret_cast<char*>(m_pStaticMeshData), cBytes) < cBytes)
+	if (!fileStream.read(reinterpret_cast<char*>(m_pStaticMeshData), cBytes))
 		hr = E_FAIL;
 
 	fileStream.close();

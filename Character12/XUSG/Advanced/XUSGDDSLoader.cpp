@@ -18,61 +18,45 @@ struct handle_closer
 typedef public unique_ptr<void, handle_closer> ScopedHandle;
 inline HANDLE safe_handle(HANDLE h) { return (h == INVALID_HANDLE_VALUE) ? 0 : h; }
 
-static HRESULT LoadTextureDataFromFile(const wchar_t *fileName,
+static bool LoadTextureDataFromFile(const wchar_t *fileName,
 	unique_ptr<uint8_t[]> &ddsData, DDS_HEADER **header,
 	uint8_t **bitData, size_t *bitSize)
 {
-	if (!header || !bitData || !bitSize) return E_POINTER;
+	F_RETURN(!header || !bitData || !bitSize, cerr, E_POINTER, false);
 
 	// Open the file
-#if (_WIN32_WINNT >= _WIN32_WINNT_WIN8)
-	ScopedHandle hFile(safe_handle(CreateFile2(fileName, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, nullptr)));
-#else
-	ScopedHandle hFile(safe_handle(CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, nullptr,
-		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr)));
-#endif
-
-	if (!hFile) return HRESULT_FROM_WIN32(GetLastError());
+	ifstream fileStream(fileName, ios::in | ios::binary);
+	F_RETURN(!fileStream, cerr, GetLastError(), false);
 
 	// Get the file size
-	LARGE_INTEGER FileSize = { 0 };
+	fileStream.seekg(0, fileStream.end);
+	const auto fileSize = static_cast<uint32_t>(fileStream.tellg());
+	if (!fileStream.seekg(0))
+	{
+		fileStream.close();
 
-#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
-	FILE_STANDARD_INFO fileInfo;
-	if (!GetFileInformationByHandleEx(hFile.get(), FileStandardInfo, &fileInfo, sizeof(fileInfo)))
-		return HRESULT_FROM_WIN32(GetLastError());
-
-	FileSize = fileInfo.EndOfFile;
-#else
-	GetFileSizeEx(hFile.get(), &FileSize);
-#endif
-
-	// File is too big for 32-bit allocation, so reject read
-	if (FileSize.HighPart > 0) return E_FAIL;
+		return false;
+	}
 
 	// Need at least enough data to fill the header and magic number to be a valid DDS
-	if (FileSize.LowPart < (sizeof(DDS_HEADER) + sizeof(uint32_t))) return E_FAIL;
+	C_RETURN(fileSize < (sizeof(DDS_HEADER) + sizeof(uint32_t)), false);
 
 	// create enough space for the file data
-	ddsData.reset(new uint8_t[FileSize.LowPart]);
-	if (!ddsData) return E_OUTOFMEMORY;
+	ddsData.reset(new uint8_t[fileSize]);
+	F_RETURN(!ddsData, cerr, E_OUTOFMEMORY, false);
 
 	// read the data in
-	DWORD BytesRead = 0;
-	if (!ReadFile(hFile.get(), ddsData.get(), FileSize.LowPart, &BytesRead, nullptr))
-		return HRESULT_FROM_WIN32(GetLastError());
-
-	if (BytesRead < FileSize.LowPart)return E_FAIL;
+	F_RETURN(!fileStream.read(reinterpret_cast<char*>(ddsData.get()), fileSize),
+		cerr, GetLastError(), false);
 
 	// DDS files always start with the same magic number ("DDS ")
 	const auto dwMagicNumber = *(const uint32_t*)(ddsData.get());
-	if (dwMagicNumber != DDS_MAGIC) return E_FAIL;
+	C_RETURN(dwMagicNumber != DDS_MAGIC, false);
 
 	const auto hdr = reinterpret_cast<DDS_HEADER*>(ddsData.get() + sizeof(uint32_t));
 
 	// Verify header to validate DDS file
-	if (hdr->size != sizeof(DDS_HEADER) || hdr->ddspf.size != sizeof(DDS_PIXELFORMAT))
-		return E_FAIL;
+	C_RETURN(hdr->size != sizeof(DDS_HEADER) || hdr->ddspf.size != sizeof(DDS_PIXELFORMAT), false);
 
 	auto offset = sizeof(uint32_t) + sizeof(DDS_HEADER);
 
@@ -82,14 +66,14 @@ static HRESULT LoadTextureDataFromFile(const wchar_t *fileName,
 			offset += sizeof(DDS_HEADER_DXT10);
 
 	// Must be long enough for all headers and magic value
-	if (FileSize.LowPart < offset) return E_FAIL;
+	C_RETURN(fileSize < offset, false);
 
 	// setup the pointers in the process request
 	*header = hdr;
 	*bitData = ddsData.get() + offset;
-	*bitSize = FileSize.LowPart - offset;
+	*bitSize = fileSize - offset;
 
-	return S_OK;
+	return true;
 }
 
 //--------------------------------------------------------------------------------------
@@ -673,7 +657,7 @@ bool Loader::CreateTextureFromFile(const Device &device, const GraphicsCommandLi
 	size_t bitSize = 0;
 
 	unique_ptr<uint8_t[]> ddsData;
-	V_RETURN(LoadTextureDataFromFile(fileName, ddsData, &header, &bitData, &bitSize), cerr, false);
+	N_RETURN(LoadTextureDataFromFile(fileName, ddsData, &header, &bitData, &bitSize), false);
 
 	N_RETURN(CreateTexture(device, commandList, header, bitData, bitSize,
 		maxsize, forceSRGB, texture, uploader), false);

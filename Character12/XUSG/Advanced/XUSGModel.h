@@ -7,6 +7,7 @@
 #include "Core/XUSGGraphicsState.h"
 #include "XUSGShaderCommon.h"
 #include "XUSGSDKMesh.h"
+#include "XUSGSharedConst.h"
 
 namespace XUSG
 {
@@ -66,16 +67,18 @@ namespace XUSG
 			DirectX::XMMATRIX Normal;
 			DirectX::XMMATRIX ShadowProj;
 #if	TEMPORAL
-			DirectX::XMMATRIX WorldViewProj;
+			DirectX::XMMATRIX WorldViewProjPrev;
 #endif
 		};
 
 		bool createConstantBuffers();
-		void createPipelineLayout();
+		virtual void createPipelineLayout();
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
 		void render(uint32_t mesh, SubsetFlags subsetFlags, bool reset);
+
+		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);
 
 		Device				m_device;
 		GraphicsCommandList	m_commandList;

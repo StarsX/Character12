@@ -85,7 +85,7 @@ bool ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t c
 	// Describe and create a constant buffer view.
 	D3D12_CONSTANT_BUFFER_VIEW_DESC desc;
 	desc.BufferLocation = m_resource->GetGPUVirtualAddress();
-	desc.SizeInBytes = (cbvSize + 255) & ~255;	// CB size is required to be 256-byte aligned.
+	desc.SizeInBytes = ALIGN_WITH(cbvSize, 256);	// CB size is required to be 256-byte aligned.
 
 	// Create CBV
 	m_CBV = m_cbvPool->GetCPUDescriptorHandleForHeapStart();

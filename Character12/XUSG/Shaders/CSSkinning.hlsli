@@ -20,7 +20,7 @@ struct VS_Input
 // Buffers
 //--------------------------------------------------------------------------------------
 // Structured buffer for bone matrices
-StructuredBuffer<float3x4>	g_roDualQuat : register (t1);
+StructuredBuffer<float3x4>	g_roDualQuat;
 
 //--------------------------------------------------------------------------------------
 // Helper struct for passing back skinned vertex information

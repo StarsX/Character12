@@ -229,9 +229,9 @@ void Character::createPipelineLayout()
 {
 	// Skinning
 	{
+		auto roBoneWorld = 0u;
 		auto rwVertices = 0u;
-		auto roVertices = 0u;
-		auto roBoneWorld = roVertices + 1;
+		auto roVertices = roBoneWorld + 1;
 
 		// Get shader resource slots
 		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
@@ -241,23 +241,23 @@ void Character::createPipelineLayout()
 			auto hr = pReflector->GetResourceBindingDescByName("g_rwVertices", &desc);
 			if (SUCCEEDED(hr)) rwVertices = desc.BindPoint;
 
-			hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
-			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
-
 			hr = pReflector->GetResourceBindingDescByName("g_roDualQuat", &desc);
 			if (SUCCEEDED(hr)) roBoneWorld = desc.BindPoint;
+
+			hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
+			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
 		}
 
 		// Get pipeline layout
 		Util::PipelineLayout utilPipelineLayout;
 
 		// Input vertices and bone matrices
-		if (roBoneWorld == roVertices + 1)
-			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 2, roVertices);
+		if (roVertices == roBoneWorld + 1)
+			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 2, roBoneWorld);
 		else
 		{
-			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
 			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld);
+			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
 		}
 		utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
 
@@ -328,7 +328,7 @@ void Character::createDescriptorTables()
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		Util::DescriptorTable srvTable;
-		const Descriptor srvs[] = { m_mesh->GetVertexBuffer(m, 0)->GetSRV(), m_boneWorlds[m].GetSRV() };
+		const Descriptor srvs[] = { m_boneWorlds[m].GetSRV(), m_mesh->GetVertexBuffer(m, 0)->GetSRV() };
 		srvTable.SetDescriptors(0, _countof(srvs), srvs);
 		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 
@@ -409,7 +409,8 @@ void Character::skinning(bool reset)
 		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_temporalIndex][m]);
 		
 		// Skinning
-		const auto numGroups = ceilf(m_mesh->GetNumVertices(m, 0) / 64.0f);
+		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
+		const auto numGroups = ALIGN_WITH(numVertices, 64) / 64;
 		m_commandList->Dispatch(static_cast<uint32_t>(numGroups), 1, 1);
 	}
 }

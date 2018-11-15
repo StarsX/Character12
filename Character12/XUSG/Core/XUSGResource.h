@@ -6,7 +6,8 @@
 
 #include "XUSGDescriptor.h"
 
-#define	BIND_PACKED_UAV	ResourceFlags(0x4 | 0x8000)
+#define	BIND_PACKED_UAV		ResourceFlags(0x4 | 0x8000)
+#define ALIGN_WITH(x, n)	(((x) + (n - 1)) & ~(n - 1))
 
 namespace XUSG
 {

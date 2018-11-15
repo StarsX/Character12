@@ -30,8 +30,8 @@ struct CS_Output
 //--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
-RWStructuredBuffer<CS_Output>	g_rwVertices	: register (u0);
-StructuredBuffer<CS_Input>		g_roVertices	: register (t0);
+RWStructuredBuffer<CS_Output>	g_rwVertices;
+StructuredBuffer<CS_Input>		g_roVertices;
 
 //--------------------------------------------------------------------------------------
 // Encode R16G16B16_FLOAT

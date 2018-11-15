@@ -19,14 +19,6 @@ namespace XUSG
 		NUM
 	};
 
-	namespace Graphics
-	{
-		namespace Pipeline
-		{
-			class Pool;
-		}
-	}
-
 	class PipelineLayoutPool;
 
 	struct DescriptorRange
@@ -50,14 +42,10 @@ namespace XUSG
 			void SetRange(uint32_t index, DescriptorType type, uint32_t num, uint32_t baseReg, uint32_t space = 0);
 
 			XUSG::PipelineLayout CreatePipelineLayout(PipelineLayoutPool &pipelineLayoutPool, uint8_t flags);
-			XUSG::PipelineLayout CreatePipelineLayout(Graphics::Pipeline::Pool &pipelinePool, uint8_t flags);
 			XUSG::PipelineLayout GetPipelineLayout(PipelineLayoutPool &pipelineLayoutPool, uint8_t flags);
-			XUSG::PipelineLayout GetPipelineLayout(Graphics::Pipeline::Pool &pipelinePool, uint8_t flags);
 
 			DescriptorTableLayout CreateDescriptorTableLayout(uint32_t index, PipelineLayoutPool &pipelineLayoutPool) const;
-			DescriptorTableLayout CreateDescriptorTableLayout(uint32_t index, Graphics::Pipeline::Pool &pipelinePool) const;
 			DescriptorTableLayout GetDescriptorTableLayout(uint32_t index, PipelineLayoutPool &pipelineLayoutPool) const;
-			DescriptorTableLayout GetDescriptorTableLayout(uint32_t index, Graphics::Pipeline::Pool &pipelinePool) const;
 
 		protected:
 			friend class PipelineLayoutPool;

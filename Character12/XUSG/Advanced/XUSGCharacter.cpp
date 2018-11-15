@@ -12,6 +12,7 @@ Character::Character(const Device &device, const GraphicsCommandList &commandLis
 	Model(device, commandList),
 	m_linkedMeshes(nullptr),
 	m_meshLinks(nullptr),
+	m_computePipelinePool(nullptr),
 	m_transformedVBs(),
 	m_boneWorlds(0),
 	m_cbLinkedMatrices(0),
@@ -30,17 +31,22 @@ Character::~Character(void)
 bool Character::Init(const InputLayout &inputLayout,
 	const shared_ptr<SDKMesh> &mesh,
 	const shared_ptr<Shader::Pool> &shaderPool,
-	const shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
+	const shared_ptr<Graphics::Pipeline::Pool> &graphicsPipelinePool,
+	const shared_ptr<Compute::Pipeline::Pool> &computePipelinePool,
+	const shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
 	const shared_ptr<DescriptorTablePool> &descriptorTablePool,
 	const shared_ptr<vector<SDKMesh>> &linkedMeshes,
 	const shared_ptr<vector<MeshLink>> &meshLinks)
 {
+	m_computePipelinePool = computePipelinePool;
+
 	// Set the Linked Meshes
 	m_meshLinks = meshLinks;
 	m_linkedMeshes = linkedMeshes;
 
 	// Get SDKMesh
-	N_RETURN(Model::Init(inputLayout, mesh, shaderPool, pipelinePool, descriptorTablePool), false);
+	N_RETURN(Model::Init(inputLayout, mesh, shaderPool, graphicsPipelinePool,
+		pipelineLayoutPool, descriptorTablePool), false);
 
 	// Create buffers
 	N_RETURN(createBuffers(), false);
@@ -259,7 +265,7 @@ void Character::createPipelineLayout()
 		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices);
 		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
 
-		m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
+		m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutPool,
 			D3D12_ROOT_SIGNATURE_FLAG_NONE);
 	}
 
@@ -295,17 +301,17 @@ void Character::createPipelineLayout()
 			utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias);
 #endif
 
-		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
+		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutPool,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 	}
 }
 
 void Character::createPipelines()
 {
-	Compute::PipelineDesc desc = {};
-	desc.pRootSignature = m_skinningPipelineLayout.Get();
-	desc.CS = Shader::ByteCode(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING).Get());
-	ThrowIfFailed(m_device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_skinningPipeline)));
+	Compute::State state;
+	state.SetPipelineLayout(m_skinningPipelineLayout);
+	state.SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
+	m_skinningPipeline = state.GetPipeline(*m_computePipelinePool);
 }
 
 void Character::createDescriptorTables()

@@ -48,7 +48,9 @@ private:
 	};
 
 	std::shared_ptr<XUSG::Shader::Pool>				m_shaderPool;
-	std::shared_ptr<XUSG::Graphics::Pipeline::Pool>	m_pipelinePool;
+	std::shared_ptr<XUSG::Graphics::Pipeline::Pool>	m_graphicsPipelinePool;
+	std::shared_ptr<XUSG::Compute::Pipeline::Pool>	m_computePipelinePool;
+	std::shared_ptr<XUSG::PipelineLayoutPool>		m_pipelineLayoutPool;
 	std::shared_ptr<XUSG::DescriptorTablePool>		m_descriptorTablePool;
 
 	// Pipeline objects.

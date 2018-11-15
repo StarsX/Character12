@@ -31,11 +31,13 @@ Model::~Model()
 
 bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh,
 	const shared_ptr<Shader::Pool> &shaderPool, const shared_ptr<Pipeline::Pool> &pipelinePool,
+	const shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
 	const shared_ptr <DescriptorTablePool> &descriptorTablePool)
 {
 	// Set shader group and states
 	m_shaderPool = shaderPool;
 	m_pipelinePool = pipelinePool;
+	m_pipelineLayoutPool = pipelineLayoutPool;
 	m_descriptorTablePool = descriptorTablePool;
 
 	// Get SDKMesh
@@ -184,7 +186,7 @@ bool Model::createConstantBuffers()
 void Model::createPipelineLayout()
 {
 	auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
-	m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelinePool,
+	m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutPool,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 }
 

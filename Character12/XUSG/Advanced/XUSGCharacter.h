@@ -5,6 +5,7 @@
 #pragma once
 
 #include "XUSGModel.h"
+#include "Core/XUSGComputeState.h"
 
 namespace XUSG
 {
@@ -32,7 +33,9 @@ namespace XUSG
 		bool Init(const InputLayout &inputLayout,
 			const std::shared_ptr<SDKMesh> &mesh,
 			const std::shared_ptr<Shader::Pool> &shaderPool,
-			const std::shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
+			const std::shared_ptr<Graphics::Pipeline::Pool> &graphicsPipelinePool,
+			const std::shared_ptr<Compute::Pipeline::Pool> &computePipelinePool,
+			const std::shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
 			const std::shared_ptr<DescriptorTablePool> &descriptorTablePool,
 			const std::shared_ptr<std::vector<SDKMesh>> &linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr);
@@ -80,6 +83,8 @@ namespace XUSG
 
 		std::shared_ptr<std::vector<SDKMesh>>	m_linkedMeshes;
 		std::shared_ptr<std::vector<MeshLink>>	m_meshLinks;
+
+		std::shared_ptr<Compute::Pipeline::Pool> m_computePipelinePool;
 
 		std::vector<VertexBuffer> m_transformedVBs[2];
 		DirectX::XMFLOAT4X4	m_mWorld;

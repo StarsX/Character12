@@ -150,7 +150,9 @@ void CharacterX::LoadPipeline()
 void CharacterX::LoadAssets()
 {
 	m_shaderPool = make_shared<Shader::Pool>();
-	m_pipelinePool = make_shared<Graphics::Pipeline::Pool>(m_device);
+	m_graphicsPipelinePool = make_shared<Graphics::Pipeline::Pool>(m_device);
+	m_computePipelinePool = make_shared<Compute::Pipeline::Pool>(m_device);
+	m_pipelineLayoutPool = make_shared<PipelineLayoutPool>(m_device);
 
 	// Create the shaders.
 	{
@@ -168,14 +170,16 @@ void CharacterX::LoadAssets()
 
 	// Load character asset
 	{
-		m_inputLayout = Character::CreateInputLayout(*m_pipelinePool);
+		m_inputLayout = Character::CreateInputLayout(*m_graphicsPipelinePool);
 		const auto textureCache = make_shared<TextureCache::element_type>(0);
 		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
 			L"Media/Bright/Stars.sdkmesh_anim", textureCache);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
 		m_character = make_unique<Character>(m_device, m_commandList);
 		if (!m_character) ThrowIfFailed(E_FAIL);
-		if (!m_character->Init(m_inputLayout, characterMesh, m_shaderPool, m_pipelinePool, m_descriptorTablePool))
+		if (!m_character->Init(m_inputLayout, characterMesh, m_shaderPool,
+			m_graphicsPipelinePool, m_computePipelinePool,
+			m_pipelineLayoutPool, m_descriptorTablePool))
 			ThrowIfFailed(E_FAIL);
 	}
 

@@ -48,11 +48,6 @@ PipelineLayout Util::PipelineLayout::CreatePipelineLayout(PipelineLayoutPool &pi
 	return pipelineLayoutPool.createPipelineLayout(m_pipelineLayoutKey);
 }
 
-PipelineLayout Util::PipelineLayout::CreatePipelineLayout(Graphics::Pipeline::Pool &pipelinePool, uint8_t flags)
-{
-	return CreatePipelineLayout(pipelinePool.GetPipelineLayoutPool(), flags);
-}
-
 PipelineLayout Util::PipelineLayout::GetPipelineLayout(PipelineLayoutPool &pipelineLayoutPool, uint8_t flags)
 {
 	setPipelineLayoutKey(pipelineLayoutPool, flags);
@@ -60,29 +55,14 @@ PipelineLayout Util::PipelineLayout::GetPipelineLayout(PipelineLayoutPool &pipel
 	return pipelineLayoutPool.getPipelineLayout(m_pipelineLayoutKey);
 }
 
-PipelineLayout Util::PipelineLayout::GetPipelineLayout(Graphics::Pipeline::Pool &pipelinePool, uint8_t flags)
-{
-	return GetPipelineLayout(pipelinePool.GetPipelineLayoutPool(), flags);
-}
-
 DescriptorTableLayout Util::PipelineLayout::CreateDescriptorTableLayout(uint32_t index, PipelineLayoutPool &pipelineLayoutPool) const
 {
 	return pipelineLayoutPool.createDescriptorTableLayout(m_descriptorTableLayoutKeys[index]);
 }
 
-DescriptorTableLayout Util::PipelineLayout::CreateDescriptorTableLayout(uint32_t index, Graphics::Pipeline::Pool &pipelinePool) const
-{
-	return CreateDescriptorTableLayout(index, pipelinePool.GetPipelineLayoutPool());
-}
-
 DescriptorTableLayout Util::PipelineLayout::GetDescriptorTableLayout(uint32_t index, PipelineLayoutPool &pipelineLayoutPool) const
 {
 	return pipelineLayoutPool.getDescriptorTableLayout(m_descriptorTableLayoutKeys[index]);
-}
-
-DescriptorTableLayout Util::PipelineLayout::GetDescriptorTableLayout(uint32_t index, Graphics::Pipeline::Pool &pipelinePool) const
-{
-	return GetDescriptorTableLayout(index, pipelinePool.GetPipelineLayoutPool());
 }
 
 void Util::PipelineLayout::setPipelineLayoutKey(PipelineLayoutPool &pipelineLayoutPool, uint8_t flags)

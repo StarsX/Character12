@@ -30,6 +30,7 @@ namespace XUSG
 		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
 			const std::shared_ptr<Shader::Pool> &shaderPool,
 			const std::shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
+			const std::shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
 			const std::shared_ptr<DescriptorTablePool> &descriptorTablePool);
 		void FrameMove();
 		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
@@ -88,6 +89,7 @@ namespace XUSG
 		std::shared_ptr<SDKMesh>					m_mesh;
 		std::shared_ptr<Shader::Pool>				m_shaderPool;
 		std::shared_ptr<Graphics::Pipeline::Pool>	m_pipelinePool;
+		std::shared_ptr<PipelineLayoutPool>			m_pipelineLayoutPool;
 		std::shared_ptr<DescriptorTablePool>		m_descriptorTablePool;
 
 #if	TEMPORAL

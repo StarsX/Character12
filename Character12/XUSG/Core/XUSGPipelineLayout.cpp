@@ -23,7 +23,8 @@ void Util::PipelineLayout::SetShaderStage(uint32_t index, Shader::Stage::Type st
 	checkKeySpace(index)[0] = stage;
 }
 
-void Util::PipelineLayout::SetRange(uint32_t index, DescriptorType type, uint32_t num, uint32_t baseReg, uint32_t space)
+void Util::PipelineLayout::SetRange(uint32_t index, DescriptorType type, uint32_t num, uint32_t baseReg,
+	uint32_t space, uint8_t flags)
 {
 	auto &key = checkKeySpace(index);
 
@@ -39,6 +40,7 @@ void Util::PipelineLayout::SetRange(uint32_t index, DescriptorType type, uint32_
 	pRanges[i].NumDescriptors = num;
 	pRanges[i].BaseRegister = baseReg;
 	pRanges[i].Space = space;
+	pRanges[i].Flags = flags;
 }
 
 PipelineLayout Util::PipelineLayout::CreatePipelineLayout(PipelineLayoutPool &pipelineLayoutPool, uint8_t flags)
@@ -198,9 +200,7 @@ DescriptorTableLayout PipelineLayoutPool::createDescriptorTableLayout(const stri
 	{
 		const auto &range = pRanges[i];
 		ranges[i].Init(rangeTypes[static_cast<uint8_t>(range.ViewType)], range.NumDescriptors,
-			range.BaseRegister, range.Space, D3D12_DESCRIPTOR_RANGE_FLAG_NONE);
-		//	range.Space, range.DescriptorType == Descriptor::SAMPLER ?
-		//	D3D12_DESCRIPTOR_RANGE_FLAG_NONE : D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+			range.BaseRegister, range.Space, D3D12_DESCRIPTOR_RANGE_FLAGS(range.Flags));
 	}
 
 	D3D12_SHADER_VISIBILITY visibilities[Shader::Stage::NUM];

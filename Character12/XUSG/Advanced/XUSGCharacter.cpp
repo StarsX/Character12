@@ -255,13 +255,9 @@ void Character::createPipelineLayout()
 		Util::PipelineLayout utilPipelineLayout;
 
 		// Input vertices and bone matrices
-		if (roVertices == roBoneWorld + 1)
-			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 2, roBoneWorld);
-		else
-		{
-			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld);
-			utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
-		}
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld,
+				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
 		utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
 
 		// Output vertices
@@ -288,7 +284,7 @@ void Character::createPipelineLayout()
 			auto hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
 			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
 #if TEMPORAL_AA
-			hr = pReflector->GetResourceBindingDescByName("cbTempBias", &desc);
+			hr = pReflector->GetResourceBindingDescByName("g_cbTempBias", &desc);
 			cbTempBias = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
 #endif
 		}
@@ -301,7 +297,8 @@ void Character::createPipelineLayout()
 #endif
 #if TEMPORAL_AA
 		if (cbTempBias != UINT32_MAX)
-			utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias);
+			utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias,
+				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 #endif
 
 		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutPool,

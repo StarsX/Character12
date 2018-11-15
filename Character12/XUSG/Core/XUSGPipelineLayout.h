@@ -28,6 +28,7 @@ namespace XUSG
 		uint32_t NumDescriptors;
 		uint32_t BaseRegister;
 		uint32_t Space;
+		uint8_t Flags;
 	};
 
 	namespace Util
@@ -39,7 +40,8 @@ namespace XUSG
 			virtual ~PipelineLayout();
 
 			void SetShaderStage(uint32_t index, Shader::Stage::Type stage);
-			void SetRange(uint32_t index, DescriptorType type, uint32_t num, uint32_t baseReg, uint32_t space = 0);
+			void SetRange(uint32_t index, DescriptorType type, uint32_t num, uint32_t baseReg,
+				uint32_t space = 0, uint8_t flags = 0);
 
 			XUSG::PipelineLayout CreatePipelineLayout(PipelineLayoutPool &pipelineLayoutPool, uint8_t flags);
 			XUSG::PipelineLayout GetPipelineLayout(PipelineLayoutPool &pipelineLayoutPool, uint8_t flags);

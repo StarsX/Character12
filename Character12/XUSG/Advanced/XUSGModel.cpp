@@ -337,16 +337,20 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	// Get pipeline layout
 	Util::PipelineLayout utilPipelineLayout;
 	// Constant buffers
-	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices);
+	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices,
+		0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
 
 	// Textures (material and shadow)
 	if (txNormal == txDiffuse + 1)
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 2, txDiffuse);
+		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 2, txDiffuse,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	else
 	{
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txDiffuse);
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txNormal);
+		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txDiffuse,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txNormal,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	}
 	utilPipelineLayout.SetShaderStage(MATERIAL, Shader::Stage::PS);
 

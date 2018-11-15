@@ -9,7 +9,7 @@
 // Constant buffers
 //--------------------------------------------------------------------------------------
 #if	TEMPORAL_AA
-cbuffer cbTempBias	: register (b3)
+cbuffer g_cbTempBias	: register (b3)
 {
 	float2	g_vProjBias;
 };

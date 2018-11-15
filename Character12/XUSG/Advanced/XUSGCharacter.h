@@ -76,6 +76,7 @@ namespace XUSG
 		void skinning(bool reset);
 		void renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool reset);
 		void renderLinked(uint32_t mesh, bool isShadow, bool reset);
+		void setSkeletalMatrices(uint32_t numMeshes);
 		void setBoneMatrices(uint32_t mesh);
 		void convertToDQ(DirectX::XMFLOAT4 &dqTran, DirectX::CXMVECTOR quat,
 			const DirectX::XMFLOAT3 &tran) const;
@@ -96,7 +97,7 @@ namespace XUSG
 
 		double m_time;
 
-		std::vector<StructuredBuffer> m_boneWorlds;
+		StructuredBuffer m_boneWorlds;
 		std::vector<ConstantBuffer> m_cbLinkedMatrices;
 		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
 

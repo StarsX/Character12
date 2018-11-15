@@ -1054,7 +1054,11 @@ Descriptor Texture3D::GetSubSRV(uint8_t i) const
 RawBuffer::RawBuffer() :
 	ResourceBase(),
 	m_counter(nullptr),
-	m_UAV(D3D12_DEFAULT)
+	m_UAV(D3D12_DEFAULT),
+	m_UAVs(0),
+	m_SRVs(0),
+	m_SRVOffsets(0),
+	m_pDataBegin(nullptr)
 {
 }
 
@@ -1063,13 +1067,16 @@ RawBuffer::~RawBuffer()
 }
 
 bool RawBuffer::Create(const Device &device, uint32_t byteWidth, ResourceFlags resourceFlags,
-	PoolType poolType, ResourceState state)
+	PoolType poolType, ResourceState state, uint32_t numSubSRVs, uint32_t numSubUAVs)
 {
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
+	const auto numSRVs = hasSRV ? numSubSRVs + 1 : 0;
+	const auto numUAVs = hasUAV ? numSubUAVs + 1 : 0;
+
 	// Create buffer
-	N_RETURN(create(device, byteWidth, resourceFlags, poolType, state, hasSRV, hasUAV), false);
+	N_RETURN(create(device, byteWidth, resourceFlags, poolType, state, numSRVs, numUAVs), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(byteWidth);
@@ -1140,13 +1147,93 @@ void RawBuffer::CreateUAV(uint32_t byteWidth)
 	m_srvUavCurrent.Offset(m_strideSrvUav);
 }
 
+void RawBuffer::CreateSRVs(uint32_t byteWidth, const uint32_t *firstElements, uint32_t numSRVs)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+	desc.Format = DXGI_FORMAT_R32_TYPELESS;
+	desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+
+	m_SRVOffsets.resize(numSRVs);
+	m_SRVs.resize(numSRVs);
+	for (auto i = 0u; i < numSRVs; ++i)
+	{
+		const auto firstElement = firstElements[i];
+		desc.Buffer.FirstElement = firstElement;
+		desc.Buffer.NumElements = byteWidth / 4 - firstElement;
+
+		m_SRVOffsets[i] = 4 * firstElement;
+
+		// Create a shader resource view
+		m_SRVs[i] = m_srvUavCurrent;
+		m_device->CreateShaderResourceView(m_resource.Get(), &desc, m_SRVs[i]);
+		m_srvUavCurrent.Offset(m_strideSrvUav);
+	}
+}
+
+void RawBuffer::CreateUAVs(uint32_t byteWidth, const uint32_t *firstElements, uint32_t numUAVs)
+{
+	D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+	desc.Format = DXGI_FORMAT_R32_TYPELESS;
+	desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+	desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+
+	m_UAVs.resize(numUAVs);
+	for (auto i = 0u; i < numUAVs; ++i)
+	{
+		const auto firstElement = firstElements[i];
+		desc.Buffer.FirstElement = firstElement;
+		desc.Buffer.NumElements = byteWidth / 4 - firstElement;
+
+		// Create an unordered access view
+		m_UAVs[i] = m_srvUavCurrent;
+		m_device->CreateUnorderedAccessView(m_resource.Get(), m_counter.Get(), &desc, m_UAVs[i]);
+		m_srvUavCurrent.Offset(m_strideSrvUav);
+	}
+}
+
 const Descriptor &RawBuffer::GetUAV() const
 {
 	return m_UAV;
 }
 
+Descriptor RawBuffer::GetSubSRV(uint32_t i) const
+{
+	return m_SRVs.size() > i ? m_SRVs[i] : Descriptor(D3D12_DEFAULT);
+}
+
+Descriptor RawBuffer::GetSubUAV(uint32_t i) const
+{
+	return m_UAVs.size() > i ? m_UAVs[i] : Descriptor(D3D12_DEFAULT);
+}
+
+void *RawBuffer::Map()
+{
+	if (m_pDataBegin == nullptr)
+	{
+		// Map and initialize the constant buffer. We don't unmap this until the
+		// app closes. Keeping things mapped for the lifetime of the resource is okay.
+		CD3DX12_RANGE readRange(0, 0);	// We do not intend to read from this resource on the CPU.
+		V_RETURN(m_resource->Map(0, &readRange, &m_pDataBegin), cerr, false);
+	}
+
+	return m_pDataBegin;
+}
+
+void *RawBuffer::Map(uint32_t i)
+{
+	return &reinterpret_cast<uint8_t*>(Map())[m_SRVOffsets[i]];
+}
+
+void RawBuffer::Unmap()
+{
+	m_resource->Unmap(0, nullptr);
+	m_pDataBegin = nullptr;
+}
+
 bool RawBuffer::create(const Device &device, uint32_t byteWidth, ResourceFlags resourceFlags,
-	PoolType poolType, ResourceState state, bool hasSRV, bool hasUAV)
+	PoolType poolType, ResourceState state, uint32_t numSRVs, uint32_t numUAVs)
 {
 	M_RETURN(!device, cerr, "The device is NULL.", false);
 	setDevice(device);
@@ -1158,17 +1245,16 @@ bool RawBuffer::create(const Device &device, uint32_t byteWidth, ResourceFlags r
 	if (state) m_state = state;
 	else
 	{
-		m_state = hasSRV ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+		m_state = numSRVs > 0 ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE : D3D12_RESOURCE_STATE_COMMON;
-		m_state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : m_state;
+		m_state = numUAVs > 0 ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : m_state;
 	}
 
 	V_RETURN(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
 		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)), clog, false);
 
 	// Allocate descriptor pool
-	auto numDescriptors = hasSRV ? 1 : 0u;
-	numDescriptors += hasUAV ? 1 : 0;
+	const auto numDescriptors = numSRVs + numUAVs;
 	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	return true;
@@ -1188,14 +1274,18 @@ StructuredBuffer::~StructuredBuffer()
 }
 
 bool StructuredBuffer::Create(const Device &device, uint32_t numElements, uint32_t stride,
-	ResourceFlags resourceFlags, PoolType poolType, ResourceState state)
+	ResourceFlags resourceFlags, PoolType poolType, ResourceState state,
+	uint32_t numSubSRVs, uint32_t numSubUAVs)
 {
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
+	const auto numSRVs = hasSRV ? numSubSRVs + 1 : 0;
+	const auto numUAVs = hasUAV ? numSubUAVs + 1 : 0;
+
 	// Create buffer
 	N_RETURN(create(device, stride * numElements, resourceFlags,
-		poolType, state, hasSRV, hasUAV), false);
+		poolType, state, numSRVs, numUAVs), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRV(numElements, stride);
@@ -1233,6 +1323,54 @@ void StructuredBuffer::CreateUAV(uint32_t numElements, uint32_t stride)
 	m_UAV = m_srvUavCurrent;
 	m_device->CreateUnorderedAccessView(m_resource.Get(), m_counter.Get(), &desc, m_UAV);
 	m_srvUavCurrent.Offset(m_strideSrvUav);
+}
+
+void StructuredBuffer::CreateSRVs(uint32_t numElements, uint32_t stride,
+	const uint32_t *firstElements, uint32_t numSRVs)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+	desc.Format = m_resource->GetDesc().Format;
+	desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	desc.Buffer.StructureByteStride = stride;
+
+	m_SRVOffsets.resize(numSRVs);
+	m_SRVs.resize(numSRVs);
+	for (auto i = 0u; i < numSRVs; ++i)
+	{
+		const auto firstElement = firstElements[i];
+		desc.Buffer.FirstElement = firstElement;
+		desc.Buffer.NumElements = numElements - firstElement;
+
+		m_SRVOffsets[i] = stride * firstElement;
+
+		// Create a shader resource view
+		m_SRVs[i] = m_srvUavCurrent;
+		m_device->CreateShaderResourceView(m_resource.Get(), &desc, m_SRVs[i]);
+		m_srvUavCurrent.Offset(m_strideSrvUav);
+	}
+}
+
+void StructuredBuffer::CreateUAVs(uint32_t numElements, uint32_t stride,
+	const uint32_t *firstElements, uint32_t numUAVs)
+{
+	D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+	desc.Format = m_resource->GetDesc().Format;
+	desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+	desc.Buffer.StructureByteStride = stride;
+
+	m_UAVs.resize(numUAVs);
+	for (auto i = 0u; i < numUAVs; ++i)
+	{
+		const auto firstElement = firstElements[i];
+		desc.Buffer.FirstElement = firstElement;
+		desc.Buffer.NumElements = numElements - firstElement;
+
+		// Create an unordered access view
+		m_UAVs[i] = m_srvUavCurrent;
+		m_device->CreateUnorderedAccessView(m_resource.Get(), m_counter.Get(), &desc, m_UAVs[i]);
+		m_srvUavCurrent.Offset(m_strideSrvUav);
+	}
 }
 
 //--------------------------------------------------------------------------------------
@@ -1311,7 +1449,7 @@ void TypedBuffer::CreateSRV(uint32_t numElements, Format format)
 void TypedBuffer::CreateUAV(uint32_t numElements, Format format)
 {
 	D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
-	desc.Format = format ? format : m_resource->GetDesc().Format;;
+	desc.Format = format ? format : m_resource->GetDesc().Format;
 	desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 	desc.Buffer.NumElements = numElements;
 
@@ -1319,6 +1457,52 @@ void TypedBuffer::CreateUAV(uint32_t numElements, Format format)
 	m_UAV = m_srvUavCurrent;
 	m_device->CreateUnorderedAccessView(m_resource.Get(), m_counter.Get(), &desc, m_UAV);
 	m_srvUavCurrent.Offset(m_strideSrvUav);
+}
+
+void TypedBuffer::CreateSRVs(uint32_t numElements, Format format, uint32_t stride,
+	const uint32_t *firstElements, uint32_t numSRVs)
+{
+	D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+	desc.Format = format ? format : m_resource->GetDesc().Format;
+	desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+
+	m_SRVOffsets.resize(numSRVs);
+	m_SRVs.resize(numSRVs);
+	for (auto i = 0u; i < numSRVs; ++i)
+	{
+		const auto firstElement = firstElements[i];
+		desc.Buffer.FirstElement = firstElement;
+		desc.Buffer.NumElements = numElements - firstElement;
+
+		m_SRVOffsets[i] = stride * firstElement;
+
+		// Create a shader resource view
+		m_SRVs[i] = m_srvUavCurrent;
+		m_device->CreateShaderResourceView(m_resource.Get(), &desc, m_SRVs[i]);
+		m_srvUavCurrent.Offset(m_strideSrvUav);
+	}
+}
+
+void TypedBuffer::CreateUAVs(uint32_t numElements, Format format, uint32_t stride,
+	const uint32_t *firstElements, uint32_t numUAVs)
+{
+	D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+	desc.Format = format ? format : m_resource->GetDesc().Format;
+	desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+
+	m_UAVs.resize(numUAVs);
+	for (auto i = 0u; i < numUAVs; ++i)
+	{
+		const auto firstElement = firstElements[i];
+		desc.Buffer.FirstElement = firstElement;
+		desc.Buffer.NumElements = numElements - firstElement;
+
+		// Create an unordered access view
+		m_UAVs[i] = m_srvUavCurrent;
+		m_device->CreateUnorderedAccessView(m_resource.Get(), m_counter.Get(), &desc, m_UAVs[i]);
+		m_srvUavCurrent.Offset(m_strideSrvUav);
+	}
 }
 
 //--------------------------------------------------------------------------------------

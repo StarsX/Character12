@@ -14,7 +14,6 @@ Character::Character(const Device &device, const GraphicsCommandList &commandLis
 	m_meshLinks(nullptr),
 	m_computePipelinePool(nullptr),
 	m_transformedVBs(),
-	m_boneWorlds(0),
 	m_cbLinkedMatrices(0),
 	m_cbLinkedShadowMatrices(0),
 	m_skinningPipelineLayout(nullptr),
@@ -81,7 +80,7 @@ void Character::FrameMove(double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	// Set the bone matrices
 	const auto numMeshes = m_mesh->GetNumMeshes();
 	m_mesh->TransformMesh(XMMatrixIdentity(), time);
-	for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
+	setSkeletalMatrices(numMeshes);
 
 	SetMatrices(viewProj, pWorld, pShadow, isTemporal);
 	m_time = -1.0;
@@ -202,16 +201,20 @@ bool Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
 bool Character::createBuffers()
 {
 	// Bone world matrices
+	auto numElements = 0u;
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	m_boneWorlds.resize(numMeshes);
-
+	vector<uint32_t> firstElements(numMeshes);
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
-		const auto numBones = m_mesh->GetNumInfluences(m);
-		N_RETURN(m_boneWorlds[m].Create(m_device, numBones, sizeof(XMFLOAT4X3),
-			D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
-			D3D12_RESOURCE_STATE_GENERIC_READ), false);
+		firstElements[m] = numElements;
+		numElements += m_mesh->GetNumInfluences(m);
 	}
+
+	N_RETURN(m_boneWorlds.Create(m_device, numElements, sizeof(XMFLOAT4X3),
+		D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
+		D3D12_RESOURCE_STATE_GENERIC_READ, numMeshes), false);
+	m_boneWorlds.CreateSRVs(numElements, sizeof(XMFLOAT4X3),
+		firstElements.data(), numMeshes);
 
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
@@ -328,7 +331,7 @@ void Character::createDescriptorTables()
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		Util::DescriptorTable srvTable;
-		const Descriptor srvs[] = { m_boneWorlds[m].GetSRV(), m_mesh->GetVertexBuffer(m, 0)->GetSRV() };
+		const Descriptor srvs[] = { m_boneWorlds.GetSubSRV(m), m_mesh->GetVertexBuffer(m, 0)->GetSRV() };
 		srvTable.SetDescriptors(0, _countof(srvs), srvs);
 		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 
@@ -397,8 +400,7 @@ void Character::skinning(bool reset)
 	const auto numMeshes = m_mesh->GetNumMeshes();
 
 	// Set the bone matrices
-	if (m_time >= 0.0)
-		for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
+	if (m_time >= 0.0) setSkeletalMatrices(numMeshes);
 
 	// Skin the vertices and output them to buffers
 	for (auto m = 0u; m < numMeshes; ++m)
@@ -482,21 +484,15 @@ void Character::renderLinked(uint32_t mesh, bool isShadow, bool reset)
 }
 #endif
 
-//--------------------------------------------------------------------------------------
-// SetBoneMatrices
-//
-// This function handles the various ways of sending bone matrices to the shader.
-//		FT_CONSTANTBUFFER:
-//			With this approach, the bone matrices are stored in a constant buffer.
-//			The shader will index into the constant buffer to grab the correct
-//			transformation matrices for each vertex.
-//--------------------------------------------------------------------------------------
+void Character::setSkeletalMatrices(uint32_t numMeshes)
+{
+	for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
+	m_boneWorlds.Unmap();
+}
+
 void Character::setBoneMatrices(uint32_t mesh)
 {
-	XMFLOAT4X3 *pDataBoneWorld;
-	CD3DX12_RANGE readRange(0, 0);	// We do not intend to read from this resource on the CPU.
-	ThrowIfFailed(m_boneWorlds[mesh].GetResource()->Map(0, &readRange,
-		reinterpret_cast<void**>(&pDataBoneWorld)));
+	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds.Map(mesh));
 
 	const auto numBones = m_mesh->GetNumInfluences(mesh);
 	for (auto i = 0u; i < numBones; ++i)
@@ -504,8 +500,6 @@ void Character::setBoneMatrices(uint32_t mesh)
 		const auto qMat = getDualQuat(mesh, i);
 		XMStoreFloat4x3(&pDataBoneWorld[i], XMMatrixTranspose(qMat));
 	}
-
-	m_boneWorlds[mesh].GetResource()->Unmap(0, nullptr);
 }
 
 // Convert unit quaternion and translation to unit dual quaternion

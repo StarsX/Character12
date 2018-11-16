@@ -66,7 +66,7 @@ namespace XUSG
 		};
 
 		bool createTransformedStates();
-		bool createTransformedVBs(std::vector<VertexBuffer> &vertexBuffers);
+		bool createTransformedVBs(VertexBuffer &vertexBuffer);
 		bool createBuffers();
 		void createPipelineLayout();
 		void createPipelines();
@@ -87,7 +87,7 @@ namespace XUSG
 
 		std::shared_ptr<Compute::Pipeline::Pool> m_computePipelinePool;
 
-		std::vector<VertexBuffer> m_transformedVBs[2];
+		VertexBuffer m_transformedVBs[2];
 		DirectX::XMFLOAT4X4	m_mWorld;
 		DirectX::XMFLOAT4	m_vPosRot;
 

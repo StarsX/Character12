@@ -182,18 +182,23 @@ bool Character::createTransformedStates()
 #endif
 }
 
-bool Character::createTransformedVBs(vector<VertexBuffer> &vertexBuffers)
+bool Character::createTransformedVBs(VertexBuffer &vertexBuffer)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
+	auto numVertices = 0u;
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	vertexBuffers.resize(numMeshes);
+	vector<uint32_t> firstVertices(numMeshes);
 
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
-		const auto vertexCount = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
-		N_RETURN(vertexBuffers[m].Create(m_device, vertexCount, sizeof(Vertex),
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS), false);
+		firstVertices[m] = numVertices;
+		numVertices += static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 	}
+
+	N_RETURN(vertexBuffer.Create(m_device, numVertices, sizeof(Vertex),
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, PoolType(1), ResourceState(0),
+		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
+		numMeshes, firstVertices.data()), false);
 
 	return true;
 }
@@ -331,20 +336,21 @@ void Character::createDescriptorTables()
 		srvTable.SetDescriptors(0, _countof(srvs), srvs);
 		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 
+#if	TEMPORAL
 		for (auto i = 0u; i < _countof(m_transformedVBs); ++i)
+#else
+		auto i = 0u;
+#endif
 		{
-			if (!m_transformedVBs[i].empty())
-			{
-				Util::DescriptorTable uavTable;
-				uavTable.SetDescriptors(0, 1, &m_transformedVBs[i][m].GetUAV());
-				m_uavSkinningTables[i][m] = uavTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			Util::DescriptorTable uavTable;
+			uavTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetUAV(m));
+			m_uavSkinningTables[i][m] = uavTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 
 #if	TEMPORAL
-				Util::DescriptorTable srvTable;
-				srvTable.SetDescriptors(0, 1, &m_transformedVBs[i][m].GetSRV());
-				m_srvSkinnedTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			Util::DescriptorTable srvTable;
+			srvTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetSRV(m));
+			m_srvSkinnedTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 #endif
-			}
 		}
 	}
 }
@@ -402,7 +408,7 @@ void Character::skinning(bool reset)
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Setup descriptor tables
-		m_transformedVBs[m_temporalIndex][m].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		m_transformedVBs[m_temporalIndex].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m]);
 		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_temporalIndex][m]);
 		
@@ -441,13 +447,13 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
 				// Set IA parameters
-				auto &vertexBuffer = m_transformedVBs[m_temporalIndex][m];
+				auto &vertexBuffer = m_transformedVBs[m_temporalIndex];
 				vertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-				m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV());
+				m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV(m));
 
 				// Set historical motion states, if neccessary
 #if	TEMPORAL
-				auto &prevVertexBuffer = m_transformedVBs[!m_temporalIndex][m];
+				auto &prevVertexBuffer = m_transformedVBs[!m_temporalIndex];
 				prevVertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 				m_commandList->SetGraphicsRootDescriptorTable(HISTORY, *m_srvSkinnedTables[!m_temporalIndex][m]);
 #endif

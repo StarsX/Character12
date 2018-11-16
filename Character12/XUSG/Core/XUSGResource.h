@@ -25,7 +25,7 @@ namespace XUSG
 		void *Map();
 		void Unmap();
 
-		const Resource		&GetResource() const;
+		const Resource	&GetResource() const;
 		const Descriptor	&GetCBV() const;
 
 	protected:
@@ -306,12 +306,15 @@ namespace XUSG
 
 		bool Create(const Device &device, uint32_t numVertices, uint32_t stride,
 			ResourceFlags resourceFlags = ResourceFlags(0), PoolType poolType = PoolType(1),
-			ResourceState state = ResourceState(0));
+			ResourceState state = ResourceState(0),
+			uint32_t numVBVs = 1, const uint32_t *firstVertices = nullptr,
+			uint32_t numSRVs = 1, const uint32_t *firstSRVElements = nullptr,
+			uint32_t numUAVs = 1, const uint32_t *firstUAVElements = nullptr);
 
-		const VertexBufferView &GetVBV() const;
+		VertexBufferView GetVBV(uint32_t i = 0) const;
 
 	protected:
-		VertexBufferView m_VBV;
+		std::vector<VertexBufferView> m_VBVs;
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -326,11 +329,14 @@ namespace XUSG
 
 		bool Create(const Device &device, uint32_t byteWidth, Format format = Format(42),
 			ResourceFlags resourceFlags = ResourceFlags(0x8), PoolType poolType = PoolType(1),
-			ResourceState state = ResourceState(0));
+			ResourceState state = ResourceState(0),
+			uint32_t numIBVs = 1, const uint32_t *firstIndices = nullptr,
+			uint32_t numSRVs = 1, const uint32_t *firstSRVElements = nullptr,
+			uint32_t numUAVs = 1, const uint32_t *firstUAVElements = nullptr);
 
-		const IndexBufferView &GetIBV() const;
+		IndexBufferView GetIBV(uint32_t i = 0) const;
 
 	protected:
-		IndexBufferView m_IBV;
+		std::vector<IndexBufferView> m_IBVs;
 	};
 }

@@ -1433,7 +1433,7 @@ void TypedBuffer::CreateUAVs(uint32_t numElements, Format format, uint32_t strid
 
 VertexBuffer::VertexBuffer() :
 	StructuredBuffer(),
-	m_VBV()
+	m_VBVs(0)
 {
 }
 
@@ -1442,7 +1442,10 @@ VertexBuffer::~VertexBuffer()
 }
 
 bool VertexBuffer::Create(const Device &device, uint32_t numVertices, uint32_t stride,
-	ResourceFlags resourceFlags, PoolType poolType, ResourceState state)
+	ResourceFlags resourceFlags, PoolType poolType, ResourceState state,
+	uint32_t numVBVs, const uint32_t *firstVertices,
+	uint32_t numSRVs, const uint32_t *firstSRVElements,
+	uint32_t numUAVs, const uint32_t *firstUAVElements)
 {
 	const auto hasSRV = !(resourceFlags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
@@ -1455,19 +1458,26 @@ bool VertexBuffer::Create(const Device &device, uint32_t numVertices, uint32_t s
 		state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : state;
 	}
 
-	N_RETURN(StructuredBuffer::Create(device, numVertices, stride, resourceFlags, poolType, state), false);
+	N_RETURN(StructuredBuffer::Create(device, numVertices, stride, resourceFlags, poolType,
+		state, numSRVs, firstSRVElements, numUAVs, firstUAVElements), false);
 
 	// Create vertex buffer view
-	m_VBV.BufferLocation = m_resource->GetGPUVirtualAddress();
-	m_VBV.StrideInBytes = stride;
-	m_VBV.SizeInBytes = stride * numVertices;
+	m_VBVs.resize(numVBVs);
+	for (auto i = 0u; i < numVBVs; ++i)
+	{
+		const auto firstVertex = firstVertices ? firstVertices[i] : 0;
+		m_VBVs[i].BufferLocation = m_resource->GetGPUVirtualAddress() + stride * firstVertex;
+		m_VBVs[i].StrideInBytes = stride;
+		m_VBVs[i].SizeInBytes = stride * ((!firstVertex || i + 1 >= numVBVs ?
+			numVertices : firstVertices[i + 1]) - firstVertex);
+	}
 
 	return true;
 }
 
-const VertexBufferView &VertexBuffer::GetVBV() const
+VertexBufferView VertexBuffer::GetVBV(uint32_t i) const
 {
-	return m_VBV;
+	return m_VBVs.size() > i ? m_VBVs[i] : VertexBufferView();
 }
 
 //--------------------------------------------------------------------------------------
@@ -1476,7 +1486,7 @@ const VertexBufferView &VertexBuffer::GetVBV() const
 
 IndexBuffer::IndexBuffer() :
 	RawBuffer(),
-	m_IBV()
+	m_IBVs(0)
 {
 }
 
@@ -1485,7 +1495,10 @@ IndexBuffer::~IndexBuffer()
 }
 
 bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format,
-	ResourceFlags resourceFlags, PoolType poolType, ResourceState state)
+	ResourceFlags resourceFlags, PoolType poolType, ResourceState state,
+	uint32_t numIBVs, const uint32_t *firstIndices,
+	uint32_t numSRVs, const uint32_t *firstSRVElements,
+	uint32_t numUAVs, const uint32_t *firstUAVElements)
 {
 	setDevice(device);
 
@@ -1493,6 +1506,7 @@ bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	assert(format == DXGI_FORMAT_R32_UINT || format == DXGI_FORMAT_R16_UINT);
+	const auto stride = format == DXGI_FORMAT_R16_UINT ? 2 : 4;
 	if (hasSRV || hasUAV) byteWidth += byteWidth % 4;
 
 	// Determine initial state
@@ -1500,17 +1514,24 @@ bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format
 	else m_state = hasSRV ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE :
 		D3D12_RESOURCE_STATE_INDEX_BUFFER;
 
-	N_RETURN(RawBuffer::Create(device, byteWidth, resourceFlags, poolType, state), false);
+	N_RETURN(RawBuffer::Create(device, byteWidth, resourceFlags, poolType,
+		state, numSRVs, firstSRVElements, numUAVs, firstUAVElements), false);
 
 	// Create index buffer view
-	m_IBV.BufferLocation = m_resource->GetGPUVirtualAddress();
-	m_IBV.SizeInBytes = byteWidth;
-	m_IBV.Format = format;
+	m_IBVs.resize(numIBVs);
+	for (auto i = 0u; i < numIBVs; ++i)
+	{
+		const auto offset = firstIndices ? stride * firstIndices[i] : 0;
+		m_IBVs[i].BufferLocation = m_resource->GetGPUVirtualAddress() + offset;
+		m_IBVs[i].SizeInBytes = (!firstIndices || i + 1 >= numIBVs ?
+			byteWidth : stride * firstIndices[i + 1]) - offset;
+		m_IBVs[i].Format = format;
+	}
 
 	return true;
 }
 
-const IndexBufferView &IndexBuffer::GetIBV() const
+IndexBufferView IndexBuffer::GetIBV(uint32_t i) const
 {
-	return m_IBV;
+	return m_IBVs[i];
 }

@@ -212,9 +212,8 @@ bool Character::createBuffers()
 
 	N_RETURN(m_boneWorlds.Create(m_device, numElements, sizeof(XMFLOAT4X3),
 		D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
-		D3D12_RESOURCE_STATE_GENERIC_READ, numMeshes), false);
-	m_boneWorlds.CreateSRVs(numElements, sizeof(XMFLOAT4X3),
-		firstElements.data(), numMeshes);
+		D3D12_RESOURCE_STATE_GENERIC_READ, numMeshes,
+		firstElements.data()), false);
 
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
@@ -328,7 +327,7 @@ void Character::createDescriptorTables()
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		Util::DescriptorTable srvTable;
-		const Descriptor srvs[] = { m_boneWorlds.GetSubSRV(m), m_mesh->GetVertexBuffer(m, 0)->GetSRV() };
+		const Descriptor srvs[] = { m_boneWorlds.GetSRV(m), m_mesh->GetVertexBuffer(m, 0)->GetSRV() };
 		srvTable.SetDescriptors(0, _countof(srvs), srvs);
 		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 

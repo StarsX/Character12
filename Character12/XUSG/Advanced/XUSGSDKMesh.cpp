@@ -68,31 +68,31 @@ bool SDKMesh::LoadAnimation(const wchar_t *fileName)
 	F_RETURN(!fileStream, cerr, MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903), false);
 
 	// Read header
-	SDKANIMATION_FILE_HEADER fileheader;
-	F_RETURN(!fileStream.read(reinterpret_cast<char*>(&fileheader), sizeof(SDKANIMATION_FILE_HEADER)),
+	SDKAnimationFileHeader fileheader;
+	F_RETURN(!fileStream.read(reinterpret_cast<char*>(&fileheader), sizeof(SDKAnimationFileHeader)),
 		fileStream.close(); cerr, GetLastError(), false);
 
 	// Allocate
-	m_animation.resize(static_cast<size_t>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize));
+	m_animation.resize(static_cast<size_t>(sizeof(SDKAnimationFileHeader) + fileheader.AnimationDataSize));
 	
 	// Read it all in
 	F_RETURN(!fileStream.seekg(0), fileStream.close(); cerr, GetLastError(), false);
 
-	const auto cBytes = static_cast<streamsize>(sizeof(SDKANIMATION_FILE_HEADER) + fileheader.AnimationDataSize);
+	const auto cBytes = static_cast<streamsize>(sizeof(SDKAnimationFileHeader) + fileheader.AnimationDataSize);
 	F_RETURN(!fileStream.read(reinterpret_cast<char*>(m_animation.data()), cBytes),
 		fileStream.close(); cerr, GetLastError(), false);
 
 	fileStream.close();
 
 	// pointer fixup
-	m_pAnimationHeader = reinterpret_cast<SDKANIMATION_FILE_HEADER*>(m_animation.data());
-	m_pAnimationFrameData = reinterpret_cast<SDKANIMATION_FRAME_DATA*>(m_animation.data() + m_pAnimationHeader->AnimationDataOffset);
+	m_pAnimationHeader = reinterpret_cast<SDKAnimationFileHeader*>(m_animation.data());
+	m_pAnimationFrameData = reinterpret_cast<SDKAnimationFrameData*>(m_animation.data() + m_pAnimationHeader->AnimationDataOffset);
 
-	const auto BaseOffset = sizeof(SDKANIMATION_FILE_HEADER);
+	const auto BaseOffset = sizeof(SDKAnimationFileHeader);
 
 	for (auto i = 0u; i < m_pAnimationHeader->NumFrames; ++i)
 	{
-		m_pAnimationFrameData[i].pAnimationData = reinterpret_cast<SDKANIMATION_DATA*>
+		m_pAnimationFrameData[i].pAnimationData = reinterpret_cast<SDKAnimationData*>
 			(m_animation.data() + m_pAnimationFrameData[i].DataOffset + BaseOffset);
 
 		const auto pFrame = FindFrame(m_pAnimationFrameData[i].FrameName);
@@ -119,19 +119,13 @@ void SDKMesh::Destroy()
 					m_pMaterialArray[m].pNormal = nullptr;
 					m_pMaterialArray[m].pSpecular = nullptr;
 				}
+
+				m_pMaterialArray[m].AlphaModeAlbedo = 0;
+				m_pMaterialArray[m].AlphaModeNormal = 0;
+				m_pMaterialArray[m].AlphaModeSpecular = 0;
 			}
 		}
-		for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
-			m_pVertexBufferArray[i].pVertexBuffer = nullptr;
-
-		for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
-			m_pIndexBufferArray[i].pIndexBuffer = nullptr;
 	}
-
-	if (m_pAdjIndexBufferArray)
-		for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; i++ )
-			m_pAdjIndexBufferArray[i].pIndexBuffer = nullptr;
-	SAFE_DELETE_ARRAY(m_pAdjIndexBufferArray);
 
 	m_pStaticMeshData = nullptr;
 	m_heapData.clear();
@@ -150,6 +144,7 @@ void SDKMesh::Destroy()
 	m_pSubsetArray = nullptr;
 	m_pFrameArray = nullptr;
 	m_pMaterialArray = nullptr;
+	m_pAdjIndexBufferArray = nullptr;
 
 	m_pAnimationHeader = nullptr;
 	m_pAnimationFrameData = nullptr;
@@ -187,7 +182,7 @@ void SDKMesh::TransformMesh(CXMMATRIX world, double time)
 }
 
 //--------------------------------------------------------------------------------------
-PrimitiveTopology SDKMesh::GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE primType)
+PrimitiveTopology SDKMesh::GetPrimitiveType(SDKMeshPrimitiveType primType)
 {
 	PrimitiveTopology retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
@@ -238,9 +233,9 @@ Format SDKMesh::GetIBFormat(uint32_t mesh) const
 	return DXGI_FORMAT_R16_UINT;
 }
 
-SDKMESH_INDEX_TYPE SDKMesh::GetIndexType(uint32_t mesh) const
+SDKMeshIndexType SDKMesh::GetIndexType(uint32_t mesh) const
 {
-	return static_cast<SDKMESH_INDEX_TYPE>(m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].IndexType);
+	return static_cast<SDKMeshIndexType>(m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].IndexType);
 }
 
 Descriptor SDKMesh::GetVertexBufferSRV(uint32_t mesh, uint32_t i) const
@@ -319,12 +314,12 @@ uint8_t *SDKMesh::GetRawIndicesAt(uint32_t ib) const
 	return m_indices[ib];
 }
 
-SDKMESH_MATERIAL *SDKMesh::GetMaterial(uint32_t material) const
+SDKMeshMaterial *SDKMesh::GetMaterial(uint32_t material) const
 {
 	return &m_pMaterialArray[material];
 }
 
-SDKMESH_MESH *SDKMesh::GetMesh(uint32_t mesh) const
+SDKMeshData *SDKMesh::GetMesh(uint32_t mesh) const
 {
 	return &m_pMeshArray[mesh];
 }
@@ -341,12 +336,12 @@ uint32_t SDKMesh::GetNumSubsets(uint32_t mesh, SubsetFlags materialType) const
 	return static_cast<uint32_t>(m_classifiedSubsets[materialType - 1][mesh].size());
 }
 
-SDKMESH_SUBSET *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset) const
+SDKMeshSubset *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset) const
 {
 	return &m_pSubsetArray[m_pMeshArray[mesh].pSubsets[subset]];
 }
 
-SDKMESH_SUBSET *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const
+SDKMeshSubset *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const
 {
 	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
 
@@ -363,14 +358,14 @@ uint32_t SDKMesh::GetNumFrames() const
 	return m_pMeshHeader->NumFrames;
 }
 
-SDKMESH_FRAME *SDKMesh::GetFrame(uint32_t frame) const
+SDKMeshFrame *SDKMesh::GetFrame(uint32_t frame) const
 {
 	assert(frame < m_pMeshHeader->NumFrames);
 
 	return &m_pFrameArray[frame];
 }
 
-SDKMESH_FRAME *SDKMesh::FindFrame(const char *name) const
+SDKMeshFrame *SDKMesh::FindFrame(const char *name) const
 {
 	const auto i = FindFrameIndex(name);
 
@@ -535,7 +530,7 @@ bool SDKMesh::GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) cons
 }
 
 //--------------------------------------------------------------------------------------
-void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATERIAL *pMaterials,
+void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMeshMaterial *pMaterials,
 	uint32_t numMaterials, vector<Resource> &uploaders)
 {
 	string filePath;
@@ -761,14 +756,14 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 			commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)), cerr, false);
 	}
 
-	F_RETURN(dataBytes < sizeof(SDKMESH_HEADER), cerr, E_FAIL, false);
+	F_RETURN(dataBytes < sizeof(SDKMeshHeader), cerr, E_FAIL, false);
 
 	// Set outstanding resources to zero
 	m_numOutstandingResources = 0;
 
 	if (copyStatic)
 	{
-		const auto pHeader = reinterpret_cast<SDKMESH_HEADER*>(pData);
+		const auto pHeader = reinterpret_cast<SDKMeshHeader*>(pData);
 		const auto StaticSize = static_cast<SIZE_T>(pHeader->HeaderSize + pHeader->NonBufferDataSize);
 		F_RETURN(dataBytes < StaticSize, cerr, E_FAIL, false);
 
@@ -780,14 +775,14 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	else m_pStaticMeshData = pData;
 
 	// Pointer fixup
-	m_pMeshHeader = reinterpret_cast<SDKMESH_HEADER*>(m_pStaticMeshData);
+	m_pMeshHeader = reinterpret_cast<SDKMeshHeader*>(m_pStaticMeshData);
 
-	m_pVertexBufferArray = reinterpret_cast<SDKMESH_VERTEX_BUFFER_HEADER*>(m_pStaticMeshData + m_pMeshHeader->VertexStreamHeadersOffset);
-	m_pIndexBufferArray = reinterpret_cast<SDKMESH_INDEX_BUFFER_HEADER*>(m_pStaticMeshData + m_pMeshHeader->IndexStreamHeadersOffset);
-	m_pMeshArray = reinterpret_cast<SDKMESH_MESH*>(m_pStaticMeshData + m_pMeshHeader->MeshDataOffset);
-	m_pSubsetArray = reinterpret_cast<SDKMESH_SUBSET*>(m_pStaticMeshData + m_pMeshHeader->SubsetDataOffset);
-	m_pFrameArray = reinterpret_cast<SDKMESH_FRAME*>(m_pStaticMeshData + m_pMeshHeader->FrameDataOffset);
-	m_pMaterialArray = reinterpret_cast<SDKMESH_MATERIAL*>(m_pStaticMeshData + m_pMeshHeader->MaterialDataOffset);
+	m_pVertexBufferArray = reinterpret_cast<SDKMeshVertexBufferHeader*>(m_pStaticMeshData + m_pMeshHeader->VertexStreamHeadersOffset);
+	m_pIndexBufferArray = reinterpret_cast<SDKMeshIndexBufferHeader*>(m_pStaticMeshData + m_pMeshHeader->IndexStreamHeadersOffset);
+	m_pMeshArray = reinterpret_cast<SDKMeshData*>(m_pStaticMeshData + m_pMeshHeader->MeshDataOffset);
+	m_pSubsetArray = reinterpret_cast<SDKMeshSubset*>(m_pStaticMeshData + m_pMeshHeader->SubsetDataOffset);
+	m_pFrameArray = reinterpret_cast<SDKMeshFrame*>(m_pStaticMeshData + m_pMeshHeader->FrameDataOffset);
+	m_pMaterialArray = reinterpret_cast<SDKMeshMaterial*>(m_pStaticMeshData + m_pMeshHeader->MaterialDataOffset);
 
 	// Setup subsets
 	for(auto i = 0u; i < m_pMeshHeader->NumMeshes; ++i)
@@ -823,11 +818,11 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	m_transformedFrameMatrices.resize(m_pMeshHeader->NumFrames);
 	m_worldPoseFrameMatrices.resize(m_pMeshHeader->NumFrames);
 
-	SDKMESH_SUBSET* pSubset = nullptr;
+	SDKMeshSubset* pSubset = nullptr;
 	PrimitiveTopology primType;
 
 	// update bounding volume
-	SDKMESH_MESH *currentMesh = m_pMeshArray;
+	SDKMeshData *currentMesh = m_pMeshArray;
 	auto tris = 0;
 
 	for (auto m = 0u; m < m_pMeshHeader->NumMeshes; ++m)
@@ -841,7 +836,7 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 		{
 			pSubset = GetSubset(m, subset);	//&m_pSubsetArray[currentMesh->pSubsets[subset]];
 
-			primType = GetPrimitiveType(static_cast<SDKMESH_PRIMITIVE_TYPE>(pSubset->PrimitiveType));
+			primType = GetPrimitiveType(static_cast<SDKMeshPrimitiveType>(pSubset->PrimitiveType));
 			assert(primType == D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);	// only triangle lists are handled.
 
 			const auto indexCount = static_cast<uint32_t>(pSubset->IndexCount);
@@ -1079,7 +1074,7 @@ void SDKMesh::transformFrameAbsolute(uint32_t frame, double time)
 	if (INVALID_ANIMATION_DATA != m_pFrameArray[frame].AnimationDataIndex)
 	{
 		const auto pFrameData = &m_pAnimationFrameData[m_pFrameArray[frame].AnimationDataIndex];
-		const auto pData = &pFrameData->pAnimationData[iTick ];
+		const auto pData = &pFrameData->pAnimationData[iTick];
 		const auto pDataOrig = &pFrameData->pAnimationData[0];
 
 		const auto mTrans1 = XMMatrixTranslation(-pDataOrig->Translation.x, -pDataOrig->Translation.y, -pDataOrig->Translation.z);

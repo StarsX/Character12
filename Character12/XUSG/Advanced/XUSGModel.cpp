@@ -164,7 +164,7 @@ shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &mesh
 {
 	// Load the mesh
 	const auto mesh = make_shared<SDKMesh>();
-	ThrowIfFailed(mesh->Create(device, meshFileName.c_str(), textureCache));
+	N_RETURN(mesh->Create(device, meshFileName.c_str(), textureCache), nullptr);
 
 	return mesh;
 }
@@ -284,7 +284,7 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 	{
 		// Get subset
 		const auto pSubset = m_mesh->GetSubset(mesh, subset, materialType);
-		const auto primType = m_mesh->GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE(pSubset->PrimitiveType));
+		const auto primType = m_mesh->GetPrimitiveType(SDKMeshPrimitiveType(pSubset->PrimitiveType));
 		m_commandList->IASetPrimitiveTopology(primType);
 
 		// Set material

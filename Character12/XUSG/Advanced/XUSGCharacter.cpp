@@ -141,7 +141,7 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 {
 	// Load the animated mesh
 	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache);
-	ThrowIfFailed(mesh->LoadAnimation(animFileName.c_str()));
+	N_RETURN(mesh->LoadAnimation(animFileName.c_str()), nullptr);
 	mesh->TransformBindPose(XMMatrixIdentity());
 
 	// Fix the frame name to avoid space
@@ -163,7 +163,8 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 		{
 			auto &meshInfo = meshLinks->at(m);
 			meshInfo.uBone = mesh->FindFrameIndex(meshInfo.szBoneName.c_str());
-			ThrowIfFailed(linkedMeshes->at(m).Create(device.Get(), meshInfo.szMeshName.c_str(), textureCache));
+			N_RETURN(linkedMeshes->at(m).Create(device.Get(), meshInfo.szMeshName.c_str(),
+				textureCache), nullptr);
 		}
 	}
 

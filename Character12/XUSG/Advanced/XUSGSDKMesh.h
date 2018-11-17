@@ -4,7 +4,6 @@
 
 #pragma once
 
-//#undef D3DCOLOR_ARGB
 #include "DXFramework.h"
 #include "Core/XUSGResource.h"
 
@@ -28,14 +27,8 @@
 #define INVALID_SAMPLER_SLOT	((uint32_t)-1)
 #define ERROR_RESOURCE_VALUE	1
 
-#ifndef SAFE_DELETE
-#define SAFE_DELETE(p)			{ if (p) { delete (p); (p) = nullptr; } }
-#endif
 #ifndef SAFE_DELETE_ARRAY
 #define SAFE_DELETE_ARRAY(p)	{ if (p) { delete[] (p); (p) = nullptr; } }
-#endif
-#ifndef SAFE_RELEASE
-#define SAFE_RELEASE(p)			{ if (p) { (p)->Release(); (p) = nullptr; } }
 #endif
 
 namespace XUSG
@@ -62,7 +55,7 @@ namespace XUSG
 	};
 	DEFINE_ENUM_FLAG_OPERATORS(SubsetFlags);
 
-	enum SDKMESH_PRIMITIVE_TYPE
+	enum SDKMeshPrimitiveType
 	{
 		PT_TRIANGLE_LIST = 0,
 		PT_TRIANGLE_STRIP,
@@ -77,16 +70,16 @@ namespace XUSG
 		PT_TRIANGLE_PATCH_LIST
 	};
 
-	enum SDKMESH_INDEX_TYPE
+	enum SDKMeshIndexType
 	{
 		IT_16BIT = 0,
 		IT_32BIT
 	};
 
-	enum FRAME_TRANSFORM_TYPE
+	enum FrameTransformType
 	{
 		FTT_RELATIVE = 0,
-		FTT_ABSOLUTE		//This is not currently used but is here to support absolute transformations in the future
+		FTT_ABSOLUTE		// This is not currently used but is here to support absolute transformations in the future
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -94,7 +87,7 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 #pragma pack(push, 8)
 
-	struct SDKMESH_HEADER
+	struct SDKMeshHeader
 	{
 		//Basic Info and sizes
 		uint32_t Version;
@@ -120,7 +113,7 @@ namespace XUSG
 		uint64_t MaterialDataOffset;
 	};
 
-	struct SDKMESH_VERTEX_BUFFER_HEADER
+	struct SDKMeshVertexBufferHeader
 	{
 		uint64_t NumVertices;
 		uint64_t SizeBytes;
@@ -136,26 +129,18 @@ namespace XUSG
 			uint8_t		UsageIndex;	// Semantic index
 		} Decl[MAX_VERTEX_ELEMENTS];
 
-		union
-		{
-			uint64_t DataOffset;	// (This also forces the union to 64bits)
-			void *pVertexBuffer;
-		};
+		uint64_t DataOffset;		// (This also forces the union to 64bits)
 	};
 
-	struct SDKMESH_INDEX_BUFFER_HEADER
+	struct SDKMeshIndexBufferHeader
 	{
 		uint64_t NumIndices;
 		uint64_t SizeBytes;
 		uint32_t IndexType;
-		union
-		{
-			uint64_t DataOffset;	// (This also forces the union to 64bits)
-			void *pIndexBuffer;
-		};
+		uint64_t DataOffset;		// (This also forces the union to 64bits)
 	};
 
-	struct SDKMESH_MESH
+	struct SDKMeshData
 	{
 		char Name[MAX_MESH_NAME];
 		uint8_t NumVertexBuffers;
@@ -169,17 +154,17 @@ namespace XUSG
 
 		union
 		{
-			uint64_t SubsetOffset;			//Offset to list of subsets (This also forces the union to 64bits)
-			uint32_t *pSubsets;				//Pointer to list of subsets
+			uint64_t SubsetOffset;			// Offset to list of subsets (This also forces the union to 64bits)
+			uint32_t *pSubsets;				// Pointer to list of subsets
 		};
 		union
 		{
-			uint64_t FrameInfluenceOffset;	//Offset to list of frame influences (This also forces the union to 64bits)
-			uint32_t *pFrameInfluences;		//Pointer to list of frame influences
+			uint64_t FrameInfluenceOffset;	// Offset to list of frame influences (This also forces the union to 64bits)
+			uint32_t *pFrameInfluences;		// Pointer to list of frame influences
 		};
 	};
 
-	struct SDKMESH_SUBSET
+	struct SDKMeshSubset
 	{
 		char Name[MAX_SUBSET_NAME];
 		uint32_t MaterialID;
@@ -190,7 +175,7 @@ namespace XUSG
 		uint64_t VertexCount;
 	};
 
-	struct SDKMESH_FRAME
+	struct SDKMeshFrame
 	{
 		char Name[MAX_FRAME_NAME];
 		uint32_t Mesh;
@@ -198,10 +183,10 @@ namespace XUSG
 		uint32_t ChildFrame;
 		uint32_t SiblingFrame;
 		DirectX::XMFLOAT4X4 Matrix;
-		uint32_t AnimationDataIndex;		//Used to index which set of keyframes transforms this frame
+		uint32_t AnimationDataIndex;		// Used to index which set of keyframes transforms this frame
 	};
 
-	struct SDKMESH_MATERIAL
+	struct SDKMeshMaterial
 	{
 		char Name[MAX_MATERIAL_NAME];
 
@@ -239,7 +224,7 @@ namespace XUSG
 		uint64_t AlphaModeSpecular;		// Force the union to 64bits
 	};
 
-	struct SDKANIMATION_FILE_HEADER
+	struct SDKAnimationFileHeader
 	{
 		uint32_t	Version;
 		uint8_t		IsBigEndian;
@@ -251,36 +236,36 @@ namespace XUSG
 		uint64_t	AnimationDataOffset;
 	};
 
-	struct SDKANIMATION_DATA
+	struct SDKAnimationData
 	{
 		DirectX::XMFLOAT3 Translation;
 		DirectX::XMFLOAT4 Orientation;
 		DirectX::XMFLOAT3 Scaling;
 	};
 
-	struct SDKANIMATION_FRAME_DATA
+	struct SDKAnimationFrameData
 	{
 		char FrameName[MAX_FRAME_NAME];
 		union
 		{
 			uint64_t DataOffset;
-			SDKANIMATION_DATA* pAnimationData;
+			SDKAnimationData* pAnimationData;
 		};
 	};
 
 #pragma pack(pop)
 
-	static_assert(sizeof(SDKMESH_VERTEX_BUFFER_HEADER::VertexElement) == 8, "Vertex element structure size incorrect");
-	static_assert(sizeof(SDKMESH_HEADER) == 104, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKMESH_VERTEX_BUFFER_HEADER) == 288, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKMESH_INDEX_BUFFER_HEADER) == 32, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKMESH_MESH) == 224, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKMESH_SUBSET) == 144, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKMESH_FRAME) == 184, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKMESH_MATERIAL) == 1256, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKANIMATION_FILE_HEADER) == 40, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKANIMATION_DATA) == 40, "SDK Mesh structure size incorrect");
-	static_assert(sizeof(SDKANIMATION_FRAME_DATA) == 112, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKMeshVertexBufferHeader::VertexElement) == 8, "Vertex element structure size incorrect");
+	static_assert(sizeof(SDKMeshHeader) == 104, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKMeshVertexBufferHeader) == 288, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKMeshIndexBufferHeader) == 32, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKMeshData) == 224, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKMeshSubset) == 144, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKMeshFrame) == 184, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKMeshMaterial) == 1256, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKAnimationFileHeader) == 40, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKAnimationData) == 40, "SDK Mesh structure size incorrect");
+	static_assert(sizeof(SDKAnimationFrameData) == 112, "SDK Mesh structure size incorrect");
 
 	struct TextureCacheEntry
 	{
@@ -290,7 +275,7 @@ namespace XUSG
 	using TextureCache = std::shared_ptr<std::unordered_map<std::string, TextureCacheEntry>>;
 
 	//--------------------------------------------------------------------------------------
-	// SDKMesh class. This class reads the sdkmesh file format for use by the samples
+	// SDKMesh class. This class reads the sdkmesh file format
 	//--------------------------------------------------------------------------------------
 	class SDKMesh
 	{
@@ -309,10 +294,10 @@ namespace XUSG
 		void TransformMesh(DirectX::CXMMATRIX world, double time);
 
 		// Helpers (Graphics API specific)
-		static PrimitiveTopology GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE primType);
+		static PrimitiveTopology GetPrimitiveType(SDKMeshPrimitiveType primType);
 		Format GetIBFormat(uint32_t mesh) const;
 
-		SDKMESH_INDEX_TYPE	GetIndexType(uint32_t mesh) const;
+		SDKMeshIndexType	GetIndexType(uint32_t mesh) const;
 
 		Descriptor			GetVertexBufferSRV(uint32_t mesh, uint32_t i) const;
 		VertexBufferView	GetVertexBufferView(uint32_t mesh, uint32_t i) const;
@@ -334,16 +319,16 @@ namespace XUSG
 		uint8_t				*GetRawVerticesAt(uint32_t vb) const;
 		uint8_t				*GetRawIndicesAt(uint32_t ib) const;
 
-		SDKMESH_MATERIAL	*GetMaterial(uint32_t material) const;
-		SDKMESH_MESH		*GetMesh(uint32_t mesh) const;
+		SDKMeshMaterial	*GetMaterial(uint32_t material) const;
+		SDKMeshData		*GetMesh(uint32_t mesh) const;
 		uint32_t			GetNumSubsets(uint32_t mesh) const;
 		uint32_t			GetNumSubsets(uint32_t mesh, SubsetFlags materialType) const;
-		SDKMESH_SUBSET		*GetSubset(uint32_t mesh, uint32_t subset) const;
-		SDKMESH_SUBSET		*GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const;
+		SDKMeshSubset		*GetSubset(uint32_t mesh, uint32_t subset) const;
+		SDKMeshSubset		*GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const;
 		uint32_t			GetVertexStride(uint32_t mesh, uint32_t i) const;
 		uint32_t			GetNumFrames() const;
-		SDKMESH_FRAME		*GetFrame(uint32_t frame) const;
-		SDKMESH_FRAME		*FindFrame(const char *name) const;
+		SDKMeshFrame		*GetFrame(uint32_t frame) const;
+		SDKMeshFrame		*FindFrame(const char *name) const;
 		uint32_t			FindFrameIndex(const char *name) const;
 		uint64_t			GetNumVertices(uint32_t mesh, uint32_t i) const;
 		uint64_t			GetNumIndices(uint32_t mesh) const;
@@ -367,7 +352,7 @@ namespace XUSG
 		bool				GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) const;
 
 	protected:
-		void loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATERIAL *pMaterials,
+		void loadMaterials(const GraphicsCommandList &commandList, SDKMeshMaterial *pMaterials,
 			uint32_t NumMaterials, std::vector<Resource> &uploaders);
 
 		bool createVertexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders);
@@ -397,13 +382,13 @@ namespace XUSG
 		std::string						m_filePath;
 
 		// General mesh info
-		SDKMESH_HEADER					*m_pMeshHeader;
-		SDKMESH_VERTEX_BUFFER_HEADER	*m_pVertexBufferArray;
-		SDKMESH_INDEX_BUFFER_HEADER		*m_pIndexBufferArray;
-		SDKMESH_MESH					*m_pMeshArray;
-		SDKMESH_SUBSET					*m_pSubsetArray;
-		SDKMESH_FRAME					*m_pFrameArray;
-		SDKMESH_MATERIAL				*m_pMaterialArray;
+		SDKMeshHeader					*m_pMeshHeader;
+		SDKMeshVertexBufferHeader		*m_pVertexBufferArray;
+		SDKMeshIndexBufferHeader		*m_pIndexBufferArray;
+		SDKMeshData						*m_pMeshArray;
+		SDKMeshSubset					*m_pSubsetArray;
+		SDKMeshFrame					*m_pFrameArray;
+		SDKMeshMaterial					*m_pMaterialArray;
 
 		VertexBuffer					m_vertexBuffer;
 		IndexBuffer						m_indexBuffer;
@@ -416,11 +401,11 @@ namespace XUSG
 		TextureCache					m_textureCache;
 
 		// Adjacency information (not part of the m_pStaticMeshData, so it must be created and destroyed separately )
-		SDKMESH_INDEX_BUFFER_HEADER		*m_pAdjIndexBufferArray;
+		SDKMeshIndexBufferHeader		*m_pAdjIndexBufferArray;
 
 		// Animation
-		SDKANIMATION_FILE_HEADER		*m_pAnimationHeader;
-		SDKANIMATION_FRAME_DATA			*m_pAnimationFrameData;
+		SDKAnimationFileHeader			*m_pAnimationHeader;
+		SDKAnimationFrameData			*m_pAnimationFrameData;
 		std::vector<DirectX::XMFLOAT4X4> m_bindPoseFrameMatrices;
 		std::vector<DirectX::XMFLOAT4X4> m_transformedFrameMatrices;
 		std::vector<DirectX::XMFLOAT4X4> m_worldPoseFrameMatrices;

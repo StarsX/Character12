@@ -823,7 +823,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 
 	if (bCopyStatic)
 	{
-		auto pHeader = reinterpret_cast<SDKMESH_HEADER*>( pData );
+		auto pHeader = reinterpret_cast<SDKMESH_HEADER*>(pData);
 
 		SIZE_T StaticSize = static_cast<SIZE_T>(pHeader->HeaderSize + pHeader->NonBufferDataSize);
 		if (dataBytes < StaticSize) return E_FAIL;
@@ -862,10 +862,10 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	if (m_pMeshHeader->Version != SDKMESH_FILE_VERSION) return E_NOINTERFACE;
 
 	// Setup buffer data pointer
-	uint8_t* pBufferData = pData + m_pMeshHeader->HeaderSize + m_pMeshHeader->NonBufferDataSize;
+	//uint8_t* pBufferData = pData + m_pMeshHeader->HeaderSize + m_pMeshHeader->NonBufferDataSize;
 
 	// Get the start of the buffer data
-	uint64_t BufferDataStart = m_pMeshHeader->HeaderSize + m_pMeshHeader->NonBufferDataSize;
+	//uint64_t BufferDataStart = m_pMeshHeader->HeaderSize + m_pMeshHeader->NonBufferDataSize;
 
 	// Uploader buffers
 	vector<Resource> uploaders;
@@ -877,7 +877,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	for(auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 	{
 		uint8_t *pVertices = nullptr;
-		pVertices = reinterpret_cast<uint8_t*>(pBufferData + (m_pVertexBufferArray[i].DataOffset - BufferDataStart));
+		pVertices = reinterpret_cast<uint8_t*>(pData + m_pVertexBufferArray[i].DataOffset);
 
 		if (commandList) createVertexBuffer(commandList, &m_pVertexBufferArray[i], pVertices, uploaders);
 
@@ -891,7 +891,7 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
 	{
 		uint8_t *pIndices = nullptr;
-		pIndices = reinterpret_cast<uint8_t*>(pBufferData + ( m_pIndexBufferArray[i].DataOffset - BufferDataStart));
+		pIndices = reinterpret_cast<uint8_t*>(pData + m_pIndexBufferArray[i].DataOffset);
 
 		if (commandList) createIndexBuffer(commandList, &m_pIndexBufferArray[i], pIndices, uploaders);
 

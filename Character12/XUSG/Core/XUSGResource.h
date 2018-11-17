@@ -93,21 +93,18 @@ namespace XUSG
 		bool Upload(const GraphicsCommandList &commandList, Resource &resourceUpload, const uint8_t *pData,
 			uint8_t stride = sizeof(float), ResourceState dstState = ResourceState(0));
 
-		void CreateSRV(uint32_t arraySize, Format format = Format(0),
+		void CreateSRVs(uint32_t arraySize, Format format = Format(0),
 			uint8_t numMips = 1, uint8_t sampleCount = 1);
 		void CreateSRVLevels(uint32_t arraySize, uint8_t numMips, Format format = Format(0), uint8_t sampleCount = 1);
 		void CreateUAVs(uint32_t arraySize, Format format = Format(0), uint8_t numMips = 1);
-		void CreateSubSRVs(Format format = Format(0));
 
 		Descriptor GetUAV(uint8_t i = 0) const;
 		Descriptor GetSRVLevel(uint8_t i) const;
-		Descriptor GetSubSRV(uint8_t i) const;
 
 	protected:
 		Resource m_counter;
 		std::vector<Descriptor>	m_UAVs;
 		std::vector<Descriptor>	m_SRVLevels;
-		std::vector<Descriptor>	m_subSRVs;
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -195,20 +192,17 @@ namespace XUSG
 			Format format, ResourceFlags resourceFlags = ResourceFlags(0), uint8_t numMips = 1,
 			PoolType poolType = PoolType(1), ResourceState state = ResourceState(0));
 
-		void CreateSRV(Format format = Format(0), uint8_t numMips = 1);
-		void CreateSRVs(uint8_t numMips, Format format = Format(0));
+		void CreateSRVs(Format format = Format(0), uint8_t numMips = 1);
+		void CreateSRVLevels(uint8_t numMips, Format format = Format(0));
 		void CreateUAVs(Format format = Format(0), uint8_t numMips = 1);
-		void CreateSubSRVs(Format format = Format(0));
-
+		
 		Descriptor GetUAV(uint8_t i = 0) const;
 		Descriptor GetSRVLevel(uint8_t i) const;
-		Descriptor GetSubSRV(uint8_t i) const;
 
 	protected:
 		Resource m_counter;
 		std::vector<Descriptor>	m_UAVs;
 		std::vector<Descriptor>	m_SRVLevels;
-		std::vector<Descriptor>	m_subSRVs;
 	};
 
 	//--------------------------------------------------------------------------------------

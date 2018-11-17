@@ -139,7 +139,7 @@ namespace XUSG
 		union
 		{
 			uint64_t DataOffset;	// (This also forces the union to 64bits)
-			VertexBuffer *pVertexBuffer;
+			void *pVertexBuffer;
 		};
 	};
 
@@ -151,7 +151,7 @@ namespace XUSG
 		union
 		{
 			uint64_t DataOffset;	// (This also forces the union to 64bits)
-			IndexBuffer *pIndexBuffer;
+			void *pIndexBuffer;
 		};
 	};
 
@@ -315,11 +315,12 @@ namespace XUSG
 		static PrimitiveTopology GetPrimitiveType(_In_ SDKMESH_PRIMITIVE_TYPE PrimType);
 		Format GetIBFormat(_In_ uint32_t iMesh) const;
 
-		VertexBuffer		*GetVertexBuffer(_In_ uint32_t iMesh, _In_ uint32_t iVB) const;
-		IndexBuffer			*GetIndexBuffer(_In_ uint32_t iMesh) const;
 		SDKMESH_INDEX_TYPE	GetIndexType(_In_ uint32_t iMesh) const;
 
-		IndexBuffer			*GetAdjIndexBuffer(_In_ uint32_t iMesh) const;
+		Descriptor			GetVertexBufferSRV(uint32_t iMesh, uint32_t iVB) const;
+		VertexBufferView	GetVertexBufferView(uint32_t iMesh, uint32_t iVB) const;
+		IndexBufferView		GetIndexBufferView(uint32_t iMesh) const;
+		IndexBufferView		GetAdjIndexBufferView(uint32_t iMesh) const;
 
 		// Helpers (general)
 		const char			*GetMeshPathA() const;
@@ -329,8 +330,9 @@ namespace XUSG
 		uint32_t			GetNumVertexBuffers() const;
 		uint32_t			GetNumIndexBuffers() const;
 
-		VertexBuffer		*GetVertexBufferAt(_In_ uint32_t iVB) const;
-		IndexBuffer			*GetIndexBufferAt(_In_ uint32_t iIB) const;
+		Descriptor			GetVertexBufferSRVAt(uint32_t iVB) const;
+		VertexBufferView	GetVertexBufferViewAt(uint32_t iVB) const;
+		IndexBufferView		GetIndexBufferViewAt(uint32_t iIB) const;
 
 		uint8_t				*GetRawVerticesAt(_In_ uint32_t iVB) const;
 		uint8_t				*GetRawIndicesAt(_In_ uint32_t iIB) const;
@@ -372,10 +374,8 @@ namespace XUSG
 			_In_reads_(NumMaterials) SDKMESH_MATERIAL *pMaterials,
 			_In_ uint32_t NumMaterials, std::vector<Resource> &uploaders);
 
-		HRESULT createVertexBuffer(_In_ const GraphicsCommandList &commandList, _In_ SDKMESH_VERTEX_BUFFER_HEADER *pHeader,
-			_In_reads_(pHeader->SizeBytes) void *pVertices, std::vector<Resource> &uploaders);
-		HRESULT createIndexBuffer(const GraphicsCommandList &commandList, _In_ SDKMESH_INDEX_BUFFER_HEADER *pHeader,
-			_In_reads_(pHeader->SizeBytes) void *pIndices, std::vector<Resource> &uploaders);
+		bool createVertexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders);
+		bool createIndexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders);
 
 		virtual HRESULT createFromFile(_In_opt_ const Device &device, _In_z_ const wchar_t *szFileName,
 			_In_ const TextureCache &textureCache);
@@ -394,8 +394,8 @@ namespace XUSG
 		uint8_t *m_pStaticMeshData;
 		uint8_t *m_pHeapData;
 		uint8_t *m_pAnimationData;
-		uint8_t **m_ppVertices;
-		uint8_t **m_ppIndices;
+		std::vector<uint8_t*> m_vertices;
+		std::vector<uint8_t*> m_indices;
 
 		// Keep track of the path
 		std::wstring	m_strPathW;
@@ -409,6 +409,10 @@ namespace XUSG
 		SDKMESH_SUBSET					*m_pSubsetArray;
 		SDKMESH_FRAME					*m_pFrameArray;
 		SDKMESH_MATERIAL				*m_pMaterialArray;
+
+		VertexBuffer					m_vertexBuffer;
+		IndexBuffer						m_indexBuffer;
+		IndexBuffer						m_adjIndexBuffer;
 
 		// Classified subsets
 		std::vector<std::vector<uint32_t>> m_classifiedSubsets[NUM_SUBSET_TYPE];

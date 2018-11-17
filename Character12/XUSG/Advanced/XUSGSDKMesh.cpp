@@ -17,8 +17,8 @@ SDKMesh::SDKMesh() noexcept :
 	m_pStaticMeshData(nullptr),
 	m_pHeapData(nullptr),
 	m_pAnimationData(nullptr),
-	m_ppVertices(nullptr),
-	m_ppIndices(nullptr),
+	m_vertices(0),
+	m_indices(0),
 	m_strPathW(),
 	m_strPath(),
 	m_pMeshHeader(nullptr),
@@ -149,10 +149,10 @@ void SDKMesh::Destroy()
 			}
 		}
 		for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
-			SAFE_DELETE(m_pVertexBufferArray[i].pVertexBuffer);
+			m_pVertexBufferArray[i].pVertexBuffer = nullptr;
 
 		for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
-			SAFE_DELETE(m_pIndexBufferArray[i].pIndexBuffer);
+			m_pIndexBufferArray[i].pIndexBuffer = nullptr;
 	}
 
 	if (m_pAdjacencyIndexBufferArray)
@@ -167,8 +167,8 @@ void SDKMesh::Destroy()
 	SAFE_DELETE_ARRAY(m_pTransformedFrameMatrices);
 	SAFE_DELETE_ARRAY(m_pWorldPoseFrameMatrices);
 
-	SAFE_DELETE_ARRAY(m_ppVertices );
-	SAFE_DELETE_ARRAY(m_ppIndices );
+	m_vertices.clear();
+	m_indices.clear();
 
 	m_pMeshHeader = nullptr;
 	m_pVertexBufferArray = nullptr;
@@ -268,27 +268,30 @@ Format SDKMesh::GetIBFormat(_In_ uint32_t iMesh) const
 	return DXGI_FORMAT_R16_UINT;
 }
 
-//--------------------------------------------------------------------------------------
-VertexBuffer *SDKMesh::GetVertexBuffer(_In_ uint32_t iMesh, _In_ uint32_t iVB) const
-{
-	return m_pVertexBufferArray[m_pMeshArray[iMesh].VertexBuffers[iVB]].pVertexBuffer;
-}
-
-//--------------------------------------------------------------------------------------
-IndexBuffer *SDKMesh::GetIndexBuffer(_In_ uint32_t iMesh ) const
-{
-	return m_pIndexBufferArray[m_pMeshArray[iMesh].IndexBuffer ].pIndexBuffer;
-}
-
 SDKMESH_INDEX_TYPE SDKMesh::GetIndexType(_In_ uint32_t iMesh) const
 {
 	return static_cast<SDKMESH_INDEX_TYPE>(m_pIndexBufferArray[m_pMeshArray[iMesh].IndexBuffer].IndexType);
 }
 
-//--------------------------------------------------------------------------------------
-IndexBuffer *SDKMesh::GetAdjIndexBuffer(_In_ uint32_t iMesh) const
+Descriptor SDKMesh::GetVertexBufferSRV(uint32_t iMesh, uint32_t iVB) const
 {
-	return m_pAdjacencyIndexBufferArray[m_pMeshArray[iMesh].IndexBuffer].pIndexBuffer;
+	return m_vertexBuffer.GetSRV(m_pMeshArray[iMesh].VertexBuffers[iVB]);
+}
+
+VertexBufferView SDKMesh::GetVertexBufferView(uint32_t iMesh, uint32_t iVB) const
+{
+	return m_vertexBuffer.GetVBV(m_pMeshArray[iMesh].VertexBuffers[iVB]);
+}
+
+IndexBufferView SDKMesh::GetIndexBufferView(uint32_t iMesh) const
+{
+	return m_indexBuffer.GetIBV(m_pMeshArray[iMesh].IndexBuffer);
+}
+
+//--------------------------------------------------------------------------------------
+IndexBufferView SDKMesh::GetAdjIndexBufferView(uint32_t iMesh) const
+{
+	return m_adjIndexBuffer.GetIBV(m_pMeshArray[iMesh].IndexBuffer);
 }
 
 //--------------------------------------------------------------------------------------
@@ -327,28 +330,33 @@ uint32_t SDKMesh::GetNumIndexBuffers() const
 	return m_pMeshHeader ? m_pMeshHeader->NumIndexBuffers : 0;
 }
 
-//--------------------------------------------------------------------------------------
-VertexBuffer *SDKMesh::GetVertexBufferAt(_In_ uint32_t iVB) const
+Descriptor SDKMesh::GetVertexBufferSRVAt(uint32_t iVB) const
 {
-	return m_pVertexBufferArray[iVB].pVertexBuffer;
+	return m_vertexBuffer.GetSRV(iVB);
 }
 
 //--------------------------------------------------------------------------------------
-IndexBuffer *SDKMesh::GetIndexBufferAt(_In_ uint32_t iIB) const
+VertexBufferView SDKMesh::GetVertexBufferViewAt(uint32_t iVB) const
 {
-	return m_pIndexBufferArray[iIB].pIndexBuffer;
+	return m_vertexBuffer.GetVBV(iVB);
+}
+
+//--------------------------------------------------------------------------------------
+IndexBufferView SDKMesh::GetIndexBufferViewAt(uint32_t iIB) const
+{
+	return m_indexBuffer.GetIBV(iIB);
 }
 
 //--------------------------------------------------------------------------------------
 uint8_t *SDKMesh::GetRawVerticesAt(_In_ uint32_t iVB) const
 {
-	return m_ppVertices[iVB];
+	return m_vertices[iVB];
 }
 
 //--------------------------------------------------------------------------------------
 uint8_t *SDKMesh::GetRawIndicesAt(_In_ uint32_t iIB) const
 {
-	return m_ppIndices[iIB];
+	return m_indices[iIB];
 }
 
 //--------------------------------------------------------------------------------------
@@ -694,51 +702,78 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 	}
 }
 
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-HRESULT SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, SDKMESH_VERTEX_BUFFER_HEADER *pHeader,
-	void *pVertices, vector<Resource> &uploaders)
+bool SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders)
 {
-	HRESULT hr = S_OK;
-	pHeader->DataOffset = 0;
+	// Vertex buffer info
+	auto numVertices = 0u;
+	const auto stride = static_cast<uint32_t>(m_pVertexBufferArray->StrideBytes);
+	vector<uint32_t> firstVertices(m_pMeshHeader->NumVertexBuffers);
 
-	//Vertex Buffer
-	const auto stride = static_cast<uint32_t>(pHeader->StrideBytes);
-	const auto numVertices = static_cast<uint32_t>(pHeader->SizeBytes) / stride;
-	pHeader->pVertexBuffer = new VertexBuffer();
-	pHeader->pVertexBuffer->Create(m_device, numVertices, stride, D3D12_RESOURCE_FLAG_NONE,
-		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST);
+	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
+	{
+		firstVertices[i] = numVertices;
+		numVertices += static_cast<uint32_t>(m_pVertexBufferArray[i].SizeBytes) / stride;
+	}
 
+	// Create a vertex Buffer
+	N_RETURN(m_vertexBuffer.Create(m_device, numVertices, stride, D3D12_RESOURCE_FLAG_NONE,
+		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST,
+		m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
+		m_pMeshHeader->NumVertexBuffers, firstVertices.data()), false);
+
+	// Copy vertices into one buffer
+	auto offset = 0u;
+	vector<uint8_t> bufferData(stride * numVertices);
+
+	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
+	{
+		const auto sizeBytes = static_cast<uint32_t>(m_pVertexBufferArray[i].SizeBytes);
+		memcpy(&bufferData[offset], m_vertices[i], sizeBytes);
+		offset += sizeBytes;
+	}
+
+	// Upload vertices
 	uploaders.push_back(Resource());
-	pHeader->pVertexBuffer->Upload(commandList, uploaders.back(), pVertices,
+	
+	return m_vertexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-
-	return hr;
 }
 
-//--------------------------------------------------------------------------------------
-_Use_decl_annotations_
-HRESULT SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, SDKMESH_INDEX_BUFFER_HEADER *pHeader,
-	void *pIndices, std::vector<Resource> &uploaders)
+bool SDKMesh::createIndexBuffer(const GraphicsCommandList & commandList, std::vector<Resource>& uploaders)
 {
-	HRESULT hr = S_OK;
-	pHeader->DataOffset = 0;
+	// Index buffer info
+	auto byteWidth = 0u;
+	vector<uint32_t> offsets(m_pMeshHeader->NumIndexBuffers);
 
-	//Index Buffer
-	//pHeader->pIB11 = make_unique<IndexBuffer>(m_pDev11);
-	pHeader->pIndexBuffer = new IndexBuffer();
-	pHeader->pIndexBuffer->Create(m_device, static_cast<uint32_t>(pHeader->SizeBytes),
-		pHeader->IndexType == IT_32BIT ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT,
-		D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE, D3D12_HEAP_TYPE_DEFAULT,
-		D3D12_RESOURCE_STATE_COPY_DEST);
+	for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
+	{
+		offsets[i] = byteWidth;
+		byteWidth += static_cast<uint32_t>(m_pIndexBufferArray[i].SizeBytes);
+	}
 
+	// Create a vertex Buffer
+	N_RETURN(m_indexBuffer.Create(m_device, byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
+		DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT, D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE,
+		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST,
+		m_pMeshHeader->NumIndexBuffers, offsets.data()), false);
+	
+	// Copy indices into one buffer
+	auto offset = 0u;
+	vector<uint8_t> bufferData(byteWidth);
+
+	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
+	{
+		const auto sizeBytes = static_cast<uint32_t>(m_pIndexBufferArray[i].SizeBytes);
+		memcpy(&bufferData[offset], m_indices[i], sizeBytes);
+		offset += sizeBytes;
+	}
+
+	// Upload indices
 	uploaders.push_back(Resource());
-	pHeader->pIndexBuffer->Upload(commandList, uploaders.back(), pIndices,
+
+	return m_indexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
 		D3D12_RESOURCE_STATE_INDEX_BUFFER);
-
-	return hr;
 }
-
 
 //--------------------------------------------------------------------------------------
 _Use_decl_annotations_
@@ -861,49 +896,22 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	// error condition
 	if (m_pMeshHeader->Version != SDKMESH_FILE_VERSION) return E_NOINTERFACE;
 
-	// Setup buffer data pointer
-	//uint8_t* pBufferData = pData + m_pMeshHeader->HeaderSize + m_pMeshHeader->NonBufferDataSize;
+	// Create VBs
+	m_vertices.resize(m_pMeshHeader->NumVertexBuffers);
+	for(auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
+		m_vertices[i] = reinterpret_cast<uint8_t*>(pData + m_pVertexBufferArray[i].DataOffset);
 
-	// Get the start of the buffer data
-	//uint64_t BufferDataStart = m_pMeshHeader->HeaderSize + m_pMeshHeader->NonBufferDataSize;
+	// Create IBs
+	m_indices.resize(m_pMeshHeader->NumIndexBuffers);
+	for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
+		m_indices[i] = reinterpret_cast<uint8_t*>(pData + m_pIndexBufferArray[i].DataOffset);
 
 	// Uploader buffers
 	vector<Resource> uploaders;
 
-	// Create VBs
-	m_ppVertices = new uint8_t*[m_pMeshHeader->NumVertexBuffers];
-	if (!m_ppVertices) return E_OUTOFMEMORY;
-
-	for(auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
-	{
-		uint8_t *pVertices = nullptr;
-		pVertices = reinterpret_cast<uint8_t*>(pData + m_pVertexBufferArray[i].DataOffset);
-
-		if (commandList) createVertexBuffer(commandList, &m_pVertexBufferArray[i], pVertices, uploaders);
-
-		m_ppVertices[i] = pVertices;
-	}
-
-	// Create IBs
-	m_ppIndices = new uint8_t*[m_pMeshHeader->NumIndexBuffers];
-	if (!m_ppIndices) return E_OUTOFMEMORY;
-
-	for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
-	{
-		uint8_t *pIndices = nullptr;
-		pIndices = reinterpret_cast<uint8_t*>(pData + m_pIndexBufferArray[i].DataOffset);
-
-		if (commandList) createIndexBuffer(commandList, &m_pIndexBufferArray[i], pIndices, uploaders);
-
-		m_ppIndices[i] = pIndices;
-	}
-
 	// Load Materials
 	m_textureCache = textureCache;
 	if (commandList) loadMaterials(commandList, m_pMaterialArray, m_pMeshHeader->NumMaterials, uploaders);
-
-	// Execute commands
-	executeCommandList(commandList);
 
 	// Create a place to store our bind pose frame matrices
 	m_pBindPoseFrameMatrices = new XMFLOAT4X4[m_pMeshHeader->NumFrames];
@@ -948,8 +956,8 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 
 			//uint8_t* pIndices = nullptr;
 			//m_ppIndices[i]
-			const auto indices = reinterpret_cast<uint32_t*>(m_ppIndices[currentMesh->IndexBuffer]);
-			const auto vertices = reinterpret_cast<float*>(m_ppVertices[currentMesh->VertexBuffers[0]]);
+			const auto indices = reinterpret_cast<uint32_t*>(m_indices[currentMesh->IndexBuffer]);
+			const auto vertices = reinterpret_cast<float*>(m_vertices[currentMesh->VertexBuffers[0]]);
 			auto stride = static_cast<uint32_t>(m_pVertexBufferArray[currentMesh->VertexBuffers[0]].StrideBytes);
 			assert (stride % 4 == 0);
 			stride /= 4;
@@ -996,6 +1004,13 @@ HRESULT SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 
 	// Classify material type for each subset
 	classifyMaterialType();
+
+	//Create vertex Buffer and index buffer
+	createVertexBuffer(commandList, uploaders);
+	createIndexBuffer(commandList, uploaders);
+
+	// Execute commands
+	executeCommandList(commandList);
 
 	return S_OK;
 }

@@ -1437,7 +1437,7 @@ IndexBuffer::~IndexBuffer()
 
 bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format,
 	ResourceFlags resourceFlags, PoolType poolType, ResourceState state,
-	uint32_t numIBVs, const uint32_t *firstIndices,
+	uint32_t numIBVs, const uint32_t *offsets,
 	uint32_t numSRVs, const uint32_t *firstSRVElements,
 	uint32_t numUAVs, const uint32_t *firstUAVElements)
 {
@@ -1447,7 +1447,6 @@ bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	assert(format == DXGI_FORMAT_R32_UINT || format == DXGI_FORMAT_R16_UINT);
-	const auto stride = format == DXGI_FORMAT_R16_UINT ? 2 : 4;
 	if (hasSRV || hasUAV) byteWidth += byteWidth % 4;
 
 	// Determine initial state
@@ -1462,10 +1461,10 @@ bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format
 	m_IBVs.resize(numIBVs);
 	for (auto i = 0u; i < numIBVs; ++i)
 	{
-		const auto offset = firstIndices ? stride * firstIndices[i] : 0;
+		const auto offset = offsets ? offsets[i] : 0;
 		m_IBVs[i].BufferLocation = m_resource->GetGPUVirtualAddress() + offset;
-		m_IBVs[i].SizeInBytes = (!firstIndices || i + 1 >= numIBVs ?
-			byteWidth : stride * firstIndices[i + 1]) - offset;
+		m_IBVs[i].SizeInBytes = (!offsets || i + 1 >= numIBVs ?
+			byteWidth : offsets[i + 1]) - offset;
 		m_IBVs[i].Format = format;
 	}
 

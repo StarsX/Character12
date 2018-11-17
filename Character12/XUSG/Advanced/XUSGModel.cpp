@@ -133,8 +133,7 @@ void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Set IA parameters
-		const auto vertexBuffer = m_mesh->GetVertexBuffer(m, 0);
-		m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer->GetVBV());
+		m_commandList->IASetVertexBuffers(0, 1, &m_mesh->GetVertexBufferView(m, 0));
 
 		// Render mesh
 		render(m, subsetFlags, reset);
@@ -274,7 +273,7 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
 
 	// Set IA parameters
-	m_commandList->IASetIndexBuffer(&m_mesh->GetIndexBuffer(mesh)->GetIBV());
+	m_commandList->IASetIndexBuffer(&m_mesh->GetIndexBufferView(mesh));
 
 	// Set pipeline state
 	if (reset) SetPipelineState(subsetFlags);

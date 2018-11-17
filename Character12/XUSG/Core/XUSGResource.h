@@ -303,7 +303,7 @@ namespace XUSG
 			ResourceState state = ResourceState(0),
 			uint32_t numVBVs = 1, const uint32_t *firstVertices = nullptr,
 			uint32_t numSRVs = 1, const uint32_t *firstSRVElements = nullptr,
-			uint32_t numUAVs = 1, const uint32_t *firstUAVElements = nullptr);
+			uint32_t numUAVs = 0, const uint32_t *firstUAVElements = nullptr);
 
 		VertexBufferView GetVBV(uint32_t i = 0) const;
 
@@ -324,9 +324,9 @@ namespace XUSG
 		bool Create(const Device &device, uint32_t byteWidth, Format format = Format(42),
 			ResourceFlags resourceFlags = ResourceFlags(0x8), PoolType poolType = PoolType(1),
 			ResourceState state = ResourceState(0),
-			uint32_t numIBVs = 1, const uint32_t *firstIndices = nullptr,
-			uint32_t numSRVs = 1, const uint32_t *firstSRVElements = nullptr,
-			uint32_t numUAVs = 1, const uint32_t *firstUAVElements = nullptr);
+			uint32_t numIBVs = 1, const uint32_t *offsets = nullptr,
+			uint32_t numSRVs = 0, const uint32_t *firstSRVElements = nullptr,
+			uint32_t numUAVs = 0, const uint32_t *firstUAVElements = nullptr);
 
 		IndexBufferView GetIBV(uint32_t i = 0) const;
 

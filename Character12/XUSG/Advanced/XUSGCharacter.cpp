@@ -332,7 +332,7 @@ void Character::createDescriptorTables()
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		Util::DescriptorTable srvTable;
-		const Descriptor srvs[] = { m_boneWorlds.GetSRV(m), m_mesh->GetVertexBuffer(m, 0)->GetSRV() };
+		const Descriptor srvs[] = { m_boneWorlds.GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
 		srvTable.SetDescriptors(0, _countof(srvs), srvs);
 		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
 

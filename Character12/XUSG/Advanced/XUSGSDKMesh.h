@@ -298,30 +298,30 @@ namespace XUSG
 		SDKMesh();
 		virtual ~SDKMesh();
 
-		virtual bool Create(const Device &device, const wchar_t *szFileName, const TextureCache &textureCache);
+		virtual bool Create(const Device &device, const wchar_t *fileName, const TextureCache &textureCache);
 		virtual bool Create(const Device &device, uint8_t *pData, const TextureCache &textureCache,
-			size_t dataBytes, bool bCopyStatic = false);
-		virtual bool LoadAnimation(const wchar_t *szFileName);
+			size_t dataBytes, bool copyStatic = false);
+		virtual bool LoadAnimation(const wchar_t *fileName);
 		virtual void Destroy();
 
 		//Frame manipulation
 		void TransformBindPose(DirectX::CXMMATRIX world);
-		void TransformMesh(DirectX::CXMMATRIX world, double fTime);
+		void TransformMesh(DirectX::CXMMATRIX world, double time);
 
 		// Helpers (Graphics API specific)
-		static PrimitiveTopology GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE PrimType);
-		Format GetIBFormat(uint32_t iMesh) const;
+		static PrimitiveTopology GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE primType);
+		Format GetIBFormat(uint32_t mesh) const;
 
-		SDKMESH_INDEX_TYPE	GetIndexType(uint32_t iMesh) const;
+		SDKMESH_INDEX_TYPE	GetIndexType(uint32_t mesh) const;
 
-		Descriptor			GetVertexBufferSRV(uint32_t iMesh, uint32_t iVB) const;
-		VertexBufferView	GetVertexBufferView(uint32_t iMesh, uint32_t iVB) const;
-		IndexBufferView		GetIndexBufferView(uint32_t iMesh) const;
-		IndexBufferView		GetAdjIndexBufferView(uint32_t iMesh) const;
+		Descriptor			GetVertexBufferSRV(uint32_t mesh, uint32_t i) const;
+		VertexBufferView	GetVertexBufferView(uint32_t mesh, uint32_t i) const;
+		IndexBufferView		GetIndexBufferView(uint32_t mesh) const;
+		IndexBufferView		GetAdjIndexBufferView(uint32_t mesh) const;
 
-		Descriptor			GetVertexBufferSRVAt(uint32_t iVB) const;
-		VertexBufferView	GetVertexBufferViewAt(uint32_t iVB) const;
-		IndexBufferView		GetIndexBufferViewAt(uint32_t iIB) const;
+		Descriptor			GetVertexBufferSRVAt(uint32_t vb) const;
+		VertexBufferView	GetVertexBufferViewAt(uint32_t vb) const;
+		IndexBufferView		GetIndexBufferViewAt(uint32_t ib) const;
 
 		// Helpers (general)
 		const char			*GetMeshPathA() const;
@@ -331,39 +331,39 @@ namespace XUSG
 		uint32_t			GetNumVertexBuffers() const;
 		uint32_t			GetNumIndexBuffers() const;
 
-		uint8_t				*GetRawVerticesAt(uint32_t iVB) const;
-		uint8_t				*GetRawIndicesAt(uint32_t iIB) const;
+		uint8_t				*GetRawVerticesAt(uint32_t vb) const;
+		uint8_t				*GetRawIndicesAt(uint32_t ib) const;
 
-		SDKMESH_MATERIAL	*GetMaterial(uint32_t iMaterial) const;
-		SDKMESH_MESH		*GetMesh(uint32_t iMesh) const;
-		uint32_t			GetNumSubsets(uint32_t iMesh) const;
-		uint32_t			GetNumSubsets(uint32_t iMesh, SubsetFlags materialType) const;
-		SDKMESH_SUBSET		*GetSubset(uint32_t iMesh, uint32_t iSubset) const;
-		SDKMESH_SUBSET		*GetSubset(uint32_t iMesh, uint32_t iSubset, SubsetFlags materialType) const;
-		uint32_t			GetVertexStride(uint32_t iMesh, uint32_t iVB) const;
+		SDKMESH_MATERIAL	*GetMaterial(uint32_t material) const;
+		SDKMESH_MESH		*GetMesh(uint32_t mesh) const;
+		uint32_t			GetNumSubsets(uint32_t mesh) const;
+		uint32_t			GetNumSubsets(uint32_t mesh, SubsetFlags materialType) const;
+		SDKMESH_SUBSET		*GetSubset(uint32_t mesh, uint32_t subset) const;
+		SDKMESH_SUBSET		*GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const;
+		uint32_t			GetVertexStride(uint32_t mesh, uint32_t i) const;
 		uint32_t			GetNumFrames() const;
-		SDKMESH_FRAME		*GetFrame(uint32_t iFrame) const;
-		SDKMESH_FRAME		*FindFrame(const char *szName) const;
-		uint32_t			FindFrameIndex(const char *szName) const;
-		uint64_t			GetNumVertices(uint32_t iMesh, uint32_t iVB) const;
-		uint64_t			GetNumIndices(uint32_t iMesh) const;
-		DirectX::XMVECTOR	GetMeshBBoxCenter(uint32_t iMesh) const;
-		DirectX::XMVECTOR	GetMeshBBoxExtents(uint32_t iMesh) const;
+		SDKMESH_FRAME		*GetFrame(uint32_t frame) const;
+		SDKMESH_FRAME		*FindFrame(const char *name) const;
+		uint32_t			FindFrameIndex(const char *name) const;
+		uint64_t			GetNumVertices(uint32_t mesh, uint32_t i) const;
+		uint64_t			GetNumIndices(uint32_t mesh) const;
+		DirectX::XMVECTOR	GetMeshBBoxCenter(uint32_t mesh) const;
+		DirectX::XMVECTOR	GetMeshBBoxExtents(uint32_t mesh) const;
 		uint32_t			GetOutstandingResources() const;
 		uint32_t			GetOutstandingBufferResources() const;
 		bool				CheckLoadDone();
 		bool				IsLoaded() const;
 		bool				IsLoading() const;
-		void				SetLoading(bool bLoading);
+		void				SetLoading(bool loading);
 		bool				HadLoadingError() const;
 
 		// Animation
-		uint32_t			GetNumInfluences(uint32_t iMesh) const;
-		DirectX::XMMATRIX	GetMeshInfluenceMatrix(uint32_t iMesh, uint32_t iInfluence) const;
-		uint32_t			GetAnimationKeyFromTime(double fTime) const;
-		DirectX::XMMATRIX	GetWorldMatrix(uint32_t iFrameIndex) const;
-		DirectX::XMMATRIX	GetInfluenceMatrix(uint32_t iFrameIndex) const;
-		DirectX::XMMATRIX	GetBindMatrix(uint32_t iFrameIndex) const;
+		uint32_t			GetNumInfluences(uint32_t mesh) const;
+		DirectX::XMMATRIX	GetMeshInfluenceMatrix(uint32_t mesh, uint32_t influence) const;
+		uint32_t			GetAnimationKeyFromTime(double time) const;
+		DirectX::XMMATRIX	GetWorldMatrix(uint32_t frameIndex) const;
+		DirectX::XMMATRIX	GetInfluenceMatrix(uint32_t frameIndex) const;
+		DirectX::XMMATRIX	GetBindMatrix(uint32_t frameIndex) const;
 		bool				GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) const;
 
 	protected:
@@ -373,28 +373,28 @@ namespace XUSG
 		bool createVertexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders);
 		bool createIndexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders);
 
-		virtual bool createFromFile(const Device &device, const wchar_t *szFileName, const TextureCache &textureCache);
+		virtual bool createFromFile(const Device &device, const wchar_t *fileName, const TextureCache &textureCache);
 		virtual bool createFromMemory(const Device &device, uint8_t *pData, const TextureCache &textureCache,
-			size_t dataBytes, bool bCopyStatic);
+			size_t dataBytes, bool copyStatic);
 
 		void classifyMaterialType();
 		bool executeCommandList(const GraphicsCommandList &commandList);
 
 		// Frame manipulation
-		void transformBindPoseFrame(uint32_t iFrame, DirectX::CXMMATRIX parentWorld);
-		void transformFrame(uint32_t iFrame, DirectX::CXMMATRIX parentWorld, double fTime);
-		void transformFrameAbsolute(uint32_t iFrame, double fTime);
+		void transformBindPoseFrame(uint32_t frame, DirectX::CXMMATRIX parentWorld);
+		void transformFrame(uint32_t frame, DirectX::CXMMATRIX parentWorld, double time);
+		void transformFrameAbsolute(uint32_t frame, double time);
 
 		// These are the pointers to the two chunks of data loaded in from the mesh file
 		uint8_t							*m_pStaticMeshData;
-		std::vector<uint8_t>			m_pHeapData;
+		std::vector<uint8_t>			m_heapData;
 		std::vector<uint8_t>			m_animation;
 		std::vector<uint8_t*>			m_vertices;
 		std::vector<uint8_t*>			m_indices;
 
 		// Keep track of the path
-		std::wstring					m_strPathW;
-		std::string						m_strPath;
+		std::wstring					m_filePathW;
+		std::string						m_filePath;
 
 		// General mesh info
 		SDKMESH_HEADER					*m_pMeshHeader;

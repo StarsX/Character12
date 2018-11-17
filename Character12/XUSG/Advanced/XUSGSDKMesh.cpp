@@ -15,12 +15,12 @@ SDKMesh::SDKMesh() :
 	m_numOutstandingResources(0),
 	m_isLoading(false),
 	m_pStaticMeshData(nullptr),
-	m_pHeapData(0),
+	m_heapData(0),
 	m_animation(0),
 	m_vertices(0),
 	m_indices(0),
-	m_strPathW(),
-	m_strPath(),
+	m_filePathW(),
+	m_filePath(),
 	m_pMeshHeader(nullptr),
 	m_pVertexBufferArray(nullptr),
 	m_pIndexBufferArray(nullptr),
@@ -43,28 +43,28 @@ SDKMesh::~SDKMesh()
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh::Create(const Device &device, const wchar_t *szFileName,
+bool SDKMesh::Create(const Device &device, const wchar_t *fileName,
 	const TextureCache &textureCache)
 {
-	return createFromFile(device, szFileName, textureCache);
+	return createFromFile(device, fileName, textureCache);
 }
 
 bool SDKMesh::Create(const Device &device, uint8_t *pData,
-	const TextureCache &textureCache, size_t dataBytes, bool bCopyStatic)
+	const TextureCache &textureCache, size_t dataBytes, bool copyStatic)
 {
-	return createFromMemory(device, pData, textureCache, dataBytes, bCopyStatic);
+	return createFromMemory(device, pData, textureCache, dataBytes, copyStatic);
 }
 
-bool SDKMesh::LoadAnimation(_In_z_ const wchar_t *szFileName)
+bool SDKMesh::LoadAnimation(const wchar_t *fileName)
 {
-	wchar_t strPath[MAX_PATH];
+	wchar_t filePath[MAX_PATH];
 
 	// Find the path for the file
-	wcsncpy_s(strPath, MAX_PATH, szFileName, wcslen(szFileName));
-	//V_RETURN(DXUTFindDXSDKMediaFileCch(strPath, MAX_PATH, szFileName));
+	wcsncpy_s(filePath, MAX_PATH, fileName, wcslen(fileName));
+	//V_RETURN(DXUTFindDXSDKMediaFileCch(filePath, MAX_PATH, fileName));
 
 	// Open the file
-	ifstream fileStream(strPath, ios::in | ios::binary);
+	ifstream fileStream(filePath, ios::in | ios::binary);
 	F_RETURN(!fileStream, cerr, MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903), false);
 
 	// Read header
@@ -134,7 +134,7 @@ void SDKMesh::Destroy()
 	SAFE_DELETE_ARRAY(m_pAdjIndexBufferArray);
 
 	m_pStaticMeshData = nullptr;
-	m_pHeapData.clear();
+	m_heapData.clear();
 	m_animation.clear();
 	m_bindPoseFrameMatrices.clear();
 	m_transformedFrameMatrices.clear();
@@ -164,13 +164,13 @@ void SDKMesh::TransformBindPose(CXMMATRIX world)
 }
 
 //--------------------------------------------------------------------------------------
-// transform the mesh frames according to the animation for time fTime
+// transform the mesh frames according to the animation for time
 //--------------------------------------------------------------------------------------
-void SDKMesh::TransformMesh(CXMMATRIX world, double fTime)
+void SDKMesh::TransformMesh(CXMMATRIX world, double time)
 {
 	if (!m_pAnimationHeader || FTT_RELATIVE == m_pAnimationHeader->FrameTransformType)
 	{
-		transformFrame(0, world, fTime);
+		transformFrame(0, world, time);
 
 		// For each frame, move the transform to the bind pose, then
 		// move it to the final position
@@ -183,15 +183,15 @@ void SDKMesh::TransformMesh(CXMMATRIX world, double fTime)
 	}
 	else if (FTT_ABSOLUTE == m_pAnimationHeader->FrameTransformType)
 		for (auto i = 0u; i < m_pAnimationHeader->NumFrames; ++i)
-			transformFrameAbsolute(i, fTime);
+			transformFrameAbsolute(i, time);
 }
 
 //--------------------------------------------------------------------------------------
-PrimitiveTopology SDKMesh::GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE PrimType)
+PrimitiveTopology SDKMesh::GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE primType)
 {
 	PrimitiveTopology retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 
-	switch (PrimType)
+	switch (primType)
 	{
 		case PT_TRIANGLE_LIST:
 			retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -225,9 +225,9 @@ PrimitiveTopology SDKMesh::GetPrimitiveType(SDKMESH_PRIMITIVE_TYPE PrimType)
 	return retType;
 }
 
-Format SDKMesh::GetIBFormat(uint32_t iMesh) const
+Format SDKMesh::GetIBFormat(uint32_t mesh) const
 {
-	switch (m_pIndexBufferArray[m_pMeshArray[iMesh].IndexBuffer].IndexType)
+	switch (m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].IndexType)
 	{
 		case IT_16BIT:
 			return DXGI_FORMAT_R16_UINT;
@@ -238,55 +238,55 @@ Format SDKMesh::GetIBFormat(uint32_t iMesh) const
 	return DXGI_FORMAT_R16_UINT;
 }
 
-SDKMESH_INDEX_TYPE SDKMesh::GetIndexType(uint32_t iMesh) const
+SDKMESH_INDEX_TYPE SDKMesh::GetIndexType(uint32_t mesh) const
 {
-	return static_cast<SDKMESH_INDEX_TYPE>(m_pIndexBufferArray[m_pMeshArray[iMesh].IndexBuffer].IndexType);
+	return static_cast<SDKMESH_INDEX_TYPE>(m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].IndexType);
 }
 
-Descriptor SDKMesh::GetVertexBufferSRV(uint32_t iMesh, uint32_t iVB) const
+Descriptor SDKMesh::GetVertexBufferSRV(uint32_t mesh, uint32_t i) const
 {
-	return m_vertexBuffer.GetSRV(m_pMeshArray[iMesh].VertexBuffers[iVB]);
+	return m_vertexBuffer.GetSRV(m_pMeshArray[mesh].VertexBuffers[i]);
 }
 
-VertexBufferView SDKMesh::GetVertexBufferView(uint32_t iMesh, uint32_t iVB) const
+VertexBufferView SDKMesh::GetVertexBufferView(uint32_t mesh, uint32_t i) const
 {
-	return m_vertexBuffer.GetVBV(m_pMeshArray[iMesh].VertexBuffers[iVB]);
+	return m_vertexBuffer.GetVBV(m_pMeshArray[mesh].VertexBuffers[i]);
 }
 
-IndexBufferView SDKMesh::GetIndexBufferView(uint32_t iMesh) const
+IndexBufferView SDKMesh::GetIndexBufferView(uint32_t mesh) const
 {
-	return m_indexBuffer.GetIBV(m_pMeshArray[iMesh].IndexBuffer);
+	return m_indexBuffer.GetIBV(m_pMeshArray[mesh].IndexBuffer);
 }
 
-IndexBufferView SDKMesh::GetAdjIndexBufferView(uint32_t iMesh) const
+IndexBufferView SDKMesh::GetAdjIndexBufferView(uint32_t mesh) const
 {
-	return m_adjIndexBuffer.GetIBV(m_pMeshArray[iMesh].IndexBuffer);
+	return m_adjIndexBuffer.GetIBV(m_pMeshArray[mesh].IndexBuffer);
 }
 
-Descriptor SDKMesh::GetVertexBufferSRVAt(uint32_t iVB) const
+Descriptor SDKMesh::GetVertexBufferSRVAt(uint32_t vb) const
 {
-	return m_vertexBuffer.GetSRV(iVB);
+	return m_vertexBuffer.GetSRV(vb);
 }
 
-VertexBufferView SDKMesh::GetVertexBufferViewAt(uint32_t iVB) const
+VertexBufferView SDKMesh::GetVertexBufferViewAt(uint32_t vb) const
 {
-	return m_vertexBuffer.GetVBV(iVB);
+	return m_vertexBuffer.GetVBV(vb);
 }
 
-IndexBufferView SDKMesh::GetIndexBufferViewAt(uint32_t iIB) const
+IndexBufferView SDKMesh::GetIndexBufferViewAt(uint32_t ib) const
 {
-	return m_indexBuffer.GetIBV(iIB);
+	return m_indexBuffer.GetIBV(ib);
 }
 
 //--------------------------------------------------------------------------------------
 const char *SDKMesh::GetMeshPathA() const
 {
-	return m_strPath.c_str();
+	return m_filePath.c_str();
 }
 
 const wchar_t *SDKMesh::GetMeshPathW() const
 {
-	return m_strPathW.c_str();
+	return m_filePathW.c_str();
 }
 
 uint32_t SDKMesh::GetNumMeshes() const
@@ -309,53 +309,53 @@ uint32_t SDKMesh::GetNumIndexBuffers() const
 	return m_pMeshHeader ? m_pMeshHeader->NumIndexBuffers : 0;
 }
 
-uint8_t *SDKMesh::GetRawVerticesAt(uint32_t iVB) const
+uint8_t *SDKMesh::GetRawVerticesAt(uint32_t vb) const
 {
-	return m_vertices[iVB];
+	return m_vertices[vb];
 }
 
-uint8_t *SDKMesh::GetRawIndicesAt(uint32_t iIB) const
+uint8_t *SDKMesh::GetRawIndicesAt(uint32_t ib) const
 {
-	return m_indices[iIB];
+	return m_indices[ib];
 }
 
-SDKMESH_MATERIAL *SDKMesh::GetMaterial(uint32_t iMaterial) const
+SDKMESH_MATERIAL *SDKMesh::GetMaterial(uint32_t material) const
 {
-	return &m_pMaterialArray[iMaterial];
+	return &m_pMaterialArray[material];
 }
 
-SDKMESH_MESH *SDKMesh::GetMesh(uint32_t iMesh) const
+SDKMESH_MESH *SDKMesh::GetMesh(uint32_t mesh) const
 {
-	return &m_pMeshArray[iMesh];
+	return &m_pMeshArray[mesh];
 }
 
-uint32_t SDKMesh::GetNumSubsets(uint32_t iMesh) const
+uint32_t SDKMesh::GetNumSubsets(uint32_t mesh) const
 {
-	return m_pMeshArray[iMesh].NumSubsets;
+	return m_pMeshArray[mesh].NumSubsets;
 }
 
-uint32_t SDKMesh::GetNumSubsets(uint32_t iMesh, SubsetFlags materialType) const
+uint32_t SDKMesh::GetNumSubsets(uint32_t mesh, SubsetFlags materialType) const
 {
 	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
 
-	return static_cast<uint32_t>(m_classifiedSubsets[materialType - 1][iMesh].size());
+	return static_cast<uint32_t>(m_classifiedSubsets[materialType - 1][mesh].size());
 }
 
-SDKMESH_SUBSET *SDKMesh::GetSubset(uint32_t iMesh, uint32_t iSubset) const
+SDKMESH_SUBSET *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset) const
 {
-	return &m_pSubsetArray[m_pMeshArray[iMesh].pSubsets[iSubset]];
+	return &m_pSubsetArray[m_pMeshArray[mesh].pSubsets[subset]];
 }
 
-SDKMESH_SUBSET *SDKMesh::GetSubset(uint32_t iMesh, uint32_t iSubset, SubsetFlags materialType) const
+SDKMESH_SUBSET *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const
 {
 	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
 
-	return &m_pSubsetArray[m_classifiedSubsets[materialType - 1][iMesh][iSubset]];
+	return &m_pSubsetArray[m_classifiedSubsets[materialType - 1][mesh][subset]];
 }
 
-uint32_t SDKMesh::GetVertexStride(uint32_t iMesh, uint32_t iVB) const
+uint32_t SDKMesh::GetVertexStride(uint32_t mesh, uint32_t i) const
 {
-	return static_cast<uint32_t>(m_pVertexBufferArray[m_pMeshArray[iMesh].VertexBuffers[iVB]].StrideBytes);
+	return static_cast<uint32_t>(m_pVertexBufferArray[m_pMeshArray[mesh].VertexBuffers[i]].StrideBytes);
 }
 
 uint32_t SDKMesh::GetNumFrames() const
@@ -363,47 +363,47 @@ uint32_t SDKMesh::GetNumFrames() const
 	return m_pMeshHeader->NumFrames;
 }
 
-SDKMESH_FRAME *SDKMesh::GetFrame(uint32_t iFrame) const
+SDKMESH_FRAME *SDKMesh::GetFrame(uint32_t frame) const
 {
-	assert(iFrame < m_pMeshHeader->NumFrames);
+	assert(frame < m_pMeshHeader->NumFrames);
 
-	return &m_pFrameArray[iFrame];
+	return &m_pFrameArray[frame];
 }
 
-SDKMESH_FRAME *SDKMesh::FindFrame(const char *szName) const
+SDKMESH_FRAME *SDKMesh::FindFrame(const char *name) const
 {
-	const auto i = FindFrameIndex(szName);
+	const auto i = FindFrameIndex(name);
 
 	return i == INVALID_FRAME ? nullptr : &m_pFrameArray[i];
 }
 
-uint32_t SDKMesh::FindFrameIndex(const char *szName) const
+uint32_t SDKMesh::FindFrameIndex(const char *name) const
 {
 	for (auto i = 0u; i < m_pMeshHeader->NumFrames; ++i)
-		if (_stricmp(m_pFrameArray[i].Name, szName) == 0)
+		if (_stricmp(m_pFrameArray[i].Name, name) == 0)
 			return i;
 
 	return INVALID_FRAME;
 }
 
-uint64_t SDKMesh::GetNumVertices(uint32_t iMesh, uint32_t iVB) const
+uint64_t SDKMesh::GetNumVertices(uint32_t mesh, uint32_t i) const
 {
-	return m_pVertexBufferArray[m_pMeshArray[iMesh].VertexBuffers[iVB]].NumVertices;
+	return m_pVertexBufferArray[m_pMeshArray[mesh].VertexBuffers[i]].NumVertices;
 }
 
-uint64_t SDKMesh::GetNumIndices(uint32_t iMesh) const
+uint64_t SDKMesh::GetNumIndices(uint32_t mesh) const
 {
-	return m_pIndexBufferArray[m_pMeshArray[iMesh].IndexBuffer].NumIndices;
+	return m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].NumIndices;
 }
 
-XMVECTOR SDKMesh::GetMeshBBoxCenter(uint32_t iMesh) const
+XMVECTOR SDKMesh::GetMeshBBoxCenter(uint32_t mesh) const
 {
-	return XMLoadFloat3(&m_pMeshArray[iMesh].BoundingBoxCenter);
+	return XMLoadFloat3(&m_pMeshArray[mesh].BoundingBoxCenter);
 }
 
-XMVECTOR SDKMesh::GetMeshBBoxExtents(uint32_t iMesh) const
+XMVECTOR SDKMesh::GetMeshBBoxExtents(uint32_t mesh) const
 {
-	return XMLoadFloat3(&m_pMeshArray[iMesh].BoundingBoxExtents);
+	return XMLoadFloat3(&m_pMeshArray[mesh].BoundingBoxExtents);
 }
 
 uint32_t SDKMesh::GetOutstandingResources() const
@@ -469,9 +469,9 @@ bool SDKMesh::IsLoading() const
 	return m_isLoading;
 }
 
-void SDKMesh::SetLoading(bool bLoading)
+void SDKMesh::SetLoading(bool loading)
 {
-	m_isLoading = bLoading;
+	m_isLoading = loading;
 }
 
 bool SDKMesh::HadLoadingError() const
@@ -480,42 +480,42 @@ bool SDKMesh::HadLoadingError() const
 }
 
 //--------------------------------------------------------------------------------------
-uint32_t SDKMesh::GetNumInfluences(uint32_t iMesh) const
+uint32_t SDKMesh::GetNumInfluences(uint32_t mesh) const
 {
-	return m_pMeshArray[iMesh].NumFrameInfluences;
+	return m_pMeshArray[mesh].NumFrameInfluences;
 }
 
-XMMATRIX SDKMesh::GetMeshInfluenceMatrix(uint32_t iMesh, uint32_t iInfluence ) const
+XMMATRIX SDKMesh::GetMeshInfluenceMatrix(uint32_t mesh, uint32_t influence) const
 {
-	const auto iFrame = m_pMeshArray[iMesh].pFrameInfluences[iInfluence];
+	const auto frame = m_pMeshArray[mesh].pFrameInfluences[influence];
 
-	return XMLoadFloat4x4(&m_transformedFrameMatrices[iFrame]);
+	return XMLoadFloat4x4(&m_transformedFrameMatrices[frame]);
 }
 
-XMMATRIX SDKMesh::GetWorldMatrix(uint32_t iFrameIndex) const
+XMMATRIX SDKMesh::GetWorldMatrix(uint32_t frameIndex) const
 {
-	return XMLoadFloat4x4(&m_worldPoseFrameMatrices[iFrameIndex]);
+	return XMLoadFloat4x4(&m_worldPoseFrameMatrices[frameIndex]);
 }
 
-XMMATRIX SDKMesh::GetInfluenceMatrix(uint32_t iFrameIndex) const
+XMMATRIX SDKMesh::GetInfluenceMatrix(uint32_t frameIndex) const
 {
-	return XMLoadFloat4x4(&m_transformedFrameMatrices[iFrameIndex]);
+	return XMLoadFloat4x4(&m_transformedFrameMatrices[frameIndex]);
 }
 
-XMMATRIX SDKMesh::GetBindMatrix(uint32_t iFrameIndex) const
+XMMATRIX SDKMesh::GetBindMatrix(uint32_t frameIndex) const
 {
-	return XMLoadFloat4x4(&m_bindPoseFrameMatrices[iFrameIndex]);
+	return XMLoadFloat4x4(&m_bindPoseFrameMatrices[frameIndex]);
 }
 
-uint32_t SDKMesh::GetAnimationKeyFromTime(double fTime) const
+uint32_t SDKMesh::GetAnimationKeyFromTime(double time) const
 {
 	if (!m_pAnimationHeader) return 0;
 
-	auto iTick = static_cast<uint32_t>(m_pAnimationHeader->AnimationFPS * fTime);
+	auto tick = static_cast<uint32_t>(m_pAnimationHeader->AnimationFPS * time);
 
-	iTick = iTick % (m_pAnimationHeader->NumAnimationKeys - 1);
+	tick = tick % (m_pAnimationHeader->NumAnimationKeys - 1);
 
-	return ++iTick;
+	return ++tick;
 }
 
 bool SDKMesh::GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) const
@@ -538,8 +538,8 @@ bool SDKMesh::GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) cons
 void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATERIAL *pMaterials,
 	uint32_t numMaterials, vector<Resource> &uploaders)
 {
-	string strPath;
-	wstring strPathW;
+	string filePath;
+	wstring filePathW;
 	DDS::Loader textureLoader;
 	DDS::AlphaMode alphaMode;
 
@@ -555,8 +555,8 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 		// load textures
 		if (pMaterials[m].AlbedoTexture[0] != 0)
 		{
-			strPath = m_strPath + pMaterials[m].AlbedoTexture;
-			const auto textureIter = m_textureCache->find(strPath);
+			filePath = m_filePath + pMaterials[m].AlbedoTexture;
+			const auto textureIter = m_textureCache->find(filePath);
 
 			if (textureIter != m_textureCache->end())
 			{
@@ -568,22 +568,22 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(Resource());
 
-				strPathW.assign(strPath.begin(), strPath.end());
-				if (!textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
+				filePathW.assign(filePath.begin(), filePath.end());
+				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, true, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
 				else
 				{
 					pMaterials[m].pAlbedo = texture.get();
 					pMaterials[m].AlphaModeAlbedo = alphaMode;
-					(*m_textureCache)[strPath] = { texture, alphaMode };
+					(*m_textureCache)[filePath] = { texture, alphaMode };
 				}
 			}
 		}
 		if (pMaterials[m].NormalTexture[0] != 0)
 		{
-			strPath = m_strPath + pMaterials[m].NormalTexture;
-			const auto textureIter = m_textureCache->find(strPath);
+			filePath = m_filePath + pMaterials[m].NormalTexture;
+			const auto textureIter = m_textureCache->find(filePath);
 
 			if (textureIter != m_textureCache->end())
 			{
@@ -595,22 +595,22 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(Resource());
 
-				strPathW.assign(strPath.begin(), strPath.end());
-				if (!textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
+				filePathW.assign(filePath.begin(), filePath.end());
+				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
 				else
 				{
 					pMaterials[m].pNormal = texture.get();
 					pMaterials[m].AlphaModeNormal = alphaMode;
-					(*m_textureCache)[strPath] = { texture, alphaMode };
+					(*m_textureCache)[filePath] = { texture, alphaMode };
 				}
 			}
 		}
 		if (pMaterials[m].SpecularTexture[0] != 0)
 		{
-			strPath = m_strPath + pMaterials[m].SpecularTexture;
-			const auto textureIter = m_textureCache->find(strPath);
+			filePath = m_filePath + pMaterials[m].SpecularTexture;
+			const auto textureIter = m_textureCache->find(filePath);
 
 			if (textureIter != m_textureCache->end())
 			{
@@ -622,15 +622,15 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMESH_MATE
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(Resource());
 
-				strPathW.assign(strPath.begin(), strPath.end());
-				if (!textureLoader.CreateTextureFromFile(m_device, commandList, strPathW.c_str(),
+				filePathW.assign(filePath.begin(), filePath.end());
+				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back()))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
 				else
 				{
 					pMaterials[m].pSpecular = texture.get();
 					pMaterials[m].AlphaModeNormal = alphaMode;
-					(*m_textureCache)[strPath] = { texture, alphaMode };
+					(*m_textureCache)[filePath] = { texture, alphaMode };
 				}
 			}
 		}
@@ -674,7 +674,7 @@ bool SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, std::ve
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 }
 
-bool SDKMesh::createIndexBuffer(const GraphicsCommandList & commandList, std::vector<Resource>& uploaders)
+bool SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders)
 {
 	// Index buffer info
 	auto byteWidth = 0u;
@@ -711,21 +711,21 @@ bool SDKMesh::createIndexBuffer(const GraphicsCommandList & commandList, std::ve
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName,
+bool SDKMesh::createFromFile(const Device &device, const wchar_t *fileName,
 	const TextureCache &textureCache)
 {
 	// Find the path for the file
-	m_strPathW = szFileName;
-	//V_RETURN(DXUTFindDXSDKMediaFileCch(m_strPathW, sizeof(m_strPathW) / sizeof(WCHAR), szFileName));
+	m_filePathW = fileName;
+	//V_RETURN(DXUTFindDXSDKMediaFileCch(m_filePathW, sizeof(m_strPathW) / sizeof(WCHAR), fileName));
 
 	// Open the file
-	ifstream fileStream(m_strPathW, ios::in | ios::binary);
+	ifstream fileStream(m_filePathW, ios::in | ios::binary);
 	F_RETURN(!fileStream, cerr, MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 0x0903), false);
 
 	// Change the path to just the directory
-	const auto found = m_strPathW.find_last_of(L"/\\");
-	m_strPathW = m_strPathW.substr(0, found + 1);
-	m_strPath.assign(m_strPathW.begin(), m_strPathW.end());
+	const auto found = m_filePathW.find_last_of(L"/\\");
+	m_filePathW = m_filePathW.substr(0, found + 1);
+	m_filePath.assign(m_filePathW.begin(), m_filePathW.end());
 
 	// Get the file size
 	F_RETURN(!fileStream.seekg(0, fileStream.end), fileStream.close(); cerr, E_FAIL, false);
@@ -733,8 +733,8 @@ bool SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName,
 	F_RETURN(!fileStream.seekg(0), fileStream.close(); cerr, E_FAIL, false);
 
 	// Allocate memory
-	m_pHeapData.resize(cBytes);
-	m_pStaticMeshData = m_pHeapData.data();
+	m_heapData.resize(cBytes);
+	m_pStaticMeshData = m_heapData.data();
 
 	// Read in the file
 	F_RETURN(!fileStream.read(reinterpret_cast<char*>(m_pStaticMeshData), cBytes), cerr, E_FAIL, false);
@@ -745,7 +745,7 @@ bool SDKMesh::createFromFile(const Device &device, const wchar_t *szFileName,
 }
 
 bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
-	const TextureCache &textureCache, size_t dataBytes, bool bCopyStatic)
+	const TextureCache &textureCache, size_t dataBytes, bool copyStatic)
 {
 	XMFLOAT3 lower; 
 	XMFLOAT3 upper; 
@@ -766,14 +766,14 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	// Set outstanding resources to zero
 	m_numOutstandingResources = 0;
 
-	if (bCopyStatic)
+	if (copyStatic)
 	{
 		const auto pHeader = reinterpret_cast<SDKMESH_HEADER*>(pData);
 		const auto StaticSize = static_cast<SIZE_T>(pHeader->HeaderSize + pHeader->NonBufferDataSize);
 		F_RETURN(dataBytes < StaticSize, cerr, E_FAIL, false);
 
-		m_pHeapData.resize(StaticSize);
-		m_pStaticMeshData = m_pHeapData.data();
+		m_heapData.resize(StaticSize);
+		m_pStaticMeshData = m_heapData.data();
 
 		memcpy(m_pStaticMeshData, pData, StaticSize);
 	}
@@ -1010,36 +1010,36 @@ bool SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 //--------------------------------------------------------------------------------------
 // transform bind pose frame using a recursive traversal
 //--------------------------------------------------------------------------------------
-void SDKMesh::transformBindPoseFrame(uint32_t iFrame, CXMMATRIX parentWorld)
+void SDKMesh::transformBindPoseFrame(uint32_t frame, CXMMATRIX parentWorld)
 {
 	if (m_bindPoseFrameMatrices.empty()) return;
 
 	// Transform ourselves
-	const auto m = XMLoadFloat4x4(&m_pFrameArray[iFrame].Matrix);
+	const auto m = XMLoadFloat4x4(&m_pFrameArray[frame].Matrix);
 	const auto mLocalWorld = XMMatrixMultiply(m, parentWorld);
-	DirectX::XMStoreFloat4x4(&m_bindPoseFrameMatrices[iFrame], mLocalWorld);
+	DirectX::XMStoreFloat4x4(&m_bindPoseFrameMatrices[frame], mLocalWorld);
 
 	// Transform our siblings
-	if (m_pFrameArray[iFrame].SiblingFrame != INVALID_FRAME)
-		transformBindPoseFrame(m_pFrameArray[iFrame].SiblingFrame, parentWorld);
+	if (m_pFrameArray[frame].SiblingFrame != INVALID_FRAME)
+		transformBindPoseFrame(m_pFrameArray[frame].SiblingFrame, parentWorld);
 
 	// Transform our children
-	if( m_pFrameArray[iFrame].ChildFrame != INVALID_FRAME)
-		transformBindPoseFrame(m_pFrameArray[iFrame].ChildFrame, mLocalWorld);
+	if( m_pFrameArray[frame].ChildFrame != INVALID_FRAME)
+		transformBindPoseFrame(m_pFrameArray[frame].ChildFrame, mLocalWorld);
 }
 
 //--------------------------------------------------------------------------------------
 // transform frame using a recursive traversal
 //--------------------------------------------------------------------------------------
-void SDKMesh::transformFrame(uint32_t iFrame, CXMMATRIX parentWorld, double fTime)
+void SDKMesh::transformFrame(uint32_t frame, CXMMATRIX parentWorld, double time)
 {
 	// Get the tick data
 	XMMATRIX localTransform;
-	const auto tick = GetAnimationKeyFromTime(fTime);
+	const auto tick = GetAnimationKeyFromTime(time);
 
-	if (INVALID_ANIMATION_DATA != m_pFrameArray[iFrame].AnimationDataIndex)
+	if (INVALID_ANIMATION_DATA != m_pFrameArray[frame].AnimationDataIndex)
 	{
-		const auto frameData = &m_pAnimationFrameData[m_pFrameArray[iFrame].AnimationDataIndex];
+		const auto frameData = &m_pAnimationFrameData[m_pFrameArray[frame].AnimationDataIndex];
 		const auto data = &frameData->pAnimationData[tick];
 
 		// Turn it into a matrix
@@ -1053,32 +1053,32 @@ void SDKMesh::transformFrame(uint32_t iFrame, CXMMATRIX parentWorld, double fTim
 		const auto quatMatrix = XMMatrixRotationQuaternion(quat);
 		localTransform = scaling * quatMatrix * translate;
 	}
-	else localTransform = XMLoadFloat4x4(&m_pFrameArray[iFrame].Matrix);
+	else localTransform = XMLoadFloat4x4(&m_pFrameArray[frame].Matrix);
 
 	// Transform ourselves
 	auto localWorld = XMMatrixMultiply(localTransform, parentWorld);
-	XMStoreFloat4x4(&m_transformedFrameMatrices[iFrame], localWorld);
-	XMStoreFloat4x4(&m_worldPoseFrameMatrices[iFrame], localWorld);
+	XMStoreFloat4x4(&m_transformedFrameMatrices[frame], localWorld);
+	XMStoreFloat4x4(&m_worldPoseFrameMatrices[frame], localWorld);
 
 	// Transform our siblings
-	if (m_pFrameArray[iFrame].SiblingFrame != INVALID_FRAME)
-		transformFrame(m_pFrameArray[iFrame].SiblingFrame, parentWorld, fTime);
+	if (m_pFrameArray[frame].SiblingFrame != INVALID_FRAME)
+		transformFrame(m_pFrameArray[frame].SiblingFrame, parentWorld, time);
 
 	// Transform our children
-	if (m_pFrameArray[iFrame].ChildFrame != INVALID_FRAME)
-		transformFrame(m_pFrameArray[iFrame].ChildFrame, localWorld, fTime);
+	if (m_pFrameArray[frame].ChildFrame != INVALID_FRAME)
+		transformFrame(m_pFrameArray[frame].ChildFrame, localWorld, time);
 }
 
 //--------------------------------------------------------------------------------------
 // transform frame assuming that it is an absolute transformation
 //--------------------------------------------------------------------------------------
-void SDKMesh::transformFrameAbsolute(uint32_t iFrame, double fTime)
+void SDKMesh::transformFrameAbsolute(uint32_t frame, double time)
 {
-	const auto iTick = GetAnimationKeyFromTime(fTime);
+	const auto iTick = GetAnimationKeyFromTime(time);
 
-	if (INVALID_ANIMATION_DATA != m_pFrameArray[iFrame].AnimationDataIndex)
+	if (INVALID_ANIMATION_DATA != m_pFrameArray[frame].AnimationDataIndex)
 	{
-		const auto pFrameData = &m_pAnimationFrameData[m_pFrameArray[iFrame].AnimationDataIndex];
+		const auto pFrameData = &m_pAnimationFrameData[m_pFrameArray[frame].AnimationDataIndex];
 		const auto pData = &pFrameData->pAnimationData[iTick ];
 		const auto pDataOrig = &pFrameData->pAnimationData[0];
 
@@ -1095,6 +1095,6 @@ void SDKMesh::transformFrameAbsolute(uint32_t iFrame, double fTime)
 		const auto mFrom = mRot2 * mTrans2;
 
 		const auto mOutput = mInvTo * mFrom;
-		XMStoreFloat4x4(&m_transformedFrameMatrices[iFrame], mOutput);
+		XMStoreFloat4x4(&m_transformedFrameMatrices[frame], mOutput);
 	}
 }

@@ -755,8 +755,10 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	GraphicsCommandList commandList = nullptr;
 	if (device)
 	{
-		ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAllocator)));
-		ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)));
+		V_RETURN(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+			IID_PPV_ARGS(&commandAllocator)), cerr, false);
+		V_RETURN(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+			commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)), cerr, false);
 	}
 
 	F_RETURN(dataBytes < sizeof(SDKMESH_HEADER), cerr, E_FAIL, false);
@@ -907,9 +909,7 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	N_RETURN(createIndexBuffer(commandList, uploaders), false);
 
 	// Execute commands
-	executeCommandList(commandList);
-
-	return true;
+	return executeCommandList(commandList);
 }
 
 void SDKMesh::classifyMaterialType()
@@ -962,7 +962,7 @@ void SDKMesh::classifyMaterialType()
 	}
 }
 
-void SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
+bool SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 {
 	if (commandList)
 	{
@@ -972,10 +972,10 @@ void SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
 		ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
-		ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
+		V_RETURN(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)), cerr, false);
 
 		// Close the command list and execute it to begin the initial GPU setup.
-		ThrowIfFailed(commandList->Close());
+		V_RETURN(commandList->Close(), cerr, false);
 		ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
 		commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
@@ -985,24 +985,26 @@ void SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 			ComPtr<ID3D12Fence> fence;
 			uint64_t fenceValue = 0;
 
-			ThrowIfFailed(m_device->CreateFence(fenceValue++, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+			V_RETURN(m_device->CreateFence(fenceValue++, D3D12_FENCE_FLAG_NONE,
+				IID_PPV_ARGS(&fence)), cerr, false);
 
 			// Create an event handle to use for frame synchronization.
 			fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-			if (fenceEvent == nullptr)
-				ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
+			F_RETURN(!fenceEvent, cerr, GetLastError(), false);
 
 			// Wait for the command list to execute; we are reusing the same command 
 			// list in our main loop but for now, we just want to wait for setup to 
 			// complete before continuing.
 			// Schedule a Signal command in the queue.
-			ThrowIfFailed(commandQueue->Signal(fence.Get(), fenceValue));
+			V_RETURN(commandQueue->Signal(fence.Get(), fenceValue), cerr, false);
 
 			// Wait until the fence has been processed, and increment the fence value for the current frame.
-			ThrowIfFailed(fence->SetEventOnCompletion(fenceValue++, fenceEvent));
+			V_RETURN(fence->SetEventOnCompletion(fenceValue++, fenceEvent), cerr, false);
 			WaitForSingleObjectEx(fenceEvent, INFINITE, FALSE);
 		}
 	}
+
+	return true;
 }
 
 //--------------------------------------------------------------------------------------

@@ -378,7 +378,7 @@ namespace XUSG
 			size_t dataBytes, bool bCopyStatic);
 
 		void classifyMaterialType();
-		void executeCommandList(const GraphicsCommandList &commandList);
+		bool executeCommandList(const GraphicsCommandList &commandList);
 
 		// Frame manipulation
 		void transformBindPoseFrame(uint32_t iFrame, DirectX::CXMMATRIX parentWorld);

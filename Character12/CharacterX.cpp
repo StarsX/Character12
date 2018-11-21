@@ -18,7 +18,8 @@ CharacterX::CharacterX(uint32_t width, uint32_t height, std::wstring name) :
 	DXFramework(width, height, name),
 	m_frameIndex(0),
 	m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
-	m_scissorRect(0, 0, static_cast<long>(width), static_cast<long>(height))
+	m_scissorRect(0, 0, static_cast<long>(width), static_cast<long>(height)),
+	m_tracking(false)
 {
 }
 
@@ -212,43 +213,16 @@ void CharacterX::LoadAssets()
 		const auto proj = XMMatrixPerspectiveFovLH(g_FOVAngleY, aspectRatio, g_zNear, g_zFar);
 		XMStoreFloat4x4(&m_proj, proj);
 	}
-}
 
-// Generate a simple black and white checkerboard texture.
-vector<uint8_t> CharacterX::GenerateTextureData(uint32_t subDivLevel)
-{
-	const auto rowPitch = TextureWidth * TexturePixelSize;
-	const auto cellPitch = rowPitch >> subDivLevel;			// The width of a cell in the checkboard texture.
-	const auto cellHeight = TextureWidth >> subDivLevel;	// The height of a cell in the checkerboard texture.
-	const auto textureSize = rowPitch * TextureHeight;
-
-	vector<uint8_t> data(textureSize);
-	uint8_t* pData = &data[0];
-
-	for (auto n = 0u; n < textureSize; n += TexturePixelSize)
+	// View initialization
 	{
-		auto x = n % rowPitch;
-		auto y = n / rowPitch;
-		auto i = x / cellPitch;
-		auto j = y / cellHeight;
-
-		if (i % 2 == j % 2)
-		{
-			pData[n] = 0x00;		// R
-			pData[n + 1] = 0x00;	// G
-			pData[n + 2] = 0x00;	// B
-			pData[n + 3] = 0xff;	// A
-		}
-		else
-		{
-			pData[n] = 0xff;		// R
-			pData[n + 1] = 0xff;	// G
-			pData[n + 2] = 0xff;	// B
-			pData[n + 3] = 0xff;	// A
-		}
+		m_focusPt = XMFLOAT3(0.0f, 8.0f, 0.0f);
+		m_eyePt = XMFLOAT3(m_focusPt.x, m_focusPt.y, m_focusPt.z - 25.0f);
+		const auto focusPt = XMLoadFloat3(&m_focusPt);
+		const auto eyePt = XMLoadFloat3(&m_eyePt);
+		const auto view = XMMatrixLookAtLH(eyePt, focusPt, XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f));
+		XMStoreFloat4x4(&m_view, view);
 	}
-
-	return data;
 }
 
 // Update frame-based values.
@@ -258,9 +232,8 @@ void CharacterX::OnUpdate()
 	const auto time = CalculateFrameStats();
 	
 	// View
-	const auto focusPt = XMFLOAT4(0.0f, 8.0f, 0.0f, 25.0f);
-	const auto eyePt = XMVectorSet(focusPt.x, focusPt.y, focusPt.z - focusPt.w, 0.0f);
-	const auto view = XMMatrixLookAtLH(eyePt, XMLoadFloat4(&focusPt), XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f));
+	const auto eyePt = XMLoadFloat3(&m_eyePt);
+	const auto view = XMLoadFloat4x4(&m_view);
 	const auto proj = XMLoadFloat4x4(&m_proj);
 	const auto viewProj = view * proj;
 
@@ -291,6 +264,68 @@ void CharacterX::OnDestroy()
 	WaitForGpu();
 
 	CloseHandle(m_fenceEvent);
+}
+
+// User camera interactions
+void CharacterX::OnLButtonDown(float posX, float posY)
+{
+	m_tracking = true;
+	m_mousePt = XMFLOAT2(posX, posY);
+}
+
+void CharacterX::OnLButtonUp(float posX, float posY)
+{
+	m_tracking = false;
+}
+
+void CharacterX::OnMouseMove(float posX, float posY)
+{
+	if (m_tracking)
+	{
+		const auto dPos = XMFLOAT2(m_mousePt.x - posX, m_mousePt.y - posY);
+
+		XMFLOAT2 radians;
+		radians.x = XM_2PI * dPos.y / m_height;
+		radians.y = XM_2PI * dPos.x / m_width;
+
+		const auto focusPt = XMLoadFloat3(&m_focusPt);
+		auto eyePt = XMLoadFloat3(&m_eyePt);
+
+		const auto len = XMVectorGetX(XMVector3Length(focusPt - eyePt));
+		auto transform = XMMatrixTranslation(0.0f, 0.0f, -len);
+		transform *= XMMatrixRotationRollPitchYaw(radians.x, radians.y, 0.0f);
+		transform *= XMMatrixTranslation(0.0f, 0.0f, len);
+
+		const auto view = XMLoadFloat4x4(&m_view) * transform;
+		const auto viewInv = XMMatrixInverse(nullptr, view);
+		eyePt = viewInv.r[3];
+
+		XMStoreFloat3(&m_eyePt, eyePt);
+		XMStoreFloat4x4(&m_view, view);
+
+		m_mousePt = XMFLOAT2(posX, posY);
+	}
+}
+
+void CharacterX::OnMouseWheel(float deltaZ, float posX, float posY)
+{
+	const auto focusPt = XMLoadFloat3(&m_focusPt);
+	auto eyePt = XMLoadFloat3(&m_eyePt);
+
+	const auto len = XMVectorGetX(XMVector3Length(focusPt - eyePt));
+	const auto transform = XMMatrixTranslation(0.0f, 0.0f, -len * deltaZ / 16.0f);
+
+	const auto view = XMLoadFloat4x4(&m_view) * transform;
+	const auto viewInv = XMMatrixInverse(nullptr, view);
+	eyePt = viewInv.r[3];
+
+	XMStoreFloat3(&m_eyePt, eyePt);
+	XMStoreFloat4x4(&m_view, view);
+}
+
+void CharacterX::OnMouseLeave()
+{
+	m_tracking = false;
 }
 
 void CharacterX::PopulateCommandList()

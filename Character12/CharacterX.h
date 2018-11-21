@@ -35,6 +35,12 @@ public:
 	virtual void OnRender();
 	virtual void OnDestroy();
 
+	virtual void OnLButtonDown(float posX, float posY);
+	virtual void OnLButtonUp(float posX, float posY);
+	virtual void OnMouseMove(float posX, float posY);
+	virtual void OnMouseWheel(float deltaZ, float posX, float posY);
+	virtual void OnMouseLeave();
+
 private:
 	static const uint32_t FrameCount = 2;
 	static const uint32_t TextureWidth = 1024;
@@ -72,6 +78,9 @@ private:
 	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
 	XUSG::DepthStencil		m_depth;
 	XMFLOAT4X4				m_proj;
+	DirectX::XMFLOAT4X4		m_view;
+	DirectX::XMFLOAT3		m_focusPt;
+	DirectX::XMFLOAT3		m_eyePt;
 
 	// Synchronization objects.
 	uint32_t m_frameIndex;
@@ -82,9 +91,12 @@ private:
 	// Application state
 	StepTimer m_timer;
 
+	// User camera interactions
+	bool m_tracking;
+	DirectX::XMFLOAT2 m_mousePt;
+
 	void LoadPipeline();
 	void LoadAssets();
-	std::vector<uint8_t> GenerateTextureData(uint32_t subDivLevel);
 	void PopulateCommandList();
 	void WaitForGpu();
 	void MoveToNextFrame();

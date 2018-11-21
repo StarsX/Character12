@@ -42,7 +42,7 @@ public:
 	virtual void OnMouseLeave();
 
 private:
-	static const uint32_t FrameCount = 2;
+	static const uint32_t FrameCount = 3;
 	static const uint32_t TextureWidth = 1024;
 	static const uint32_t TextureHeight = 1024;
 	static const uint32_t TexturePixelSize = 4;	// The number of bytes used to represent a pixel in the texture.

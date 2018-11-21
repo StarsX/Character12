@@ -54,9 +54,7 @@ bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 
 void Model::FrameMove()
 {
-#if	TEMPORAL
 	m_temporalIndex = !m_temporalIndex;
-#endif
 }
 
 void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow, bool isTemporal)

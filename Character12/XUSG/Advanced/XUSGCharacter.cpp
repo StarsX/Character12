@@ -18,7 +18,7 @@ Character::Character(const Device &device, const GraphicsCommandList &commandLis
 	m_cbLinkedShadowMatrices(0),
 	m_skinningPipelineLayout(nullptr),
 	m_skinningPipeline(nullptr),
-	m_srvSkinningTables(0),
+	m_srvSkinningTables(),
 	m_uavSkinningTables()
 {
 }
@@ -173,14 +173,10 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 
 bool Character::createTransformedStates()
 {
-#if	TEMPORAL
 	for (auto &vertexBuffers : m_transformedVBs)
 		N_RETURN(createTransformedVBs(vertexBuffers), false);
 
 	return true;
-#else
-	return createTransformedVBs(m_transformedVBs[0]);
-#endif
 }
 
 bool Character::createTransformedVBs(VertexBuffer &vertexBuffer)
@@ -216,10 +212,11 @@ bool Character::createBuffers()
 		numElements += m_mesh->GetNumInfluences(m);
 	}
 
-	N_RETURN(m_boneWorlds.Create(m_device, numElements, sizeof(XMFLOAT4X3),
-		D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
-		D3D12_RESOURCE_STATE_GENERIC_READ, numMeshes,
-		firstElements.data()), false);
+	for (auto &boneWorlds : m_boneWorlds)
+		N_RETURN(boneWorlds.Create(m_device, numElements, sizeof(XMFLOAT4X3),
+			D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_TYPE_UPLOAD,
+			D3D12_RESOURCE_STATE_GENERIC_READ, numMeshes,
+			firstElements.data()), false);
 
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
@@ -322,7 +319,8 @@ void Character::createPipelines()
 void Character::createDescriptorTables()
 {
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	m_srvSkinningTables.resize(numMeshes);
+	for (auto &srvTables : m_srvSkinningTables)
+		srvTables.resize(numMeshes);
 	for (auto &uavTables : m_uavSkinningTables)
 		uavTables.resize(numMeshes);
 #if	TEMPORAL
@@ -332,16 +330,15 @@ void Character::createDescriptorTables()
 
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
-		Util::DescriptorTable srvTable;
-		const Descriptor srvs[] = { m_boneWorlds.GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
-		srvTable.SetDescriptors(0, _countof(srvs), srvs);
-		m_srvSkinningTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+		for (auto i = 0u; i < _countof(m_boneWorlds); ++i)
+		{
+			Util::DescriptorTable srvTable;
+			const Descriptor srvs[] = { m_boneWorlds[i].GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
+			srvTable.SetDescriptors(0, _countof(srvs), srvs);
+			m_srvSkinningTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+		}
 
-#if	TEMPORAL
 		for (auto i = 0u; i < _countof(m_transformedVBs); ++i)
-#else
-		auto i = 0u;
-#endif
 		{
 			Util::DescriptorTable uavTable;
 			uavTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetUAV(m));
@@ -410,7 +407,7 @@ void Character::skinning(bool reset)
 	{
 		// Setup descriptor tables
 		m_transformedVBs[m_temporalIndex].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m]);
+		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m_temporalIndex][m]);
 		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_temporalIndex][m]);
 		
 		// Skinning
@@ -490,12 +487,12 @@ void Character::renderLinked(uint32_t mesh, bool isShadow, bool reset)
 void Character::setSkeletalMatrices(uint32_t numMeshes)
 {
 	for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
-	m_boneWorlds.Unmap();
+	m_boneWorlds[m_temporalIndex].Unmap();
 }
 
 void Character::setBoneMatrices(uint32_t mesh)
 {
-	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds.Map(mesh));
+	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds[m_temporalIndex].Map(mesh));
 
 	const auto numBones = m_mesh->GetNumInfluences(mesh);
 	for (auto i = 0u; i < numBones; ++i)

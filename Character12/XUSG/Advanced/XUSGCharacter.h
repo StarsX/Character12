@@ -97,13 +97,13 @@ namespace XUSG
 
 		double m_time;
 
-		StructuredBuffer m_boneWorlds;
+		StructuredBuffer m_boneWorlds[2];
 		std::vector<ConstantBuffer> m_cbLinkedMatrices;
 		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
 
 		PipelineLayout	m_skinningPipelineLayout;
 		PipelineState	m_skinningPipeline;
-		std::vector<DescriptorTable> m_srvSkinningTables;
+		std::vector<DescriptorTable> m_srvSkinningTables[2];
 		std::vector<DescriptorTable> m_uavSkinningTables[2];
 #if	TEMPORAL
 		std::vector<DescriptorTable> m_srvSkinnedTables[2];

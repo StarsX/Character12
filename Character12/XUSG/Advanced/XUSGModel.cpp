@@ -12,7 +12,7 @@ using namespace XUSG::Graphics;
 Model::Model(const Device &device, const GraphicsCommandList &commandList) :
 	m_device(device),
 	m_commandList(commandList),
-	m_temporalIndex(0),
+	m_currentFrame(0),
 	m_mesh(nullptr),
 	m_shaderPool(nullptr),
 	m_pipelinePool(nullptr),
@@ -54,7 +54,8 @@ bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 
 void Model::FrameMove()
 {
-	m_temporalIndex = !m_temporalIndex;
+	m_previousFrame = m_currentFrame;
+	m_currentFrame = (m_currentFrame + 1) % FrameCount;
 }
 
 void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow, bool isTemporal)
@@ -82,8 +83,8 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 #if	TEMPORAL
 	if (isTemporal)
 	{
-		XMStoreFloat4x4(&m_worldViewProjs[m_temporalIndex], worldViewProj);
-		const auto worldViewProjPrev = XMLoadFloat4x4(&m_worldViewProjs[!m_temporalIndex]);
+		XMStoreFloat4x4(&m_worldViewProjs[m_currentFrame], worldViewProj);
+		const auto worldViewProjPrev = XMLoadFloat4x4(&m_worldViewProjs[m_previousFrame]);
 		pCBData->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
 	}
 #endif

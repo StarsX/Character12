@@ -381,8 +381,8 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX world,
 #if	TEMPORAL
 	if (isTemporal)
 	{
-		XMStoreFloat4x4(&m_linkedWorldViewProjs[m_temporalIndex][mesh], worldViewProj);
-		const auto worldViewProjPrev = XMLoadFloat4x4(&m_linkedWorldViewProjs[!m_temporalIndex][mesh]);
+		XMStoreFloat4x4(&m_linkedWorldViewProjs[m_currentFrame][mesh], worldViewProj);
+		const auto worldViewProjPrev = XMLoadFloat4x4(&m_linkedWorldViewProjs[m_previousFrame][mesh]);
 		pCBData->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
 	}
 #endif
@@ -406,9 +406,9 @@ void Character::skinning(bool reset)
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Setup descriptor tables
-		m_transformedVBs[m_temporalIndex].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m_temporalIndex][m]);
-		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_temporalIndex][m]);
+		m_transformedVBs[m_currentFrame].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m_currentFrame][m]);
+		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_currentFrame][m]);
 		
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
@@ -445,15 +445,15 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
 				// Set IA parameters
-				auto &vertexBuffer = m_transformedVBs[m_temporalIndex];
+				auto &vertexBuffer = m_transformedVBs[m_currentFrame];
 				vertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 				m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV(m));
 
 				// Set historical motion states, if neccessary
 #if	TEMPORAL
-				auto &prevVertexBuffer = m_transformedVBs[!m_temporalIndex];
+				auto &prevVertexBuffer = m_transformedVBs[m_previousFrame];
 				prevVertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-				m_commandList->SetGraphicsRootDescriptorTable(HISTORY, *m_srvSkinnedTables[!m_temporalIndex][m]);
+				m_commandList->SetGraphicsRootDescriptorTable(HISTORY, *m_srvSkinnedTables[m_previousFrame][m]);
 #endif
 
 				// Render mesh
@@ -487,12 +487,12 @@ void Character::renderLinked(uint32_t mesh, bool isShadow, bool reset)
 void Character::setSkeletalMatrices(uint32_t numMeshes)
 {
 	for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
-	m_boneWorlds[m_temporalIndex].Unmap();
+	m_boneWorlds[m_currentFrame].Unmap();
 }
 
 void Character::setBoneMatrices(uint32_t mesh)
 {
-	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds[m_temporalIndex].Map(mesh));
+	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds[m_currentFrame].Map(mesh));
 
 	const auto numBones = m_mesh->GetNumInfluences(mesh);
 	for (auto i = 0u; i < numBones; ++i)

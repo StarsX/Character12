@@ -87,26 +87,26 @@ namespace XUSG
 
 		std::shared_ptr<Compute::Pipeline::Pool> m_computePipelinePool;
 
-		VertexBuffer m_transformedVBs[2];
+		VertexBuffer m_transformedVBs[FrameCount];
 		DirectX::XMFLOAT4X4	m_mWorld;
 		DirectX::XMFLOAT4	m_vPosRot;
 
 #if	TEMPORAL
-		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[2];
+		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[FrameCount];
 #endif
 
 		double m_time;
 
-		StructuredBuffer m_boneWorlds[2];
+		StructuredBuffer m_boneWorlds[FrameCount];
 		std::vector<ConstantBuffer> m_cbLinkedMatrices;
 		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
 
 		PipelineLayout	m_skinningPipelineLayout;
 		PipelineState	m_skinningPipeline;
-		std::vector<DescriptorTable> m_srvSkinningTables[2];
-		std::vector<DescriptorTable> m_uavSkinningTables[2];
+		std::vector<DescriptorTable> m_srvSkinningTables[FrameCount];
+		std::vector<DescriptorTable> m_uavSkinningTables[FrameCount];
 #if	TEMPORAL
-		std::vector<DescriptorTable> m_srvSkinnedTables[2];
+		std::vector<DescriptorTable> m_srvSkinnedTables[FrameCount];
 #endif
 	};
 }

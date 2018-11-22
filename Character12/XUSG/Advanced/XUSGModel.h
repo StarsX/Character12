@@ -44,6 +44,8 @@ namespace XUSG
 			const TextureCache &textureCache);
 		static void SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable);
 
+		static constexpr uint32_t GetFrameCount() { return FrameCount; }
+
 	protected:
 		enum DescriptorTableSlot : uint8_t
 		{
@@ -81,10 +83,13 @@ namespace XUSG
 
 		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);
 
+		static const uint32_t FrameCount = FRAME_COUNT;
+
 		Device				m_device;
 		GraphicsCommandList	m_commandList;
 
-		uint8_t				m_temporalIndex;
+		uint8_t				m_currentFrame;
+		uint8_t				m_previousFrame;
 
 		std::shared_ptr<SDKMesh>					m_mesh;
 		std::shared_ptr<Shader::Pool>				m_shaderPool;
@@ -93,7 +98,7 @@ namespace XUSG
 		std::shared_ptr<DescriptorTablePool>		m_descriptorTablePool;
 
 #if	TEMPORAL
-		DirectX::XMFLOAT4X4	m_worldViewProjs[2];
+		DirectX::XMFLOAT4X4	m_worldViewProjs[FrameCount];
 #endif
 
 		ConstantBuffer		m_cbMatrices;

@@ -35,6 +35,7 @@ public:
 	virtual void OnRender();
 	virtual void OnDestroy();
 
+	virtual void OnKeyDown(uint8_t key);
 	virtual void OnLButtonDown(float posX, float posY);
 	virtual void OnLButtonUp(float posX, float posY);
 	virtual void OnMouseMove(float posX, float posY);
@@ -89,6 +90,7 @@ private:
 	uint64_t m_fenceValues[FrameCount];
 
 	// Application state
+	bool m_pausing;
 	StepTimer m_timer;
 
 	// User camera interactions

@@ -19,6 +19,7 @@ CharacterX::CharacterX(uint32_t width, uint32_t height, std::wstring name) :
 	m_frameIndex(0),
 	m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
 	m_scissorRect(0, 0, static_cast<long>(width), static_cast<long>(height)),
+	m_pausing(false),
 	m_tracking(false)
 {
 }
@@ -228,9 +229,14 @@ void CharacterX::LoadAssets()
 // Update frame-based values.
 void CharacterX::OnUpdate()
 {
-	m_timer.Tick();
-	const auto time = CalculateFrameStats();
+	// Timer
+	static auto time = 0.0, pauseTime = 0.0;
 	
+	m_timer.Tick();
+	const auto totalTime = CalculateFrameStats();
+	pauseTime = m_pausing ? totalTime - time : pauseTime;
+	time = totalTime - pauseTime;
+
 	// View
 	const auto eyePt = XMLoadFloat3(&m_eyePt);
 	const auto view = XMLoadFloat4x4(&m_view);
@@ -266,7 +272,18 @@ void CharacterX::OnDestroy()
 	CloseHandle(m_fenceEvent);
 }
 
-// User camera interactions
+// User hot-key interactions.
+void CharacterX::OnKeyDown(uint8_t key)
+{
+	switch (key)
+	{
+	case ' ':
+		m_pausing = !m_pausing;
+		break;
+	}
+}
+
+// User camera interactions.
 void CharacterX::OnLButtonDown(float posX, float posY)
 {
 	m_tracking = true;

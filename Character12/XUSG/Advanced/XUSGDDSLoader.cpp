@@ -347,7 +347,7 @@ static Format MakeSRGB(Format format)
 }
 
 static bool FillInitData(uint32_t width, uint32_t height, uint32_t depth,
-	uint8_t mipCount, uint8_t arraySize, Format format,
+	uint32_t mipCount, uint32_t arraySize, Format format,
 	size_t maxsize, size_t bitSize, const uint8_t *bitData,
 	uint32_t &twidth, uint32_t &theight, uint32_t &tdepth, uint8_t &skipMip,
 	SubresourceData *initData)
@@ -417,7 +417,7 @@ static bool CreateTexture(const Device &device, const GraphicsCommandList &comma
 	auto format = DXGI_FORMAT_UNKNOWN;
 	bool isCubeMap = false;
 
-	const auto mipCount = (max)(header->mipMapCount, 1u);
+	const auto mipCount = static_cast<uint8_t>((max)(header->mipMapCount, 1u));
 
 	if ((header->ddspf.flags & DDS_FOURCC) && (MAKEFOURCC('D', 'X', '1', '0') == header->ddspf.fourCC))
 	{

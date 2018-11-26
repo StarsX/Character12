@@ -12,7 +12,7 @@ Character::Character(const Device &device, const GraphicsCommandList &commandLis
 	Model(device, commandList),
 	m_linkedMeshes(nullptr),
 	m_meshLinks(nullptr),
-	m_computePipelinePool(nullptr),
+	m_computePipelineCache(nullptr),
 	m_transformedVBs(),
 	m_cbLinkedMatrices(0),
 	m_cbLinkedShadowMatrices(0),
@@ -29,23 +29,23 @@ Character::~Character(void)
 
 bool Character::Init(const InputLayout &inputLayout,
 	const shared_ptr<SDKMesh> &mesh,
-	const shared_ptr<Shader::Pool> &shaderPool,
-	const shared_ptr<Graphics::Pipeline::Pool> &graphicsPipelinePool,
-	const shared_ptr<Compute::Pipeline::Pool> &computePipelinePool,
-	const shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
-	const shared_ptr<DescriptorTablePool> &descriptorTablePool,
+	const shared_ptr<ShaderPool> &shaderPool,
+	const shared_ptr<Graphics::PipelineCache> &graphicsPipelineCache,
+	const shared_ptr<Compute::PipelineCache> &computePipelineCache,
+	const shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
+	const shared_ptr<DescriptorTableCache> &descriptorTableCache,
 	const shared_ptr<vector<SDKMesh>> &linkedMeshes,
 	const shared_ptr<vector<MeshLink>> &meshLinks)
 {
-	m_computePipelinePool = computePipelinePool;
+	m_computePipelineCache = computePipelineCache;
 
 	// Set the Linked Meshes
 	m_meshLinks = meshLinks;
 	m_linkedMeshes = linkedMeshes;
 
 	// Get SDKMesh
-	N_RETURN(Model::Init(inputLayout, mesh, shaderPool, graphicsPipelinePool,
-		pipelineLayoutPool, descriptorTablePool), false);
+	N_RETURN(Model::Init(inputLayout, mesh, shaderPool, graphicsPipelineCache,
+		pipelineLayoutCache, descriptorTableCache), false);
 
 	// Create buffers
 	N_RETURN(createBuffers(), false);
@@ -266,7 +266,7 @@ void Character::createPipelineLayout()
 		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices);
 		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
 
-		m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutPool,
+		m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_NONE);
 	}
 
@@ -303,7 +303,7 @@ void Character::createPipelineLayout()
 				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 #endif
 
-		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutPool,
+		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 	}
 }
@@ -313,7 +313,7 @@ void Character::createPipelines()
 	Compute::State state;
 	state.SetPipelineLayout(m_skinningPipelineLayout);
 	state.SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
-	m_skinningPipeline = state.GetPipeline(*m_computePipelinePool);
+	m_skinningPipeline = state.GetPipeline(*m_computePipelineCache);
 }
 
 void Character::createDescriptorTables()
@@ -335,19 +335,19 @@ void Character::createDescriptorTables()
 			Util::DescriptorTable srvTable;
 			const Descriptor srvs[] = { m_boneWorlds[i].GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
 			srvTable.SetDescriptors(0, _countof(srvs), srvs);
-			m_srvSkinningTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			m_srvSkinningTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 		}
 
 		for (auto i = 0u; i < _countof(m_transformedVBs); ++i)
 		{
 			Util::DescriptorTable uavTable;
 			uavTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetUAV(m));
-			m_uavSkinningTables[i][m] = uavTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			m_uavSkinningTables[i][m] = uavTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
 #if	TEMPORAL
 			Util::DescriptorTable srvTable;
 			srvTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetSRV(m));
-			m_srvSkinnedTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			m_srvSkinnedTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 #endif
 		}
 	}
@@ -392,7 +392,7 @@ void Character::skinning(bool reset)
 {
 	if (reset)
 	{
-		m_commandList->SetDescriptorHeaps(1, m_descriptorTablePool->GetCbvSrvUavPool().GetAddressOf());
+		m_commandList->SetDescriptorHeaps(1, m_descriptorTableCache->GetCbvSrvUavPool().GetAddressOf());
 		m_commandList->SetComputeRootSignature(m_skinningPipelineLayout.Get());
 		m_commandList->SetPipelineState(m_skinningPipeline.Get());
 	}
@@ -423,8 +423,8 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 	{
 		DescriptorPool::InterfaceType* heaps[] =
 		{
-			m_descriptorTablePool->GetCbvSrvUavPool().Get(),
-			m_descriptorTablePool->GetSamplerPool().Get()
+			m_descriptorTableCache->GetCbvSrvUavPool().Get(),
+			m_descriptorTableCache->GetSamplerPool().Get()
 		};
 		m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 		m_commandList->SetGraphicsRootSignature(m_pipelineLayout.Get());

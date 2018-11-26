@@ -28,10 +28,10 @@ namespace XUSG
 		virtual ~Model();
 
 		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
-			const std::shared_ptr<Shader::Pool> &shaderPool,
-			const std::shared_ptr<Graphics::Pipeline::Pool> &pipelinePool,
-			const std::shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
-			const std::shared_ptr<DescriptorTablePool> &descriptorTablePool);
+			const std::shared_ptr<ShaderPool> &shaderPool,
+			const std::shared_ptr<Graphics::PipelineCache> &pipelineCache,
+			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
+			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache);
 		void FrameMove();
 		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
@@ -39,7 +39,7 @@ namespace XUSG
 		void SetPipelineState(PipelineIndex pipeline);
 		void Render(SubsetFlags subsetFlags, bool isShadow, bool reset = false);
 
-		static InputLayout CreateInputLayout(Graphics::Pipeline::Pool &pipelinePool);
+		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
 			const TextureCache &textureCache);
 		static void SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable);
@@ -92,10 +92,10 @@ namespace XUSG
 		uint8_t				m_previousFrame;
 
 		std::shared_ptr<SDKMesh>					m_mesh;
-		std::shared_ptr<Shader::Pool>				m_shaderPool;
-		std::shared_ptr<Graphics::Pipeline::Pool>	m_pipelinePool;
-		std::shared_ptr<PipelineLayoutPool>			m_pipelineLayoutPool;
-		std::shared_ptr<DescriptorTablePool>		m_descriptorTablePool;
+		std::shared_ptr<ShaderPool>					m_shaderPool;
+		std::shared_ptr<Graphics::PipelineCache>	m_pipelineCache;
+		std::shared_ptr<PipelineLayoutCache>		m_pipelineLayoutCache;
+		std::shared_ptr<DescriptorTableCache>		m_descriptorTableCache;
 
 #if	TEMPORAL
 		DirectX::XMFLOAT4X4	m_worldViewProjs[FrameCount];
@@ -105,7 +105,7 @@ namespace XUSG
 		ConstantBuffer		m_cbShadowMatrix;
 
 		PipelineLayout		m_pipelineLayout;
-		PipelineState		m_pipelines[NUM_PIPELINE];
+		Pipeline			m_pipelines[NUM_PIPELINE];
 		DescriptorTable		m_cbvTables[NUM_CBV];
 		DescriptorTable		m_samplerTable;
 		std::vector<DescriptorTable> m_srvTables;

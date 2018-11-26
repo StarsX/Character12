@@ -15,8 +15,8 @@ Model::Model(const Device &device, const GraphicsCommandList &commandList) :
 	m_currentFrame(0),
 	m_mesh(nullptr),
 	m_shaderPool(nullptr),
-	m_pipelinePool(nullptr),
-	m_descriptorTablePool(nullptr),
+	m_pipelineCache(nullptr),
+	m_descriptorTableCache(nullptr),
 	m_pipelineLayout(nullptr),
 	m_pipelines(),
 	m_cbvTables(),
@@ -30,15 +30,15 @@ Model::~Model()
 }
 
 bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh,
-	const shared_ptr<Shader::Pool> &shaderPool, const shared_ptr<Pipeline::Pool> &pipelinePool,
-	const shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
-	const shared_ptr <DescriptorTablePool> &descriptorTablePool)
+	const shared_ptr<ShaderPool> &shaderPool, const shared_ptr<PipelineCache> &pipelineCache,
+	const shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
+	const shared_ptr <DescriptorTableCache> &descriptorTableCache)
 {
 	// Set shader group and states
 	m_shaderPool = shaderPool;
-	m_pipelinePool = pipelinePool;
-	m_pipelineLayoutPool = pipelineLayoutPool;
-	m_descriptorTablePool = descriptorTablePool;
+	m_pipelineCache = pipelineCache;
+	m_pipelineLayoutCache = pipelineLayoutCache;
+	m_descriptorTableCache = descriptorTableCache;
 
 	// Get SDKMesh
 	m_mesh = mesh;
@@ -119,8 +119,8 @@ void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 {
 	DescriptorPool::InterfaceType* heaps[] =
 	{
-		m_descriptorTablePool->GetCbvSrvUavPool().Get(),
-		m_descriptorTablePool->GetSamplerPool().Get()
+		m_descriptorTableCache->GetCbvSrvUavPool().Get(),
+		m_descriptorTableCache->GetSamplerPool().Get()
 	};
 	m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 	m_commandList->SetGraphicsRootSignature(m_pipelineLayout.Get());
@@ -142,7 +142,7 @@ void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 	if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
-InputLayout Model::CreateInputLayout(Pipeline::Pool &pipelinePool)
+InputLayout Model::CreateInputLayout(PipelineCache &pipelineCache)
 {
 	// Define vertex data layout for post-transformed objects
 	const auto offset = 0xffffffff;
@@ -155,7 +155,7 @@ InputLayout Model::CreateInputLayout(Pipeline::Pool &pipelinePool)
 		{ "BINORMAL",	0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
 
-	return pipelinePool.CreateInputLayout(inputElementDescs);
+	return pipelineCache.CreateInputLayout(inputElementDescs);
 }
 
 shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &meshFileName,
@@ -184,7 +184,7 @@ bool Model::createConstantBuffers()
 void Model::createPipelineLayout()
 {
 	auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
-	m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutPool,
+	m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 }
 
@@ -212,42 +212,41 @@ void Model::createPipelines(const InputLayout &inputLayout, const Format *rtvFor
 	state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
 	state.OMSetRTVFormats(rtvFormats, numRTVs);
 	state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
-	m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelinePool);
+	m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelineCache);
 
 	// Get transparent pipeline
-	state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelinePool);
-	state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS_EQUAL, *m_pipelinePool);
-	state.OMSetBlendState(BlendPreset::AUTO_NON_PREMUL, *m_pipelinePool);
-	m_pipelines[ALPHA_TWO_SIDE] = state.GetPipeline(*m_pipelinePool);
+	state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
+	state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS_EQUAL, *m_pipelineCache);
+	state.OMSetBlendState(BlendPreset::AUTO_NON_PREMUL, *m_pipelineCache);
+	m_pipelines[ALPHA_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
 
 	// Get alpha-test pipeline
 	state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_ALPHA_TEST));
 	state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_ALPHA_TEST));
-	state.DSSetState(Graphics::DepthStencilPreset::DEFAULT, *m_pipelinePool);
-	state.OMSetBlendState(BlendPreset::DEFAULT_OPAQUE, *m_pipelinePool);
-	m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelinePool);
+	state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
+	state.OMSetBlendState(BlendPreset::DEFAULT_OPAQUE, *m_pipelineCache);
+	m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
 	
 	// Get reflected pipeline
-	//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelinePool);
-	//state.OMSetBlendState(BlendPreset::DEFAULT_OPAQUE, *m_pipelinePool);
-	//m_pipelines[REFLECTED] = state.GetPipeline(*m_pipelinePool);
+	//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelineCache);
+	//state.OMSetBlendState(BlendPreset::DEFAULT_OPAQUE, *m_pipelineCache);
+	//m_pipelines[REFLECTED] = state.GetPipeline(*m_pipelineCache);
 }
 
 void Model::createDescriptorTables()
 {
 	Util::DescriptorTable cbMatricesTable;
 	cbMatricesTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV());
-	m_cbvTables[CBV_MATRICES] = cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+	m_cbvTables[CBV_MATRICES] = cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
 	Util::DescriptorTable cbShadowTable;
 	cbShadowTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV());
-	m_cbvTables[CBV_SHADOW_MATRIX] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+	m_cbvTables[CBV_SHADOW_MATRIX] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
 	Util::DescriptorTable samplerTable;
-	const SamplerPreset::Type samplers[] =
-	{ SamplerPreset::ANISOTROPIC_WRAP, SamplerPreset::POINT_WRAP, SamplerPreset::LINEAR_LESS_EQUAL };
-	samplerTable.SetSamplers(0, _countof(samplers), samplers, *m_descriptorTablePool);
-	m_samplerTable = samplerTable.GetSamplerTable(*m_descriptorTablePool);
+	const SamplerPreset samplers[] = { ANISOTROPIC_WRAP, POINT_WRAP, LINEAR_LESS_EQUAL };
+	samplerTable.SetSamplers(0, _countof(samplers), samplers, *m_descriptorTableCache);
+	m_samplerTable = samplerTable.GetSamplerTable(*m_descriptorTableCache);
 	
 	// Materials
 	const auto numMaterials = m_mesh->GetNumMaterials();
@@ -261,7 +260,7 @@ void Model::createDescriptorTables()
 			Util::DescriptorTable srvTable;
 			const Descriptor srvs[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };
 			srvTable.SetDescriptors(0, _countof(srvs), srvs);
-			m_srvTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTablePool);
+			m_srvTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 		}
 		else m_srvTables[m] = nullptr;
 	}

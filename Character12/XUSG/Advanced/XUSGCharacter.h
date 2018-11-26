@@ -32,11 +32,11 @@ namespace XUSG
 
 		bool Init(const InputLayout &inputLayout,
 			const std::shared_ptr<SDKMesh> &mesh,
-			const std::shared_ptr<Shader::Pool> &shaderPool,
-			const std::shared_ptr<Graphics::Pipeline::Pool> &graphicsPipelinePool,
-			const std::shared_ptr<Compute::Pipeline::Pool> &computePipelinePool,
-			const std::shared_ptr<PipelineLayoutPool> &pipelineLayoutPool,
-			const std::shared_ptr<DescriptorTablePool> &descriptorTablePool,
+			const std::shared_ptr<ShaderPool> &shaderPool,
+			const std::shared_ptr<Graphics::PipelineCache> &graphicsPipelineCache,
+			const std::shared_ptr<Compute::PipelineCache> &computePipelineCache,
+			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
+			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache,
 			const std::shared_ptr<std::vector<SDKMesh>> &linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr);
 		void InitPosition(const DirectX::XMFLOAT4 &posRot);
@@ -85,7 +85,7 @@ namespace XUSG
 		std::shared_ptr<std::vector<SDKMesh>>	m_linkedMeshes;
 		std::shared_ptr<std::vector<MeshLink>>	m_meshLinks;
 
-		std::shared_ptr<Compute::Pipeline::Pool> m_computePipelinePool;
+		std::shared_ptr<Compute::PipelineCache> m_computePipelineCache;
 
 		VertexBuffer m_transformedVBs[FrameCount];
 		DirectX::XMFLOAT4X4	m_mWorld;
@@ -102,7 +102,7 @@ namespace XUSG
 		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
 
 		PipelineLayout	m_skinningPipelineLayout;
-		PipelineState	m_skinningPipeline;
+		Pipeline		m_skinningPipeline;
 		std::vector<DescriptorTable> m_srvSkinningTables[FrameCount];
 		std::vector<DescriptorTable> m_uavSkinningTables[FrameCount];
 #if	TEMPORAL

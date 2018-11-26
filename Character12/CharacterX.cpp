@@ -109,8 +109,8 @@ void CharacterX::LoadPipeline()
 	ThrowIfFailed(swapChain.As(&m_swapChain));
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_descriptorTablePool = make_shared<DescriptorTablePool>();
-	m_descriptorTablePool->SetDevice(m_device);
+	m_descriptorTableCache = make_shared<DescriptorTableCache>();
+	m_descriptorTableCache->SetDevice(m_device);
 
 	// Create descriptor heaps.
 	{
@@ -135,7 +135,7 @@ void CharacterX::LoadPipeline()
 
 			Util::DescriptorTable rtvTable;
 			rtvTable.SetDescriptors(0, 1, &rtv);
-			m_rtvTables[n] = rtvTable.GetRtvTable(*m_descriptorTablePool);
+			m_rtvTables[n] = rtvTable.GetRtvTable(*m_descriptorTableCache);
 
 			rtv.Offset(strideRtv);
 
@@ -151,10 +151,10 @@ void CharacterX::LoadPipeline()
 // Load the sample assets.
 void CharacterX::LoadAssets()
 {
-	m_shaderPool = make_shared<Shader::Pool>();
-	m_graphicsPipelinePool = make_shared<Graphics::Pipeline::Pool>(m_device);
-	m_computePipelinePool = make_shared<Compute::Pipeline::Pool>(m_device);
-	m_pipelineLayoutPool = make_shared<PipelineLayoutPool>(m_device);
+	m_shaderPool = make_shared<ShaderPool>();
+	m_graphicsPipelineCache = make_shared<Graphics::PipelineCache>(m_device);
+	m_computePipelineCache = make_shared<Compute::PipelineCache>(m_device);
+	m_pipelineLayoutCache = make_shared<PipelineLayoutCache>(m_device);
 
 	// Create the shaders.
 	{
@@ -172,7 +172,7 @@ void CharacterX::LoadAssets()
 
 	// Load character asset
 	{
-		m_inputLayout = Character::CreateInputLayout(*m_graphicsPipelinePool);
+		m_inputLayout = Character::CreateInputLayout(*m_graphicsPipelineCache);
 		const auto textureCache = make_shared<TextureCache::element_type>(0);
 		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
 			L"Media/Bright/Stars.sdkmesh_anim", textureCache);
@@ -180,8 +180,8 @@ void CharacterX::LoadAssets()
 		m_character = make_unique<Character>(m_device, m_commandList);
 		if (!m_character) ThrowIfFailed(E_FAIL);
 		if (!m_character->Init(m_inputLayout, characterMesh, m_shaderPool,
-			m_graphicsPipelinePool, m_computePipelinePool,
-			m_pipelineLayoutPool, m_descriptorTablePool))
+			m_graphicsPipelineCache, m_computePipelineCache,
+			m_pipelineLayoutCache, m_descriptorTableCache))
 			ThrowIfFailed(E_FAIL);
 	}
 

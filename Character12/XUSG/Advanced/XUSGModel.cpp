@@ -64,7 +64,7 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 	const auto worldViewProj = XMMatrixMultiply(world, viewProj);
 
 	// Update constant buffers
-	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices.Map());
+	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices.Map(m_currentFrame));
 	pCBData->WorldViewProj = XMMatrixTranspose(worldViewProj);
 	pCBData->World = XMMatrixTranspose(world);
 	pCBData->Normal = XMMatrixInverse(nullptr, world);
@@ -76,7 +76,7 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 		const auto shadow = XMMatrixMultiply(world, *pShadow);
 		pCBData->ShadowProj = XMMatrixTranspose(shadow);
 
-		auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrix.Map());
+		auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrix.Map(m_currentFrame));
 		cbData = pCBData->ShadowProj;
 	}
 
@@ -125,7 +125,7 @@ void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 	m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
 	m_commandList->SetGraphicsRootSignature(m_pipelineLayout.Get());
 	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
-		*m_cbvTables[isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
+		*m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 	m_commandList->SetGraphicsRootDescriptorTable(SAMPLERS, *m_samplerTable);
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -175,8 +175,8 @@ void Model::SetShadowMap(const GraphicsCommandList &commandList, const Descripto
 
 bool Model::createConstantBuffers()
 {
-	N_RETURN(m_cbMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices)), false);
-	N_RETURN(m_cbShadowMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4)), false);
+	N_RETURN(m_cbMatrices.CreateUniform(m_device, sizeof(CBMatrices), FrameCount), false);
+	N_RETURN(m_cbShadowMatrix.CreateUniform(m_device, sizeof(XMFLOAT4), FrameCount), false);
 
 	return true;
 }
@@ -235,13 +235,16 @@ void Model::createPipelines(const InputLayout &inputLayout, const Format *rtvFor
 
 void Model::createDescriptorTables()
 {
-	Util::DescriptorTable cbMatricesTable;
-	cbMatricesTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV());
-	m_cbvTables[CBV_MATRICES] = cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+	for (auto i = 0ui8; i < FrameCount; ++i)
+	{
+		Util::DescriptorTable cbMatricesTable;
+		cbMatricesTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV(i));
+		m_cbvTables[i][CBV_MATRICES] = cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
-	Util::DescriptorTable cbShadowTable;
-	cbShadowTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV());
-	m_cbvTables[CBV_SHADOW_MATRIX] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+		Util::DescriptorTable cbShadowTable;
+		cbShadowTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV(i));
+		m_cbvTables[i][CBV_SHADOW_MATRIX] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+	}
 
 	Util::DescriptorTable samplerTable;
 	const SamplerPreset samplers[] = { ANISOTROPIC_WRAP, POINT_WRAP, LINEAR_LESS_EQUAL };

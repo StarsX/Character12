@@ -221,11 +221,11 @@ bool Character::createBuffers()
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrices : m_cbLinkedMatrices)
-		N_RETURN(cbLinkedMatrices.Create(m_device, 512 * 128, sizeof(CBMatrices)), false);
+		N_RETURN(cbLinkedMatrices.CreateUniform(m_device, sizeof(CBMatrices), FrameCount), false);
 
 	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrix : m_cbLinkedShadowMatrices)
-		N_RETURN(cbLinkedMatrix.Create(m_device, 256 * 128, sizeof(XMFLOAT4)), false);
+		N_RETURN(cbLinkedMatrix.CreateUniform(m_device, sizeof(XMFLOAT4), FrameCount), false);
 
 	return true;
 }
@@ -319,35 +319,30 @@ void Character::createPipelines()
 void Character::createDescriptorTables()
 {
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	for (auto &srvTables : m_srvSkinningTables)
-		srvTables.resize(numMeshes);
-	for (auto &uavTables : m_uavSkinningTables)
-		uavTables.resize(numMeshes);
+
+	for (auto i = 0ui8; i < FrameCount; ++i)
+	{
+		m_srvSkinningTables[i].resize(numMeshes);
+		m_uavSkinningTables[i].resize(numMeshes);
 #if	TEMPORAL
-	for (auto &srvTables : m_srvSkinnedTables)
-		srvTables.resize(numMeshes);
+		m_srvSkinnedTables[i].resize(numMeshes);
 #endif
 
-	for (auto m = 0u; m < numMeshes; ++m)
-	{
-		for (auto i = 0u; i < _countof(m_boneWorlds); ++i)
+		for (auto m = 0u; m < numMeshes; ++m)
 		{
-			Util::DescriptorTable srvTable;
+			Util::DescriptorTable srvSkinningTable;
 			const Descriptor srvs[] = { m_boneWorlds[i].GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
-			srvTable.SetDescriptors(0, _countof(srvs), srvs);
-			m_srvSkinningTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTableCache);
-		}
+			srvSkinningTable.SetDescriptors(0, _countof(srvs), srvs);
+			m_srvSkinningTables[i][m] = srvSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
-		for (auto i = 0u; i < _countof(m_transformedVBs); ++i)
-		{
-			Util::DescriptorTable uavTable;
-			uavTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetUAV(m));
-			m_uavSkinningTables[i][m] = uavTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+			Util::DescriptorTable uavSkinningTable;
+			uavSkinningTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetUAV(m));
+			m_uavSkinningTables[i][m] = uavSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
 #if	TEMPORAL
-			Util::DescriptorTable srvTable;
-			srvTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetSRV(m));
-			m_srvSkinnedTables[i][m] = srvTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+			Util::DescriptorTable srvSkinnedTable;
+			srvSkinnedTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetSRV(m));
+			m_srvSkinnedTables[i][m] = srvSkinnedTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 #endif
 		}
 	}
@@ -433,7 +428,7 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 
 	// Set matrices
 	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
-		*m_cbvTables[isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
+		*m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 
 	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 

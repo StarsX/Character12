@@ -106,7 +106,7 @@ namespace XUSG
 
 		PipelineLayout		m_pipelineLayout;
 		Pipeline			m_pipelines[NUM_PIPELINE];
-		DescriptorTable		m_cbvTables[NUM_CBV];
+		DescriptorTable		m_cbvTables[FrameCount][NUM_CBV];
 		DescriptorTable		m_samplerTable;
 		std::vector<DescriptorTable> m_srvTables;
 	};

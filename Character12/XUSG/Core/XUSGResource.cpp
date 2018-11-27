@@ -257,11 +257,11 @@ bool Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Fo
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// Map formats
-	auto formatReousrce = format;
-	const auto formatUAV = isPacked ? MapToPackedFormat(formatReousrce) : format;
+	auto formatResource = format;
+	const auto formatUAV = isPacked ? MapToPackedFormat(formatResource) : format;
 
 	// Setup the texture description.
-	const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(formatReousrce, width, height, arraySize,
+	const auto desc = CD3DX12_RESOURCE_DESC::Tex2D(formatResource, width, height, arraySize,
 		numMips, sampleCount, 0, D3D12_RESOURCE_FLAGS(resourceFlags));
 
 	// Determine initial state
@@ -900,11 +900,11 @@ bool Texture3D::Create(const Device &device, uint32_t width, uint32_t height,
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	// Map formats
-	auto formatReousrce = format;
-	const auto formatUAV = isPacked ? MapToPackedFormat(formatReousrce) : format;
+	auto formatResource = format;
+	const auto formatUAV = isPacked ? MapToPackedFormat(formatResource) : format;
 
 	// Setup the texture description.
-	const auto desc = CD3DX12_RESOURCE_DESC::Tex3D(formatReousrce, width, height, depth,
+	const auto desc = CD3DX12_RESOURCE_DESC::Tex3D(formatResource, width, height, depth,
 		numMips, D3D12_RESOURCE_FLAGS(resourceFlags));
 
 	// Determine initial state
@@ -1314,28 +1314,12 @@ bool TypedBuffer::Create(const Device &device, uint32_t numElements, uint32_t st
 	numUAVs = hasUAV ? numUAVs : 0;
 
 	// Map formats
-	auto formatReousrce = format;
-	const auto formatUAV = isPacked ? MapToPackedFormat(formatReousrce) : format;
+	auto formatResource = format;
+	const auto formatUAV = isPacked ? MapToPackedFormat(formatResource) : format;
 
-	// Setup the buffer description.
-	auto desc = CD3DX12_RESOURCE_DESC::Buffer(stride * numElements, D3D12_RESOURCE_FLAGS(resourceFlags));
-	desc.Format = formatReousrce;
-
-	// Determine initial state
-	if (state) m_state = state;
-	else
-	{
-		m_state = hasSRV ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE : D3D12_RESOURCE_STATE_COMMON;
-		m_state = hasUAV ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : m_state;
-	}
-
-	V_RETURN(m_device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(poolType),
-		D3D12_HEAP_FLAG_NONE, &desc, m_state, nullptr, IID_PPV_ARGS(&m_resource)), clog, false);
-
-	// Allocate descriptor pool
-	const auto numDescriptors = numSRVs + numUAVs;
-	N_RETURN(allocateDescriptorPool(numDescriptors), false);
+	// Create buffer
+	N_RETURN(create(device, stride * numElements, resourceFlags,
+		poolType, state, numSRVs, numUAVs), false);
 
 	// Create SRV
 	if (hasSRV) CreateSRVs(numElements, format, stride, firstSRVElements, numSRVs);
@@ -1435,7 +1419,7 @@ bool VertexBuffer::Create(const Device &device, uint32_t numVertices, uint32_t s
 		const auto firstVertex = firstVertices ? firstVertices[i] : 0;
 		m_VBVs[i].BufferLocation = m_resource->GetGPUVirtualAddress() + stride * firstVertex;
 		m_VBVs[i].StrideInBytes = stride;
-		m_VBVs[i].SizeInBytes = stride * ((!firstVertex || i + 1 >= numVBVs ?
+		m_VBVs[i].SizeInBytes = stride * ((!firstVertices || i + 1 >= numVBVs ?
 			numVertices : firstVertices[i + 1]) - firstVertex);
 	}
 
@@ -1452,7 +1436,7 @@ VertexBufferView VertexBuffer::GetVBV(uint32_t i) const
 //--------------------------------------------------------------------------------------
 
 IndexBuffer::IndexBuffer() :
-	RawBuffer(),
+	TypedBuffer(),
 	m_IBVs(0)
 {
 }
@@ -1473,15 +1457,15 @@ bool IndexBuffer::Create(const Device &device, uint32_t byteWidth, Format format
 	const auto hasUAV = resourceFlags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
 	assert(format == DXGI_FORMAT_R32_UINT || format == DXGI_FORMAT_R16_UINT);
-	if (hasSRV || hasUAV) byteWidth += byteWidth % 4;
+	const auto stride = format == DXGI_FORMAT_R32_UINT ? 4 : 2;
 
 	// Determine initial state
 	if (state) m_state = state;
 	else m_state = hasSRV ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE :
 		D3D12_RESOURCE_STATE_INDEX_BUFFER;
 
-	N_RETURN(RawBuffer::Create(device, byteWidth, resourceFlags, poolType,
-		state, numSRVs, firstSRVElements, numUAVs, firstUAVElements), false);
+	N_RETURN(TypedBuffer::Create(device, byteWidth / stride, stride, format, resourceFlags,
+		poolType, state, numSRVs, firstSRVElements, numUAVs, firstUAVElements), false);
 
 	// Create index buffer view
 	m_IBVs.resize(numIBVs);

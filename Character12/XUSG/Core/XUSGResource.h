@@ -319,7 +319,7 @@ namespace XUSG
 	// Index buffer
 	//--------------------------------------------------------------------------------------
 	class IndexBuffer :
-		public RawBuffer
+		public TypedBuffer
 	{
 	public:
 		IndexBuffer();

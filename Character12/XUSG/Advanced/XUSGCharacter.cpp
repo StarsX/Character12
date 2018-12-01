@@ -221,11 +221,11 @@ bool Character::createBuffers()
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrices : m_cbLinkedMatrices)
-		N_RETURN(cbLinkedMatrices.CreateUniform(m_device, sizeof(CBMatrices), FrameCount), false);
+		N_RETURN(cbLinkedMatrices.Create(m_device, sizeof(CBMatrices) * FrameCount, FrameCount), false);
 
 	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrix : m_cbLinkedShadowMatrices)
-		N_RETURN(cbLinkedMatrix.CreateUniform(m_device, sizeof(XMFLOAT4), FrameCount), false);
+		N_RETURN(cbLinkedMatrix.Create(m_device, sizeof(XMFLOAT4) * FrameCount, FrameCount), false);
 
 	return true;
 }
@@ -407,7 +407,7 @@ void Character::skinning(bool reset)
 		
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
-		const auto numGroups = ALIGN_WITH(numVertices, 64) / 64;
+		const auto numGroups = ALIGN(numVertices, 64) / 64;
 		m_commandList->Dispatch(static_cast<uint32_t>(numGroups), 1, 1);
 	}
 }

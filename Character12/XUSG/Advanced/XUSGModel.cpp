@@ -175,8 +175,8 @@ void Model::SetShadowMap(const GraphicsCommandList &commandList, const Descripto
 
 bool Model::createConstantBuffers()
 {
-	N_RETURN(m_cbMatrices.CreateUniform(m_device, sizeof(CBMatrices), FrameCount), false);
-	N_RETURN(m_cbShadowMatrix.CreateUniform(m_device, sizeof(XMFLOAT4), FrameCount), false);
+	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices) * FrameCount, FrameCount), false);
+	N_RETURN(m_cbShadowMatrix.Create(m_device, sizeof(XMFLOAT4) * FrameCount, FrameCount), false);
 
 	return true;
 }

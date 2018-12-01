@@ -75,7 +75,7 @@ bool ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t n
 
 	// Instanced CBVs
 	vector<uint32_t> offsetList;
-	if (numCBVs > 1 && !offsets)
+	if (!offsets)
 	{
 		auto numBytes = 0u;
 		const auto cbvSize = ALIGN(byteWidth / numCBVs, 256);	// CB size is required to be 256-byte aligned.
@@ -111,10 +111,9 @@ bool ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t n
 	m_CBVOffsets.resize(numCBVs);
 	for (auto i = 0u; i < numCBVs; ++i)
 	{
-		const auto offset = offsets ? offsets[i] : 0;
+		const auto &offset = offsets[i];
 		desc.BufferLocation = m_resource->GetGPUVirtualAddress() + offset;
-		desc.SizeInBytes = (!offsets || i + 1 >= numCBVs ?
-			byteWidth : offsets[i + 1]) - offset;
+		desc.SizeInBytes = (i + 1 >= numCBVs ? byteWidth : offsets[i + 1]) - offset;
 
 		m_CBVOffsets[i] = offset;
 

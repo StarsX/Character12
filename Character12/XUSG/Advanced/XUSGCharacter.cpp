@@ -296,11 +296,16 @@ void Character::createPipelineLayout()
 
 #if	TEMPORAL
 		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
+		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
+
 #if TEMPORAL_AA
 		if (cbTempBias != UINT32_MAX)
+		{
 			utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias,
 				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+			utilPipelineLayout.SetShaderStage(TEMPORAL_BIAS, Shader::Stage::VS);
+		}
 #endif
 
 		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,

@@ -746,14 +746,14 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	XMFLOAT3 upper; 
 	
 	m_device = device;
-	ComPtr<ID3D12CommandAllocator> commandAllocator = nullptr;
+	com_ptr<ID3D12CommandAllocator> commandAllocator = nullptr;
 	GraphicsCommandList commandList = nullptr;
 	if (device)
 	{
 		V_RETURN(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
 			IID_PPV_ARGS(&commandAllocator)), cerr, false);
 		V_RETURN(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-			commandAllocator.Get(), nullptr, IID_PPV_ARGS(&commandList)), cerr, false);
+			commandAllocator.get(), nullptr, IID_PPV_ARGS(&commandList)), cerr, false);
 	}
 
 	F_RETURN(dataBytes < sizeof(SDKMeshHeader), cerr, E_FAIL, false);
@@ -966,18 +966,18 @@ bool SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-		ComPtr<ID3D12CommandQueue> commandQueue = nullptr;
+		com_ptr<ID3D12CommandQueue> commandQueue = nullptr;
 		V_RETURN(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)), cerr, false);
 
 		// Close the command list and execute it to begin the initial GPU setup.
 		V_RETURN(commandList->Close(), cerr, false);
-		ID3D12CommandList* ppCommandLists[] = { commandList.Get() };
+		ID3D12CommandList* ppCommandLists[] = { commandList.get() };
 		commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
 		{
 			HANDLE fenceEvent;
-			ComPtr<ID3D12Fence> fence;
+			com_ptr<ID3D12Fence> fence;
 			uint64_t fenceValue = 0;
 
 			V_RETURN(m_device->CreateFence(fenceValue++, D3D12_FENCE_FLAG_NONE,
@@ -991,7 +991,7 @@ bool SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 			// list in our main loop but for now, we just want to wait for setup to 
 			// complete before continuing.
 			// Schedule a Signal command in the queue.
-			V_RETURN(commandQueue->Signal(fence.Get(), fenceValue), cerr, false);
+			V_RETURN(commandQueue->Signal(fence.get(), fenceValue), cerr, false);
 
 			// Wait until the fence has been processed, and increment the fence value for the current frame.
 			V_RETURN(fence->SetEventOnCompletion(fenceValue++, fenceEvent), cerr, false);

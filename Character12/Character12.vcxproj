@@ -168,6 +168,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"</Command>
     <ClInclude Include="XUSG\Advanced\XUSGSDKMesh.h" />
     <ClInclude Include="XUSG\Advanced\XUSGShaderCommon.h" />
     <ClInclude Include="XUSG\Advanced\XUSGSharedConst.h" />
+    <ClInclude Include="XUSG\Core\XUSG.h" />
     <ClInclude Include="XUSG\Core\XUSGComputeState.h" />
     <ClInclude Include="XUSG\Core\XUSGDescriptor.h" />
     <ClInclude Include="XUSG\Core\XUSGGraphicsState.h" />

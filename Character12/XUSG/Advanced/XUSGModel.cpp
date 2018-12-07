@@ -98,32 +98,32 @@ void Model::SetPipelineState(SubsetFlags subsetFlags)
 	switch (subsetFlags)
 	{
 	case SUBSET_ALPHA_TEST:
-		m_commandList->SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE].Get());
+		m_commandList->SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE].get());
 		break;
 	case SUBSET_ALPHA:
-		m_commandList->SetPipelineState(m_pipelines[ALPHA_TWO_SIDE].Get());
+		m_commandList->SetPipelineState(m_pipelines[ALPHA_TWO_SIDE].get());
 		break;
 	default:
-		m_commandList->SetPipelineState(m_pipelines[OPAQUE_FRONT].Get());
+		m_commandList->SetPipelineState(m_pipelines[OPAQUE_FRONT].get());
 	}
 	//if (subsetFlags == SUBSET_REFLECTED)
-		//m_commandList->SetPipelineState(m_pipelines[REFLECTED].Get()); 
+		//m_commandList->SetPipelineState(m_pipelines[REFLECTED].get()); 
 }
 
 void Model::SetPipelineState(PipelineIndex pipeline)
 {
-	m_commandList->SetPipelineState(m_pipelines[pipeline].Get());
+	m_commandList->SetPipelineState(m_pipelines[pipeline].get());
 }
 
 void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 {
-	DescriptorPool::InterfaceType* heaps[] =
+	DescriptorPool::element_type *const descriptorPools[] =
 	{
-		m_descriptorTableCache->GetCbvSrvUavPool().Get(),
-		m_descriptorTableCache->GetSamplerPool().Get()
+		m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL).get(),
+		m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL).get()
 	};
-	m_commandList->SetDescriptorHeaps(_countof(heaps), heaps);
-	m_commandList->SetGraphicsRootSignature(m_pipelineLayout.Get());
+	m_commandList->SetDescriptorHeaps(_countof(descriptorPools), descriptorPools);
+	m_commandList->SetGraphicsRootSignature(m_pipelineLayout.get());
 	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
 		*m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 	m_commandList->SetGraphicsRootDescriptorTable(SAMPLERS, *m_samplerTable);

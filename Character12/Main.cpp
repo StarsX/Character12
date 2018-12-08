@@ -14,7 +14,7 @@
 _Use_decl_annotations_
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-	CharacterX dx12Test(1280, 720, L"DirectX 12 Character");
+	CharacterX characterX(1280, 720, L"DirectX 12 Character");
 
-	return Win32Application::Run(&dx12Test, hInstance, nCmdShow);
+	return Win32Application::Run(&characterX, hInstance, nCmdShow);
 }

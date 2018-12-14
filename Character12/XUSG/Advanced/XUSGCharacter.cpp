@@ -8,7 +8,7 @@ using namespace std;
 using namespace DirectX;
 using namespace XUSG;
 
-Character::Character(const Device &device, const GraphicsCommandList &commandList) :
+Character::Character(const Device &device, const CommandList &commandList) :
 	Model(device, commandList),
 	m_linkedMeshes(nullptr),
 	m_meshLinks(nullptr),
@@ -337,7 +337,7 @@ void Character::createDescriptorTables()
 		{
 			Util::DescriptorTable srvSkinningTable;
 			const Descriptor srvs[] = { m_boneWorlds[i].GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
-			srvSkinningTable.SetDescriptors(0, _countof(srvs), srvs);
+			srvSkinningTable.SetDescriptors(0, static_cast<uint32_t>(size(srvs)), srvs);
 			m_srvSkinningTables[i][m] = srvSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
 			Util::DescriptorTable uavSkinningTable;
@@ -392,11 +392,11 @@ void Character::skinning(bool reset)
 {
 	if (reset)
 	{
-		DescriptorPool::element_type *const descriptorPools[] =
-		{ m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL).get() };
-		m_commandList->SetDescriptorHeaps(_countof(descriptorPools), descriptorPools);
-		m_commandList->SetComputeRootSignature(m_skinningPipelineLayout.get());
-		m_commandList->SetPipelineState(m_skinningPipeline.get());
+		const DescriptorPool descriptorPools[] =
+		{ m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL) };
+		m_commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		m_commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
+		m_commandList.SetPipelineState(m_skinningPipeline);
 	}
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -411,13 +411,13 @@ void Character::skinning(bool reset)
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Setup descriptor tables
-		m_commandList->SetComputeRootDescriptorTable(INPUT, *m_srvSkinningTables[m_currentFrame][m]);
-		m_commandList->SetComputeRootDescriptorTable(OUTPUT, *m_uavSkinningTables[m_currentFrame][m]);
+		m_commandList.SetComputeDescriptorTable(INPUT, m_srvSkinningTables[m_currentFrame][m]);
+		m_commandList.SetComputeDescriptorTable(OUTPUT, m_uavSkinningTables[m_currentFrame][m]);
 		
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 		const auto numGroups = ALIGN(numVertices, 64) / 64;
-		m_commandList->Dispatch(static_cast<uint32_t>(numGroups), 1, 1);
+		m_commandList.Dispatch(static_cast<uint32_t>(numGroups), 1, 1);
 	}
 }
 
@@ -425,19 +425,19 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 {
 	if (reset)
 	{
-		DescriptorPool::element_type *const descriptorPools[] =
+		const DescriptorPool descriptorPools[] =
 		{
-			m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL).get(),
-			m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL).get()
+			m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
+			m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
 		};
-		m_commandList->SetDescriptorHeaps(_countof(descriptorPools), descriptorPools);
-		m_commandList->SetGraphicsRootSignature(m_pipelineLayout.get());
-		m_commandList->SetGraphicsRootDescriptorTable(SAMPLERS, *m_samplerTable);
+		m_commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
+		m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 	}
 
 	// Set matrices
-	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
-		*m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
+	m_commandList.SetGraphicsDescriptorTable(MATRICES,
+		m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
 
 	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 
@@ -459,11 +459,11 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
 				// Set IA parameters
-				m_commandList->IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV(m));
+				m_commandList.IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV(m));
 
 #if	TEMPORAL
 				// Set historical motion states, if neccessary
-				m_commandList->SetGraphicsRootDescriptorTable(HISTORY, *m_srvSkinnedTables[m_previousFrame][m]);
+				m_commandList.SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
 #endif
 
 				// Render mesh
@@ -484,11 +484,11 @@ void Character::renderLinked(uint32_t mesh, bool isShadow, bool reset)
 
 	// Set Shaders
 	setShaders(uVS, uGS, uPS, bReset);
-	m_pDXContext->RSSetState(m_pState->CullCounterClockwise().get());
-	m_pDXContext->OMSetBlendState(m_pState->AutoAlphaBlend().get(), nullptr, D3D11_DEFAULT_SAMPLE_MASK);
+	m_pDXContext->RSSetState(m_pState->CullCounterClockwise());
+	m_pDXContext->OMSetBlendState(m_pState->AutoAlphaBlend(), nullptr, D3D11_DEFAULT_SAMPLE_MASK);
 
-	m_pDXContext->IASetInputLayout(m_pVertexLayout.get());
-	m_pvLinkedMeshes->at(uMesh).Render(m_pDXContext.get(), m_uSRDiffuse, m_uSRNormal);
+	m_pDXContext->IASetInputLayout(m_pVertexLayout);
+	m_pvLinkedMeshes->at(uMesh).Render(m_pDXContext, m_uSRDiffuse, m_uSRNormal);
 
 	resetShaders(uVS, uGS, uPS, SUBSET_FULL, bReset);
 }

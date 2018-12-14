@@ -27,7 +27,7 @@ namespace XUSG
 			uint32_t			uBone;
 		};
 
-		Character(const Device &device, const GraphicsCommandList &commandList);
+		Character(const Device &device, const CommandList &commandList);
 		virtual ~Character();
 
 		bool Init(const InputLayout &inputLayout,

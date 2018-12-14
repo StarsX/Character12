@@ -24,7 +24,7 @@ namespace XUSG
 			NUM_PIPELINE
 		};
 
-		Model(const Device &device, const GraphicsCommandList &commandList);
+		Model(const Device &device, const CommandList &commandList);
 		virtual ~Model();
 
 		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
@@ -85,11 +85,11 @@ namespace XUSG
 
 		static const uint32_t FrameCount = FRAME_COUNT;
 
-		Device				m_device;
-		GraphicsCommandList	m_commandList;
+		Device		m_device;
+		CommandList	m_commandList;
 
-		uint8_t				m_currentFrame;
-		uint8_t				m_previousFrame;
+		uint8_t		m_currentFrame;
+		uint8_t		m_previousFrame;
 
 		std::shared_ptr<SDKMesh>					m_mesh;
 		std::shared_ptr<ShaderPool>					m_shaderPool;

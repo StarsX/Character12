@@ -2,7 +2,7 @@
 // By Stars XU Tianchen
 //--------------------------------------------------------------------------------------
 
-#include "DXFramework.h"
+#include "DXFrameworkHelper.h"
 #include "XUSGDDSLoader.h"
 #include "dds.h"
 
@@ -404,7 +404,7 @@ static bool FillInitData(uint32_t width, uint32_t height, uint32_t depth,
 	return index > 0;
 }
 
-static bool CreateTexture(const Device &device, const GraphicsCommandList &commandList,
+static bool CreateTexture(const Device &device, const CommandList &commandList,
 	const DDS_HEADER* header, const uint8_t *bitData, size_t bitSize, size_t maxsize,
 	bool forceSRGB,shared_ptr<ResourceBase> &texture, Resource &uploader)
 {
@@ -645,7 +645,7 @@ Loader::~Loader()
 {
 }
 
-bool Loader::CreateTextureFromFile(const Device &device, const GraphicsCommandList &commandList,
+bool Loader::CreateTextureFromFile(const Device &device, const CommandList &commandList,
 	const wchar_t *fileName, size_t maxsize, bool forceSRGB, shared_ptr<ResourceBase> &texture,
 	Resource &uploader, AlphaMode *alphaMode)
 {

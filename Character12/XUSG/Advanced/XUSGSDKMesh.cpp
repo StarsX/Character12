@@ -2,6 +2,7 @@
 // By Stars XU Tianchen
 //--------------------------------------------------------------------------------------
 
+#include "DXFrameworkHelper.h"
 #include "XUSGSDKMesh.h"
 #include "XUSGDDSLoader.h"
 
@@ -530,7 +531,7 @@ bool SDKMesh::GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) cons
 }
 
 //--------------------------------------------------------------------------------------
-void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMeshMaterial *pMaterials,
+void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMaterials,
 	uint32_t numMaterials, vector<Resource> &uploaders)
 {
 	string filePath;
@@ -632,7 +633,7 @@ void SDKMesh::loadMaterials(const GraphicsCommandList &commandList, SDKMeshMater
 	}
 }
 
-bool SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders)
+bool SDKMesh::createVertexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders)
 {
 	// Vertex buffer info
 	auto numVertices = 0u;
@@ -669,7 +670,7 @@ bool SDKMesh::createVertexBuffer(const GraphicsCommandList &commandList, std::ve
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 }
 
-bool SDKMesh::createIndexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders)
+bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders)
 {
 	// Index buffer info
 	auto byteWidth = 0u;
@@ -746,14 +747,14 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	XMFLOAT3 upper; 
 	
 	m_device = device;
-	com_ptr<ID3D12CommandAllocator> commandAllocator = nullptr;
-	GraphicsCommandList commandList = nullptr;
+	CommandAllocator commandAllocator = nullptr;
+	CommandList commandList;
 	if (device)
 	{
 		V_RETURN(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
 			IID_PPV_ARGS(&commandAllocator)), cerr, false);
-		V_RETURN(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-			commandAllocator.get(), nullptr, IID_PPV_ARGS(&commandList)), cerr, false);
+		V_RETURN(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.get(),
+			nullptr, IID_PPV_ARGS(&commandList.GetCommandList())), cerr, false);
 	}
 
 	F_RETURN(dataBytes < sizeof(SDKMeshHeader), cerr, E_FAIL, false);
@@ -809,7 +810,7 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 
 	// Load Materials
 	m_textureCache = textureCache;
-	if (commandList) loadMaterials(commandList, m_pMaterialArray, m_pMeshHeader->NumMaterials, uploaders);
+	if (commandList.GetCommandList()) loadMaterials(commandList, m_pMaterialArray, m_pMeshHeader->NumMaterials, uploaders);
 
 	// Create a place to store our bind pose frame matrices
 	m_bindPoseFrameMatrices.resize(m_pMeshHeader->NumFrames);
@@ -957,9 +958,9 @@ void SDKMesh::classifyMaterialType()
 	}
 }
 
-bool SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
+bool SDKMesh::executeCommandList(CommandList &commandList)
 {
-	if (commandList)
+	if (commandList.GetCommandList())
 	{
 		// Describe and create the command queue.
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
@@ -970,9 +971,9 @@ bool SDKMesh::executeCommandList(const GraphicsCommandList &commandList)
 		V_RETURN(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)), cerr, false);
 
 		// Close the command list and execute it to begin the initial GPU setup.
-		V_RETURN(commandList->Close(), cerr, false);
-		ID3D12CommandList* ppCommandLists[] = { commandList.get() };
-		commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+		V_RETURN(commandList.Close(), cerr, false);
+		ID3D12CommandList *const ppCommandLists[] = { commandList.GetCommandList().get() };
+		commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
 
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
 		{

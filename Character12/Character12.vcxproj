@@ -169,6 +169,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"</Command>
     <ClInclude Include="XUSG\Advanced\XUSGShaderCommon.h" />
     <ClInclude Include="XUSG\Advanced\XUSGSharedConst.h" />
     <ClInclude Include="XUSG\Core\XUSG.h" />
+    <ClInclude Include="XUSG\Core\XUSGCommand.h" />
     <ClInclude Include="XUSG\Core\XUSGComputeState.h" />
     <ClInclude Include="XUSG\Core\XUSGDescriptor.h" />
     <ClInclude Include="XUSG\Core\XUSGGraphicsState.h" />
@@ -230,6 +231,10 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"</Command>
     <ClCompile Include="XUSG\Advanced\XUSGSDKMesh.cpp">
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">stdafx.h</ForcedIncludeFiles>
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">stdafx.h</ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="XUSG\Core\XUSGCommand.cpp">
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</ForcedIncludeFiles>
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdafx.h</ForcedIncludeFiles>
     </ClCompile>

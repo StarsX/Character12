@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "DXFramework.h"
 #include "Core/XUSGResource.h"
 
 //--------------------------------------------------------------------------------------
@@ -319,8 +318,8 @@ namespace XUSG
 		uint8_t				*GetRawVerticesAt(uint32_t vb) const;
 		uint8_t				*GetRawIndicesAt(uint32_t ib) const;
 
-		SDKMeshMaterial	*GetMaterial(uint32_t material) const;
-		SDKMeshData		*GetMesh(uint32_t mesh) const;
+		SDKMeshMaterial		*GetMaterial(uint32_t material) const;
+		SDKMeshData			*GetMesh(uint32_t mesh) const;
 		uint32_t			GetNumSubsets(uint32_t mesh) const;
 		uint32_t			GetNumSubsets(uint32_t mesh, SubsetFlags materialType) const;
 		SDKMeshSubset		*GetSubset(uint32_t mesh, uint32_t subset) const;
@@ -352,18 +351,18 @@ namespace XUSG
 		bool				GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) const;
 
 	protected:
-		void loadMaterials(const GraphicsCommandList &commandList, SDKMeshMaterial *pMaterials,
+		void loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMaterials,
 			uint32_t NumMaterials, std::vector<Resource> &uploaders);
 
-		bool createVertexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders);
-		bool createIndexBuffer(const GraphicsCommandList &commandList, std::vector<Resource> &uploaders);
+		bool createVertexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders);
+		bool createIndexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders);
 
 		virtual bool createFromFile(const Device &device, const wchar_t *fileName, const TextureCache &textureCache);
 		virtual bool createFromMemory(const Device &device, uint8_t *pData, const TextureCache &textureCache,
 			size_t dataBytes, bool copyStatic);
 
 		void classifyMaterialType();
-		bool executeCommandList(const GraphicsCommandList &commandList);
+		bool executeCommandList(CommandList &commandList);
 
 		// Frame manipulation
 		void transformBindPoseFrame(uint32_t frame, DirectX::CXMMATRIX parentWorld);

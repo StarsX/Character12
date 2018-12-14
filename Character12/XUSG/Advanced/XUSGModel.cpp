@@ -9,7 +9,7 @@ using namespace DirectX;
 using namespace XUSG;
 using namespace XUSG::Graphics;
 
-Model::Model(const Device &device, const GraphicsCommandList &commandList) :
+Model::Model(const Device &device, const CommandList &commandList) :
 	m_device(device),
 	m_commandList(commandList),
 	m_currentFrame(0),
@@ -98,48 +98,48 @@ void Model::SetPipelineState(SubsetFlags subsetFlags)
 	switch (subsetFlags)
 	{
 	case SUBSET_ALPHA_TEST:
-		m_commandList->SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE].get());
+		m_commandList.SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE]);
 		break;
 	case SUBSET_ALPHA:
-		m_commandList->SetPipelineState(m_pipelines[ALPHA_TWO_SIDE].get());
+		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDE]);
 		break;
 	default:
-		m_commandList->SetPipelineState(m_pipelines[OPAQUE_FRONT].get());
+		m_commandList.SetPipelineState(m_pipelines[OPAQUE_FRONT]);
 	}
 	//if (subsetFlags == SUBSET_REFLECTED)
-		//m_commandList->SetPipelineState(m_pipelines[REFLECTED].get()); 
+		//m_commandList->SetPipelineState(m_pipelines[REFLECTED]); 
 }
 
 void Model::SetPipelineState(PipelineIndex pipeline)
 {
-	m_commandList->SetPipelineState(m_pipelines[pipeline].get());
+	m_commandList.SetPipelineState(m_pipelines[pipeline]);
 }
 
 void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 {
-	DescriptorPool::element_type *const descriptorPools[] =
+	const DescriptorPool descriptorPools[] =
 	{
-		m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL).get(),
-		m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL).get()
+		m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
+		m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
 	};
-	m_commandList->SetDescriptorHeaps(_countof(descriptorPools), descriptorPools);
-	m_commandList->SetGraphicsRootSignature(m_pipelineLayout.get());
-	m_commandList->SetGraphicsRootDescriptorTable(MATRICES,
-		*m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
-	m_commandList->SetGraphicsRootDescriptorTable(SAMPLERS, *m_samplerTable);
+	m_commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
+	m_commandList.SetGraphicsDescriptorTable(MATRICES,
+		m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
+	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Set IA parameters
-		m_commandList->IASetVertexBuffers(0, 1, &m_mesh->GetVertexBufferView(m, 0));
+		m_commandList.IASetVertexBuffers(0, 1, &m_mesh->GetVertexBufferView(m, 0));
 
 		// Render mesh
 		render(m, subsetFlags, reset);
 	}
 
 	// Clear out the vb bindings for the next pass
-	if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
+	if (reset) m_commandList.IASetVertexBuffers(0, 1, nullptr);
 }
 
 InputLayout Model::CreateInputLayout(PipelineCache &pipelineCache)
@@ -200,7 +200,7 @@ void Model::createPipelines(const InputLayout &inputLayout, const Format *rtvFor
 	};
 
 	rtvFormats = rtvFormats ? rtvFormats : defaultRtvFormats;
-	numRTVs = numRTVs > 0 ? numRTVs : _countof(defaultRtvFormats);
+	numRTVs = numRTVs > 0 ? numRTVs : static_cast<uint32_t>(size(defaultRtvFormats));
 
 	Graphics::State state;
 
@@ -248,7 +248,7 @@ void Model::createDescriptorTables()
 
 	Util::DescriptorTable samplerTable;
 	const SamplerPreset samplers[] = { ANISOTROPIC_WRAP, POINT_WRAP, LINEAR_LESS_EQUAL };
-	samplerTable.SetSamplers(0, _countof(samplers), samplers, *m_descriptorTableCache);
+	samplerTable.SetSamplers(0, static_cast<uint32_t>(size(samplers)), samplers, *m_descriptorTableCache);
 	m_samplerTable = samplerTable.GetSamplerTable(*m_descriptorTableCache);
 	
 	// Materials
@@ -262,7 +262,7 @@ void Model::createDescriptorTables()
 		{
 			Util::DescriptorTable srvTable;
 			const Descriptor srvs[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };
-			srvTable.SetDescriptors(0, _countof(srvs), srvs);
+			srvTable.SetDescriptors(0, static_cast<uint32_t>(size(srvs)), srvs);
 			m_srvTables[m] = srvTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 		}
 		else m_srvTables[m] = nullptr;
@@ -274,7 +274,7 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
 
 	// Set IA parameters
-	m_commandList->IASetIndexBuffer(&m_mesh->GetIndexBufferView(mesh));
+	m_commandList.IASetIndexBuffer(m_mesh->GetIndexBufferView(mesh));
 
 	// Set pipeline state
 	if (reset) SetPipelineState(subsetFlags);
@@ -286,14 +286,14 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 		// Get subset
 		const auto pSubset = m_mesh->GetSubset(mesh, subset, materialType);
 		const auto primType = m_mesh->GetPrimitiveType(SDKMeshPrimitiveType(pSubset->PrimitiveType));
-		m_commandList->IASetPrimitiveTopology(primType);
+		m_commandList.IASetPrimitiveTopology(primType);
 
 		// Set material
 		if (m_mesh->GetMaterial(pSubset->MaterialID) && m_srvTables[pSubset->MaterialID])
-			m_commandList->SetGraphicsRootDescriptorTable(MATERIAL, *m_srvTables[pSubset->MaterialID]);
+			m_commandList.SetGraphicsDescriptorTable(MATERIAL, m_srvTables[pSubset->MaterialID]);
 
 		// Draw
-		m_commandList->DrawIndexedInstanced(static_cast<uint32_t>(pSubset->IndexCount), 1,
+		m_commandList.DrawIndexed(static_cast<uint32_t>(pSubset->IndexCount), 1,
 			static_cast<uint32_t>(pSubset->IndexStart), static_cast<int32_t>(pSubset->VertexStart), 0);
 	}
 }

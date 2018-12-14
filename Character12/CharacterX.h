@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include "DXFramework.h"
 #include "StepTimer.h"
 #include "Core/XUSG.h"
 #include "Advanced/XUSGCharacter.h"
@@ -42,15 +43,6 @@ public:
 
 private:
 	static const uint32_t FrameCount = XUSG::Model::GetFrameCount();
-	static const uint32_t TextureWidth = 1024;
-	static const uint32_t TextureHeight = 1024;
-	static const uint32_t TexturePixelSize = 4;	// The number of bytes used to represent a pixel in the texture.
-
-	struct Vertex
-	{
-		XMFLOAT3 position;
-		XMFLOAT2 uv;
-	};
 
 	std::shared_ptr<XUSG::ShaderPool>				m_shaderPool;
 	std::shared_ptr<XUSG::Graphics::PipelineCache>	m_graphicsPipelineCache;
@@ -59,17 +51,17 @@ private:
 	std::shared_ptr<XUSG::DescriptorTableCache>		m_descriptorTableCache;
 
 	// Pipeline objects.
-	XUSG::InputLayout 	m_inputLayout;
-	CD3DX12_VIEWPORT	m_viewport;
-	CD3DX12_RECT		m_scissorRect;
+	XUSG::InputLayout		m_inputLayout;
+	XUSG::Viewport			m_viewport;
+	XUSG::RectRange			m_scissorRect;
 
-	XUSG::com_ptr<IDXGISwapChain3>			m_swapChain;
-	XUSG::com_ptr<ID3D12CommandAllocator>	m_commandAllocators[FrameCount];
-	XUSG::com_ptr<ID3D12CommandQueue>		m_commandQueue;
+	XUSG::SwapChain			m_swapChain;
+	XUSG::CommandAllocator	m_commandAllocators[FrameCount];
+	XUSG::CommandQueue		m_commandQueue;
 
-	XUSG::Device m_device;
-	XUSG::Resource m_renderTargets[FrameCount];
-	XUSG::GraphicsCommandList m_commandList;
+	XUSG::Device			m_device;
+	XUSG::Resource			m_renderTargets[FrameCount];
+	XUSG::CommandList		m_commandList;
 
 	// App resources.
 	std::unique_ptr<XUSG::Character> m_character;
@@ -82,14 +74,14 @@ private:
 	DirectX::XMFLOAT3		m_eyePt;
 
 	// Synchronization objects.
-	uint32_t m_frameIndex;
-	HANDLE m_fenceEvent;
-	XUSG::com_ptr<ID3D12Fence> m_fence;
-	uint64_t m_fenceValues[FrameCount];
+	uint32_t	m_frameIndex;
+	HANDLE		m_fenceEvent;
+	XUSG::Fence	m_fence;
+	uint64_t	m_fenceValues[FrameCount];
 
 	// Application state
-	bool m_pausing;
-	StepTimer m_timer;
+	bool		m_pausing;
+	StepTimer	m_timer;
 
 	// User camera interactions
 	bool m_tracking;

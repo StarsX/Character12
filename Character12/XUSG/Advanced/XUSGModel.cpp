@@ -88,28 +88,17 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 #endif
 }
 
-void Model::SetPipelineState(SubsetFlags subsetFlags)
+void Model::SetPipeline(SubsetFlags subsetFlags)
 {
-	subsetFlags = subsetFlags & SUBSET_FULL;
-	assert(subsetFlags != SUBSET_FULL);
-
-	switch (subsetFlags)
-	{
-	case SUBSET_ALPHA_TEST:
-		m_commandList.SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE]);
-		break;
-	case SUBSET_ALPHA:
-		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDE]);
-		break;
-	default:
-		m_commandList.SetPipelineState(m_pipelines[OPAQUE_FRONT]);
-	}
-	//if (subsetFlags == SUBSET_REFLECTED)
-		//m_commandList->SetPipelineState(m_pipelines[REFLECTED]); 
+	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
+	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+	setPipelineState(subsetFlags);
 }
 
-void Model::SetPipelineState(PipelineIndex pipeline)
+void Model::SetPipeline(PipelineIndex pipeline)
 {
+	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
+	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 	m_commandList.SetPipelineState(m_pipelines[pipeline]);
 }
 
@@ -222,6 +211,26 @@ void Model::createDescriptorTables()
 	}
 }
 
+void Model::setPipelineState(SubsetFlags subsetFlags)
+{
+	subsetFlags = subsetFlags & SUBSET_FULL;
+	assert(subsetFlags != SUBSET_FULL);
+
+	switch (subsetFlags)
+	{
+	case SUBSET_ALPHA_TEST:
+		m_commandList.SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE]);
+		break;
+	case SUBSET_ALPHA:
+		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDE]);
+		break;
+	default:
+		m_commandList.SetPipelineState(m_pipelines[OPAQUE_FRONT]);
+	}
+	//if (subsetFlags == SUBSET_REFLECTED)
+		//m_commandList->SetPipelineState(m_pipelines[REFLECTED]); 
+}
+
 void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 {
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
@@ -230,7 +239,7 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 	m_commandList.IASetIndexBuffer(m_mesh->GetIndexBufferView(mesh));
 
 	// Set pipeline state
-	if (reset) SetPipelineState(subsetFlags);
+	if (reset) setPipelineState(subsetFlags);
 
 	const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
 	const auto numSubsets = m_mesh->GetNumSubsets(mesh, materialType);

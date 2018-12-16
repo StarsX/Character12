@@ -45,6 +45,7 @@ namespace XUSG
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
 			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
+		void SetSkinningPipeline();
 		void Skinning(bool reset = false);
 		void RenderTransformed(SubsetFlags subsetFlags = SUBSET_FULL, bool isShadow = false, bool reset = false);
 

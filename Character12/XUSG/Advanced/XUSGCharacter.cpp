@@ -108,6 +108,12 @@ void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld, FXMMATRIX *pS
 	}
 }
 
+void Character::SetSkinningPipeline()
+{
+	m_commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
+	m_commandList.SetPipelineState(m_skinningPipeline);
+}
+
 void Character::Skinning(bool reset)
 {
 	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);

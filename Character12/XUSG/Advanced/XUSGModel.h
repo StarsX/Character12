@@ -24,29 +24,6 @@ namespace XUSG
 			NUM_PIPELINE
 		};
 
-		Model(const Device &device, const CommandList &commandList);
-		virtual ~Model();
-
-		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
-			const std::shared_ptr<ShaderPool> &shaderPool,
-			const std::shared_ptr<Graphics::PipelineCache> &pipelineCache,
-			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
-			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache);
-		void FrameMove();
-		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
-			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
-		void SetPipelineState(SubsetFlags subsetFlags);
-		void SetPipelineState(PipelineIndex pipeline);
-		void Render(SubsetFlags subsetFlags, bool isShadow, bool reset = false);
-
-		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
-		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
-			const TextureCache &textureCache, bool isStaticMesh);
-		static void SetShadowMap(const CommandList &commandList, const DescriptorTable &shadowTable);
-
-		static constexpr uint32_t GetFrameCount() { return FrameCount; }
-
-	protected:
 		enum DescriptorTableSlot : uint8_t
 		{
 			MATRICES,
@@ -58,6 +35,29 @@ namespace XUSG
 			TEMPORAL_BIAS
 		};
 
+		Model(const Device &device, const CommandList &commandList);
+		virtual ~Model();
+
+		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
+			const std::shared_ptr<ShaderPool> &shaderPool,
+			const std::shared_ptr<Graphics::PipelineCache> &pipelineCache,
+			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
+			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache);
+		void FrameMove();
+		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
+			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
+		void SetPipeline(SubsetFlags subsetFlags);
+		void SetPipeline(PipelineIndex pipeline);
+		void Render(SubsetFlags subsetFlags, bool isShadow, bool reset = false);
+
+		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
+		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
+			const TextureCache &textureCache, bool isStaticMesh);
+		static void SetShadowMap(const CommandList &commandList, const DescriptorTable &shadowTable);
+
+		static constexpr uint32_t GetFrameCount() { return FrameCount; }
+
+	protected:
 		enum CBVTableIndex : uint8_t
 		{
 			CBV_MATRICES,
@@ -80,6 +80,7 @@ namespace XUSG
 		bool createConstantBuffers();
 		virtual void createPipelineLayout();
 		void createDescriptorTables();
+		void setPipelineState(SubsetFlags subsetFlags);
 		void render(uint32_t mesh, SubsetFlags subsetFlags, bool reset);
 
 		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);

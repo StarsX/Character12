@@ -61,15 +61,15 @@ namespace XUSG
 		{
 			INPUT,
 			OUTPUT,
-			HISTORY = SAMPLERS + 1,
-			TEMPORAL_BIAS
+			HISTORY = PER_OBJECT
 		};
 
 		bool createTransformedStates();
 		bool createTransformedVBs(VertexBuffer &vertexBuffer);
 		bool createBuffers();
 		void createPipelineLayout();
-		void createPipelines();
+		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
+			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world,
 			DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pShadow, bool isTemporal);

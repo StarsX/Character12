@@ -8,6 +8,7 @@
 
 using namespace std;
 using namespace DirectX;
+using namespace DirectX::PackedVector;
 using namespace XUSG;
 
 //--------------------------------------------------------------------------------------
@@ -45,15 +46,16 @@ SDKMesh::~SDKMesh()
 
 //--------------------------------------------------------------------------------------
 bool SDKMesh::Create(const Device &device, const wchar_t *fileName,
-	const TextureCache &textureCache)
+	const TextureCache &textureCache, bool isStaticMesh)
 {
-	return createFromFile(device, fileName, textureCache);
+	return createFromFile(device, fileName, textureCache, isStaticMesh);
 }
 
 bool SDKMesh::Create(const Device &device, uint8_t *pData,
-	const TextureCache &textureCache, size_t dataBytes, bool copyStatic)
+	const TextureCache &textureCache, size_t dataBytes,
+	bool isStaticMesh, bool copyStatic)
 {
-	return createFromMemory(device, pData, textureCache, dataBytes, copyStatic);
+	return createFromMemory(device, pData, textureCache, dataBytes, isStaticMesh, copyStatic);
 }
 
 bool SDKMesh::LoadAnimation(const wchar_t *fileName)
@@ -708,7 +710,7 @@ bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Reso
 
 //--------------------------------------------------------------------------------------
 bool SDKMesh::createFromFile(const Device &device, const wchar_t *fileName,
-	const TextureCache &textureCache)
+	const TextureCache &textureCache, bool isStaticMesh)
 {
 	// Find the path for the file
 	m_filePathW = fileName;
@@ -737,11 +739,12 @@ bool SDKMesh::createFromFile(const Device &device, const wchar_t *fileName,
 
 	fileStream.close();
 
-	return createFromMemory(device, m_pStaticMeshData, textureCache, cBytes, false);
+	return createFromMemory(device, m_pStaticMeshData, textureCache, cBytes, isStaticMesh, false);
 }
 
 bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
-	const TextureCache &textureCache, size_t dataBytes, bool copyStatic)
+	const TextureCache &textureCache, size_t dataBytes,
+	bool isStaticMesh, bool copyStatic)
 {
 	XMFLOAT3 lower; 
 	XMFLOAT3 upper; 
@@ -818,6 +821,9 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	// Create a place to store our transformed frame matrices
 	m_transformedFrameMatrices.resize(m_pMeshHeader->NumFrames);
 	m_worldPoseFrameMatrices.resize(m_pMeshHeader->NumFrames);
+
+	// Process as a static mesh
+	if (isStaticMesh) createAsStaticMesh();
 
 	SDKMeshSubset* pSubset = nullptr;
 	PrimitiveTopology primType;
@@ -906,6 +912,65 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 
 	// Execute commands
 	return executeCommandList(commandList);
+}
+
+void SDKMesh::createAsStaticMesh()
+{
+	// Calculate transform
+	XMVECTOR vScaling, quat, vTranslate;
+	for (auto i = 0u; i < m_pMeshHeader->NumFrames; ++i)
+	{
+		if (m_pFrameArray[i].Mesh != INVALID_MESH)
+		{
+			auto localTransform = XMLoadFloat4x4(&m_pFrameArray[i].Matrix);
+			XMMatrixDecompose(&vScaling, &quat, &vTranslate, localTransform);
+
+			vScaling = XMVectorSwizzle(vScaling, 0, 2, 1, 3);
+			quat = XMVectorSwizzle(quat, 0, 2, 1, 3);
+			quat = XMVectorSetY(quat, -XMVectorGetY(quat));
+			const auto translate = XMMatrixTranslationFromVector(vTranslate);
+			const auto scaling = XMMatrixScalingFromVector(vScaling);
+			const auto quatMatrix = XMMatrixRotationQuaternion(quat);
+			localTransform = scaling * quatMatrix * translate;
+			XMStoreFloat4x4(&m_pFrameArray[i].Matrix, localTransform);
+		}
+	}
+	TransformBindPose(XMMatrixIdentity());
+	
+	// Recompute vertex buffers
+	for (auto i = 0u; i < m_pMeshHeader->NumFrames; ++i)
+	{
+		const auto &m = m_pFrameArray[i].Mesh;
+		if (m != INVALID_MESH)
+		{
+			const auto numVerts = GetNumVertices(m, 0);
+			const auto vb = m_pMeshArray[m].VertexBuffers[0];
+			const auto local = GetBindMatrix(i);
+			const auto verts = m_vertices[vb];
+			const auto stride = GetVertexStride(m, 0);
+			const auto localIT = XMMatrixTranspose(XMMatrixInverse(nullptr, local));
+
+			for (auto i = 0u; i < numVerts; ++i)
+			{
+				auto loc = stride * i;
+				auto &pos = reinterpret_cast<XMFLOAT3&>(verts[loc]);
+
+				loc += sizeof(XMFLOAT3);
+				auto &norm = reinterpret_cast<XMHALF4&>(verts[loc]);
+
+				loc += sizeof(XMFLOAT3);
+				auto &tan = reinterpret_cast<XMHALF4&>(verts[loc]);
+
+				loc += sizeof(XMHALF4);
+				auto &biNorm = reinterpret_cast<XMHALF4&>(verts[loc]);
+
+				XMStoreFloat3(&pos, XMVector3TransformCoord(XMLoadFloat3(&pos), local));
+				XMStoreHalf4(&norm, XMVector3TransformNormal(XMLoadHalf4(&norm), localIT));
+				XMStoreHalf4(&tan, XMVector3TransformNormal(XMLoadHalf4(&tan), local));
+				XMStoreHalf4(&biNorm, XMVector3TransformNormal(XMLoadHalf4(&biNorm), local));
+			}
+		}
+	}
 }
 
 void SDKMesh::classifyMaterialType()

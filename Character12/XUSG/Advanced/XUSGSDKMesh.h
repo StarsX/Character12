@@ -282,9 +282,10 @@ namespace XUSG
 		SDKMesh();
 		virtual ~SDKMesh();
 
-		virtual bool Create(const Device &device, const wchar_t *fileName, const TextureCache &textureCache);
+		virtual bool Create(const Device &device, const wchar_t *fileName,
+			const TextureCache &textureCache, bool isStaticMesh = false);
 		virtual bool Create(const Device &device, uint8_t *pData, const TextureCache &textureCache,
-			size_t dataBytes, bool copyStatic = false);
+			size_t dataBytes, bool isStaticMesh = false, bool copyStatic = false);
 		virtual bool LoadAnimation(const wchar_t *fileName);
 		virtual void Destroy();
 
@@ -357,10 +358,12 @@ namespace XUSG
 		bool createVertexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders);
 		bool createIndexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders);
 
-		virtual bool createFromFile(const Device &device, const wchar_t *fileName, const TextureCache &textureCache);
+		virtual bool createFromFile(const Device &device, const wchar_t *fileName,
+			const TextureCache &textureCache, bool isStaticMesh);
 		virtual bool createFromMemory(const Device &device, uint8_t *pData, const TextureCache &textureCache,
-			size_t dataBytes, bool copyStatic);
+			size_t dataBytes, bool isStaticMesh, bool copyStatic);
 
+		void createAsStaticMesh();
 		void classifyMaterialType();
 		bool executeCommandList(CommandList &commandList);
 

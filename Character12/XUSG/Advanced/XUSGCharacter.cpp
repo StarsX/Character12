@@ -53,9 +53,9 @@ bool Character::Init(const InputLayout &inputLayout,
 	// Create VBs that will hold all of the skinned vertices that need to be transformed output
 	N_RETURN(createTransformedStates(), false);
 
-	// Create pipeline layouts, pipelines, and descriptor tables
+	// Create pipeline layout, pipelines, and descriptor tables
 	createPipelineLayout();
-	createPipelines();
+	createPipelines(inputLayout);
 	createDescriptorTables();
 
 	return true;
@@ -140,7 +140,7 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 	vector<SDKMesh> *linkedMeshes)
 {
 	// Load the animated mesh
-	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache);
+	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache, false);
 	N_RETURN(mesh->LoadAnimation(animFileName.c_str()), nullptr);
 	mesh->TransformBindPose(XMMatrixIdentity());
 
@@ -240,16 +240,16 @@ void Character::createPipelineLayout()
 
 		// Get shader resource slots
 		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
-		const auto pReflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
-		if (pReflector)
+		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
+		if (reflector)
 		{
-			auto hr = pReflector->GetResourceBindingDescByName("g_rwVertices", &desc);
+			auto hr = reflector->GetResourceBindingDescByName("g_rwVertices", &desc);
 			if (SUCCEEDED(hr)) rwVertices = desc.BindPoint;
 
-			hr = pReflector->GetResourceBindingDescByName("g_roDualQuat", &desc);
+			hr = reflector->GetResourceBindingDescByName("g_roDualQuat", &desc);
 			if (SUCCEEDED(hr)) roBoneWorld = desc.BindPoint;
 
-			hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
+			hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
 			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
 		}
 
@@ -274,21 +274,14 @@ void Character::createPipelineLayout()
 	{
 #if	TEMPORAL
 		auto roVertices = 0u;
-#if TEMPORAL_AA
-		auto cbTempBias = 3u;
-#endif
 
 		// Get shader resource slots
 		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
-		const auto pReflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
-		if (pReflector)
+		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
+		if (reflector)
 		{
-			auto hr = pReflector->GetResourceBindingDescByName("g_roVertices", &desc);
+			auto hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
 			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
-#if TEMPORAL_AA
-			hr = pReflector->GetResourceBindingDescByName("g_cbTempBias", &desc);
-			cbTempBias = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
-#endif
 		}
 #endif
 
@@ -299,26 +292,65 @@ void Character::createPipelineLayout()
 		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
 
-#if TEMPORAL_AA
-		if (cbTempBias != UINT32_MAX)
-		{
-			utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias,
-				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-			utilPipelineLayout.SetShaderStage(TEMPORAL_BIAS, Shader::Stage::VS);
-		}
-#endif
-
 		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 	}
 }
 
-void Character::createPipelines()
+void Character::createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
+	uint32_t numRTVs, Format dsvFormat)
 {
-	Compute::State state;
-	state.SetPipelineLayout(m_skinningPipelineLayout);
-	state.SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
-	m_skinningPipeline = state.GetPipeline(*m_computePipelineCache);
+	// Skinning
+	{
+		Compute::State state;
+		state.SetPipelineLayout(m_skinningPipelineLayout);
+		state.SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
+		m_skinningPipeline = state.GetPipeline(*m_computePipelineCache);
+	}
+
+	// Rendering
+	{
+		const Format defaultRtvFormats[] =
+		{
+			DXGI_FORMAT_B8G8R8A8_UNORM,
+			DXGI_FORMAT_R10G10B10A2_UNORM,
+			DXGI_FORMAT_B8G8R8A8_UNORM,
+			DXGI_FORMAT_R16G16_FLOAT
+		};
+
+		rtvFormats = rtvFormats ? rtvFormats : defaultRtvFormats;
+		numRTVs = numRTVs > 0 ? numRTVs : static_cast<uint32_t>(size(defaultRtvFormats));
+
+		Graphics::State state;
+
+		// Get opaque pipeline
+		state.IASetInputLayout(inputLayout);
+		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		state.SetPipelineLayout(m_pipelineLayout);
+		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS));
+		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
+		state.OMSetRTVFormats(rtvFormats, numRTVs);
+		state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
+		m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelineCache);
+
+		// Get transparent pipeline
+		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
+		state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS_EQUAL, *m_pipelineCache);
+		state.OMSetBlendState(Graphics::BlendPreset::AUTO_NON_PREMUL, *m_pipelineCache);
+		m_pipelines[ALPHA_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
+
+		// Get alpha-test pipeline
+		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_ALPHA_TEST));
+		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_ALPHA_TEST));
+		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
+		state.OMSetBlendState(Graphics::DEFAULT_OPAQUE, *m_pipelineCache);
+		m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
+
+		// Get reflected pipeline
+		//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelineCache);
+		//state.OMSetBlendState(Graphics::BlendPreset::DEFAULT_OPAQUE, *m_pipelineCache);
+		//m_pipelines[REFLECTED] = state.GetPipeline(*m_pipelineCache);
+	}
 }
 
 void Character::createDescriptorTables()

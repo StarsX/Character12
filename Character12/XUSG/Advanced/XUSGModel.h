@@ -41,8 +41,8 @@ namespace XUSG
 
 		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
-			const TextureCache &textureCache);
-		static void SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable);
+			const TextureCache &textureCache, bool isStaticMesh);
+		static void SetShadowMap(const CommandList &commandList, const DescriptorTable &shadowTable);
 
 		static constexpr uint32_t GetFrameCount() { return FrameCount; }
 
@@ -50,9 +50,12 @@ namespace XUSG
 		enum DescriptorTableSlot : uint8_t
 		{
 			MATRICES,
+			PER_FRAME,
+			PER_OBJECT,
 			MATERIAL,
 			SHADOW_MAP,
-			SAMPLERS
+			SAMPLERS,
+			TEMPORAL_BIAS
 		};
 
 		enum CBVTableIndex : uint8_t
@@ -76,8 +79,6 @@ namespace XUSG
 
 		bool createConstantBuffers();
 		virtual void createPipelineLayout();
-		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
-			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
 		void render(uint32_t mesh, SubsetFlags subsetFlags, bool reset);
 

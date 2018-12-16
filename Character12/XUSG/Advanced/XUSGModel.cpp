@@ -43,10 +43,8 @@ bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 	// Get SDKMesh
 	m_mesh = mesh;
 
-	// Create buffers, pipeline layouts, pipelines, and descriptor tables
+	// Create buffers and descriptor tables
 	N_RETURN(createConstantBuffers(), false);
-	createPipelineLayout();
-	createPipelines(inputLayout);
 	createDescriptorTables();
 
 	return true;
@@ -159,18 +157,18 @@ InputLayout Model::CreateInputLayout(PipelineCache &pipelineCache)
 }
 
 shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &meshFileName,
-	const TextureCache &textureCache)
+	const TextureCache &textureCache, bool isStaticMesh)
 {
 	// Load the mesh
 	const auto mesh = make_shared<SDKMesh>();
-	N_RETURN(mesh->Create(device, meshFileName.c_str(), textureCache), nullptr);
+	N_RETURN(mesh->Create(device, meshFileName.c_str(), textureCache, isStaticMesh), nullptr);
 
 	return mesh;
 }
 
-void Model::SetShadowMap(const GraphicsCommandList &commandList, const DescriptorTable &shadowTable)
+void Model::SetShadowMap(const CommandList &commandList, const DescriptorTable &shadowTable)
 {
-	commandList->SetGraphicsRootDescriptorTable(SHADOW_MAP, *shadowTable);
+	commandList.SetGraphicsDescriptorTable(SHADOW_MAP, shadowTable);
 }
 
 bool Model::createConstantBuffers()
@@ -186,51 +184,6 @@ void Model::createPipelineLayout()
 	auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 	m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-}
-
-void Model::createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
-	uint32_t numRTVs, Format dsvFormat)
-{
-	const Format defaultRtvFormats[] =
-	{
-		DXGI_FORMAT_B8G8R8A8_UNORM,
-		DXGI_FORMAT_R10G10B10A2_UNORM,
-		DXGI_FORMAT_B8G8R8A8_UNORM,
-		DXGI_FORMAT_R16G16_FLOAT
-	};
-
-	rtvFormats = rtvFormats ? rtvFormats : defaultRtvFormats;
-	numRTVs = numRTVs > 0 ? numRTVs : static_cast<uint32_t>(size(defaultRtvFormats));
-
-	Graphics::State state;
-
-	// Get opaque pipeline
-	state.IASetInputLayout(inputLayout);
-	state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	state.SetPipelineLayout(m_pipelineLayout);
-	state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS));
-	state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
-	state.OMSetRTVFormats(rtvFormats, numRTVs);
-	state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
-	m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelineCache);
-
-	// Get transparent pipeline
-	state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
-	state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS_EQUAL, *m_pipelineCache);
-	state.OMSetBlendState(BlendPreset::AUTO_NON_PREMUL, *m_pipelineCache);
-	m_pipelines[ALPHA_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
-
-	// Get alpha-test pipeline
-	state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_ALPHA_TEST));
-	state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_ALPHA_TEST));
-	state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
-	state.OMSetBlendState(BlendPreset::DEFAULT_OPAQUE, *m_pipelineCache);
-	m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
-	
-	// Get reflected pipeline
-	//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelineCache);
-	//state.OMSetBlendState(BlendPreset::DEFAULT_OPAQUE, *m_pipelineCache);
-	//m_pipelines[REFLECTED] = state.GetPipeline(*m_pipelineCache);
 }
 
 void Model::createDescriptorTables()
@@ -301,6 +254,11 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 {
 	auto cbMatrices = 0u;
+	auto cbPerFrame = cbMatrices + 1;
+	auto cbPerObject = cbPerFrame + 1;
+#if TEMPORAL_AA
+	auto cbTempBias = cbPerObject + 1;
+#endif
 	auto txDiffuse = 0u;
 	auto txNormal = txDiffuse + 1;
 	auto txShadow = txNormal + 1;
@@ -312,8 +270,16 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, vs);
 	if (reflector)
 	{
-		const auto hr = reflector->GetResourceBindingDescByName("cbMatrices", &desc);
+		auto hr = reflector->GetResourceBindingDescByName("cbMatrices", &desc);
 		if (SUCCEEDED(hr)) cbMatrices = desc.BindPoint;
+
+		hr = reflector->GetResourceBindingDescByName("cbPerFrame", &desc);
+		if (SUCCEEDED(hr)) cbPerFrame = desc.BindPoint;
+
+#if TEMPORAL_AA
+		hr = reflector->GetResourceBindingDescByName("cbTempBias", &desc);
+		cbTempBias = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
+#endif
 	}
 
 	reflector = m_shaderPool->GetReflector(Shader::Stage::PS, ps);
@@ -340,6 +306,19 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices,
 		0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
+
+	utilPipelineLayout.SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame,
+		0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	utilPipelineLayout.SetShaderStage(PER_FRAME, Shader::Stage::VS);
+
+#if TEMPORAL_AA
+	if (cbTempBias != UINT32_MAX)
+	{
+		utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		utilPipelineLayout.SetShaderStage(TEMPORAL_BIAS, Shader::Stage::VS);
+	}
+#endif
 
 	// Textures (material and shadow)
 	if (txNormal == txDiffuse + 1)

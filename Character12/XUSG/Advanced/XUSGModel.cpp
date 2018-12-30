@@ -299,9 +299,6 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		auto hr = reflector->GetResourceBindingDescByName("cbMatrices", &desc);
 		if (SUCCEEDED(hr)) cbMatrices = desc.BindPoint;
 
-		hr = reflector->GetResourceBindingDescByName("cbPerFrame", &desc);
-		if (SUCCEEDED(hr)) cbPerFrame = desc.BindPoint;
-
 #if TEMPORAL_AA
 		hr = reflector->GetResourceBindingDescByName("cbTempBias", &desc);
 		if (SUCCEEDED(hr)) cbTempBias = desc.BindPoint;
@@ -332,14 +329,11 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 
 	// Get pipeline layout
 	Util::PipelineLayout utilPipelineLayout;
+
 	// Constant buffers
 	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices,
 		0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
-
-	utilPipelineLayout.SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame,
-		0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-	utilPipelineLayout.SetShaderStage(PER_FRAME, Shader::Stage::VS);
 
 #if TEMPORAL_AA
 	utilPipelineLayout.SetConstants(TEMPORAL_BIAS, 2, cbTempBias, 0, Shader::Stage::VS);
@@ -363,7 +357,8 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		utilPipelineLayout.SetConstants(ALPHA_REF, 2, cbPerObject, 0, Shader::Stage::PS);
 	else
 	{
-		utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow);
+		utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 		utilPipelineLayout.SetShaderStage(SHADOW_MAP, Shader::Stage::PS);
 	}
 

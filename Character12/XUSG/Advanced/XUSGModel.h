@@ -40,14 +40,17 @@ namespace XUSG
 
 		enum DescriptorTableSlot : uint8_t
 		{
-			MATRICES,
-			PER_FRAME,
-			PER_OBJECT,
-			MATERIAL,
 			SAMPLERS,
+			MATERIAL,
 			SHADOW_MAP,
 			ALPHA_REF = SHADOW_MAP,
-			TEMPORAL_BIAS
+
+#if TEMPORAL_AA
+			TEMPORAL_BIAS,
+#endif
+			MATRICES,
+			PER_OBJECT,
+			PER_FRAME,
 		};
 
 		enum CBVTableIndex : uint8_t

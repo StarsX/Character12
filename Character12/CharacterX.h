@@ -68,10 +68,10 @@ private:
 	XUSG::DescriptorPool	m_rtvPool;
 	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
 	XUSG::DepthStencil		m_depth;
-	XMFLOAT4X4				m_proj;
-	DirectX::XMFLOAT4X4		m_view;
-	DirectX::XMFLOAT3		m_focusPt;
-	DirectX::XMFLOAT3		m_eyePt;
+	XMFLOAT4X4	m_proj;
+	XMFLOAT4X4	m_view;
+	XMFLOAT3	m_focusPt;
+	XMFLOAT3	m_eyePt;
 
 	// Synchronization objects.
 	uint32_t	m_frameIndex;
@@ -84,8 +84,8 @@ private:
 	StepTimer	m_timer;
 
 	// User camera interactions
-	bool m_tracking;
-	DirectX::XMFLOAT2 m_mousePt;
+	bool		m_tracking;
+	XMFLOAT2	m_mousePt;
 
 	void LoadPipeline();
 	void LoadAssets();

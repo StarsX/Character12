@@ -304,7 +304,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 
 #if TEMPORAL_AA
 		hr = reflector->GetResourceBindingDescByName("cbTempBias", &desc);
-		cbTempBias = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
+		if (SUCCEEDED(hr)) cbTempBias = desc.BindPoint;
 #endif
 	}
 
@@ -342,8 +342,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	utilPipelineLayout.SetShaderStage(PER_FRAME, Shader::Stage::VS);
 
 #if TEMPORAL_AA
-	if (cbTempBias != UINT32_MAX)
-		utilPipelineLayout.SetConstants(TEMPORAL_BIAS, 2, cbTempBias, 0, Shader::Stage::VS);
+	utilPipelineLayout.SetConstants(TEMPORAL_BIAS, 2, cbTempBias, 0, Shader::Stage::VS);
 #endif
 
 	// Textures (material and shadow)

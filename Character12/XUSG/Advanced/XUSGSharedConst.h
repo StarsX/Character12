@@ -2,6 +2,8 @@
 // By Stars XU Tianchen
 //--------------------------------------------------------------------------------------
 
+#pragma once
+
 #ifndef FRAME_COUNT
 #define	FRAME_COUNT		3
 #endif

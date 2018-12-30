@@ -9,16 +9,30 @@
 #include "XUSGSDKMesh.h"
 #include "XUSGSharedConst.h"
 
+#define	MAX_SHADOW_CASCADES	8
+
 namespace XUSG
 {
 	class Model
 	{
 	public:
+		enum PipelineLayoutIndex : uint8_t
+		{
+			BASE_PASS,
+			DEPTH_PASS,
+
+			NUM_PIPE_LAYOUT
+		};
+
 		enum PipelineIndex : uint8_t
 		{
 			OPAQUE_FRONT,
+			OPAQUE_FRONT_EQUAL,
 			OPAQUE_TWO_SIDE,
+			OPAQUE_TWO_SIDE_EQUAL,
 			ALPHA_TWO_SIDE,
+			DEPTH_FRONT,
+			DEPTH_TWO_SIDE,
 			REFLECTED,
 
 			NUM_PIPELINE
@@ -30,9 +44,18 @@ namespace XUSG
 			PER_FRAME,
 			PER_OBJECT,
 			MATERIAL,
-			SHADOW_MAP,
 			SAMPLERS,
+			SHADOW_MAP,
+			ALPHA_REF = SHADOW_MAP,
 			TEMPORAL_BIAS
+		};
+
+		enum CBVTableIndex : uint8_t
+		{
+			CBV_MATRICES,
+			CBV_SHADOW_MATRIX,
+
+			NUM_CBV = CBV_SHADOW_MATRIX + MAX_SHADOW_CASCADES
 		};
 
 		Model(const Device &device, const CommandList &commandList);
@@ -45,10 +68,11 @@ namespace XUSG
 			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache);
 		void FrameMove();
 		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
-			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
-		void SetPipeline(SubsetFlags subsetFlags);
-		void SetPipeline(PipelineIndex pipeline);
-		void Render(SubsetFlags subsetFlags, bool isShadow, bool reset = false);
+			DirectX::FXMMATRIX *pShadow = nullptr, uint8_t numShadows = 0,
+			bool isTemporal = true);
+		void SetPipeline(SubsetFlags subsetFlags, PipelineLayoutIndex layout);
+		void SetPipeline(PipelineIndex pipeline, PipelineLayoutIndex layout);
+		void Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout = NUM_PIPE_LAYOUT);
 
 		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
@@ -58,14 +82,6 @@ namespace XUSG
 		static constexpr uint32_t GetFrameCount() { return FrameCount; }
 
 	protected:
-		enum CBVTableIndex : uint8_t
-		{
-			CBV_MATRICES,
-			CBV_SHADOW_MATRIX,
-
-			NUM_CBV
-		};
-
 		struct alignas(16) CBMatrices
 		{
 			DirectX::XMMATRIX WorldViewProj;
@@ -78,10 +94,10 @@ namespace XUSG
 		};
 
 		bool createConstantBuffers();
-		virtual void createPipelineLayout();
+		virtual void createPipelineLayouts();
 		void createDescriptorTables();
-		void setPipelineState(SubsetFlags subsetFlags);
-		void render(uint32_t mesh, SubsetFlags subsetFlags, bool reset);
+		void setPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout);
+		void render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
 
 		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);
 
@@ -104,9 +120,9 @@ namespace XUSG
 #endif
 
 		ConstantBuffer		m_cbMatrices;
-		ConstantBuffer		m_cbShadowMatrix;
+		ConstantBuffer		m_cbShadowMatrices;
 
-		PipelineLayout		m_pipelineLayout;
+		PipelineLayout		m_pipelineLayouts[NUM_PIPE_LAYOUT];
 		Pipeline			m_pipelines[NUM_PIPELINE];
 		DescriptorTable		m_cbvTables[FrameCount][NUM_CBV];
 		DescriptorTable		m_samplerTable;

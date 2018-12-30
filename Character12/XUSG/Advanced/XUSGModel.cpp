@@ -17,7 +17,7 @@ Model::Model(const Device &device, const CommandList &commandList) :
 	m_shaderPool(nullptr),
 	m_pipelineCache(nullptr),
 	m_descriptorTableCache(nullptr),
-	m_pipelineLayout(nullptr),
+	m_pipelineLayouts(),
 	m_pipelines(),
 	m_cbvTables(),
 	m_samplerTable(nullptr),
@@ -34,7 +34,7 @@ bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 	const shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
 	const shared_ptr <DescriptorTableCache> &descriptorTableCache)
 {
-	// Set shader group and states
+	// Set shader pool and states
 	m_shaderPool = shaderPool;
 	m_pipelineCache = pipelineCache;
 	m_pipelineLayoutCache = pipelineLayoutCache;
@@ -56,7 +56,8 @@ void Model::FrameMove()
 	m_currentFrame = (m_currentFrame + 1) % FrameCount;
 }
 
-void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow, bool isTemporal)
+void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj,
+	FXMMATRIX *pShadow, uint8_t numShadows, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto worldViewProj = XMMatrixMultiply(world, viewProj);
@@ -71,11 +72,14 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 	
 	if (pShadow)
 	{
-		const auto shadow = XMMatrixMultiply(world, *pShadow);
-		pCBData->ShadowProj = XMMatrixTranspose(shadow);
+		for (auto i = 0ui8; i < numShadows; ++i)
+		{
+			const auto shadow = XMMatrixMultiply(world, pShadow[i]);
+			pCBData->ShadowProj = XMMatrixTranspose(shadow);
 
-		auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrix.Map(m_currentFrame));
-		cbData = pCBData->ShadowProj;
+			auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrices.Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
+			cbData = pCBData->ShadowProj;
+		}
 	}
 
 #if	TEMPORAL
@@ -88,21 +92,21 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj, FXMMATRIX *pShadow,
 #endif
 }
 
-void Model::SetPipeline(SubsetFlags subsetFlags)
+void Model::SetPipeline(SubsetFlags subsetFlags, PipelineLayoutIndex layout)
 {
-	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
+	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
-	setPipelineState(subsetFlags);
+	setPipelineState(subsetFlags, layout);
 }
 
-void Model::SetPipeline(PipelineIndex pipeline)
+void Model::SetPipeline(PipelineIndex pipeline, PipelineLayoutIndex layout)
 {
-	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
+	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 	m_commandList.SetPipelineState(m_pipelines[pipeline]);
 }
 
-void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
+void Model::Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout)
 {
 	const DescriptorPool descriptorPools[] =
 	{
@@ -110,9 +114,8 @@ void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 		m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
 	};
 	m_commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
-	m_commandList.SetGraphicsDescriptorTable(MATRICES,
-		m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
+	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
+	m_commandList.SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
 	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -122,11 +125,11 @@ void Model::Render(SubsetFlags subsetFlags, bool isShadow, bool reset)
 		m_commandList.IASetVertexBuffers(0, 1, &m_mesh->GetVertexBufferView(m, 0));
 
 		// Render mesh
-		render(m, subsetFlags, reset);
+		render(m, subsetFlags, layout);
 	}
 
 	// Clear out the vb bindings for the next pass
-	if (reset) m_commandList.IASetVertexBuffers(0, 1, nullptr);
+	if (layout != NUM_PIPE_LAYOUT) m_commandList.IASetVertexBuffers(0, 1, nullptr);
 }
 
 InputLayout Model::CreateInputLayout(PipelineCache &pipelineCache)
@@ -163,16 +166,27 @@ void Model::SetShadowMap(const CommandList &commandList, const DescriptorTable &
 bool Model::createConstantBuffers()
 {
 	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices) * FrameCount, FrameCount), false);
-	N_RETURN(m_cbShadowMatrix.Create(m_device, sizeof(XMFLOAT4) * FrameCount, FrameCount), false);
+	N_RETURN(m_cbShadowMatrices.Create(m_device, sizeof(XMFLOAT4) * MAX_SHADOW_CASCADES * FrameCount,
+		MAX_SHADOW_CASCADES * FrameCount), false);
 
 	return true;
 }
 
-void Model::createPipelineLayout()
+void Model::createPipelineLayouts()
 {
-	auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
-	m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	// Base pass
+	{
+		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
+		m_pipelineLayouts[BASE_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	}
+
+	// Depth pass
+	{
+		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
+		m_pipelineLayouts[DEPTH_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	}
 }
 
 void Model::createDescriptorTables()
@@ -183,9 +197,12 @@ void Model::createDescriptorTables()
 		cbMatricesTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV(i));
 		m_cbvTables[i][CBV_MATRICES] = cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTableCache);
 
-		Util::DescriptorTable cbShadowTable;
-		cbShadowTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV(i));
-		m_cbvTables[i][CBV_SHADOW_MATRIX] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+		for (auto j = 0ui8; j < MAX_SHADOW_CASCADES; ++j)
+		{
+			Util::DescriptorTable cbShadowTable;
+			cbShadowTable.SetDescriptors(0, 1, &m_cbShadowMatrices.GetCBV(i * MAX_SHADOW_CASCADES + j));
+			m_cbvTables[i][CBV_SHADOW_MATRIX + j] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+		}
 	}
 
 	Util::DescriptorTable samplerTable;
@@ -211,7 +228,7 @@ void Model::createDescriptorTables()
 	}
 }
 
-void Model::setPipelineState(SubsetFlags subsetFlags)
+void Model::setPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout)
 {
 	subsetFlags = subsetFlags & SUBSET_FULL;
 	assert(subsetFlags != SUBSET_FULL);
@@ -219,19 +236,19 @@ void Model::setPipelineState(SubsetFlags subsetFlags)
 	switch (subsetFlags)
 	{
 	case SUBSET_ALPHA_TEST:
-		m_commandList.SetPipelineState(m_pipelines[OPAQUE_TWO_SIDE]);
+		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_TWO_SIDE : OPAQUE_TWO_SIDE]);
 		break;
 	case SUBSET_ALPHA:
 		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDE]);
 		break;
 	default:
-		m_commandList.SetPipelineState(m_pipelines[OPAQUE_FRONT]);
+		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_FRONT : OPAQUE_FRONT]);
 	}
 	//if (subsetFlags == SUBSET_REFLECTED)
 		//m_commandList->SetPipelineState(m_pipelines[REFLECTED]); 
 }
 
-void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
+void Model::render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout)
 {
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
 
@@ -239,7 +256,7 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, bool reset)
 	m_commandList.IASetIndexBuffer(m_mesh->GetIndexBufferView(mesh));
 
 	// Set pipeline state
-	if (reset) setPipelineState(subsetFlags);
+	if (layout != NUM_PIPE_LAYOUT) setPipelineState(subsetFlags, layout);
 
 	const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
 	const auto numSubsets = m_mesh->GetNumSubsets(mesh, materialType);
@@ -302,6 +319,10 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		hr = reflector->GetResourceBindingDescByName("g_txShadow", &desc);
 		if (SUCCEEDED(hr)) txShadow = desc.BindPoint;
 
+		// Get constants slot
+		hr = reflector->GetResourceBindingDescByName("cbPerObject", &desc);
+		if (SUCCEEDED(hr)) cbPerObject = desc.BindPoint;
+
 		// Get sampler slots
 		hr = reflector->GetResourceBindingDescByName("g_smpLinear", &desc);
 		if (SUCCEEDED(hr)) smpAnisoWrap = desc.BindPoint;
@@ -322,11 +343,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 
 #if TEMPORAL_AA
 	if (cbTempBias != UINT32_MAX)
-	{
-		utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		utilPipelineLayout.SetShaderStage(TEMPORAL_BIAS, Shader::Stage::VS);
-	}
+		utilPipelineLayout.SetConstants(TEMPORAL_BIAS, 2, cbTempBias, 0, Shader::Stage::VS);
 #endif
 
 	// Textures (material and shadow)
@@ -337,13 +354,19 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	{
 		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txDiffuse,
 			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txNormal,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		if (ps != PS_DEPTH)
+			utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txNormal,
+				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	}
 	utilPipelineLayout.SetShaderStage(MATERIAL, Shader::Stage::PS);
 
-	utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow);
-	utilPipelineLayout.SetShaderStage(SHADOW_MAP, Shader::Stage::PS);
+	if (ps == PS_DEPTH)
+		utilPipelineLayout.SetConstants(ALPHA_REF, 2, cbPerObject, 0, Shader::Stage::PS);
+	else
+	{
+		utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow);
+		utilPipelineLayout.SetShaderStage(SHADOW_MAP, Shader::Stage::PS);
+	}
 
 	// Samplers
 	if (smpLinearCmp == smpAnisoWrap + 2)
@@ -351,7 +374,8 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	else
 	{
 		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 2, smpAnisoWrap);
-		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 1, smpLinearCmp);
+		if (ps != PS_DEPTH)
+			utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 1, smpLinearCmp);
 	}
 	utilPipelineLayout.SetShaderStage(SAMPLERS, Shader::Stage::PS);
 

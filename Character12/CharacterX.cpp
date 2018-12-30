@@ -162,9 +162,6 @@ void CharacterX::LoadAssets()
 		m_shaderPool->CreateShader(Shader::Stage::PS, PS_BASE_PASS, L"PSBasePass.cso");
 		m_shaderPool->CreateShader(Shader::Stage::PS, PS_ALPHA_TEST, L"PSAlphaTest.cso");
 		m_shaderPool->CreateShader(Shader::Stage::CS, CS_SKINNING, L"CSSkinning.cso");
-		m_shaderPool->SetShader(Shader::Stage::VS, VS_ALPHA_TEST,
-			m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS),
-			m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS));
 	}
 
 	// Create the command list.
@@ -376,7 +373,7 @@ void CharacterX::PopulateCommandList()
 	m_commandList.ClearDepthStencilView(m_depth.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	//m_commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	m_character->RenderTransformed(SUBSET_FULL, false, true);
+	m_character->RenderTransformed(SUBSET_FULL, Model::CBV_MATRICES, Model::BASE_PASS);
 
 	// Indicate that the back buffer will now be used to present.
 	m_commandList.Barrier(1, &ResourceBarrier::Transition(m_renderTargets[m_frameIndex].get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));

@@ -42,12 +42,13 @@ namespace XUSG
 		void InitPosition(const DirectX::XMFLOAT4 &posRot);
 		void FrameMove(double time);
 		void FrameMove(double time, DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
-			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
+			DirectX::FXMMATRIX *pShadow = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
-			DirectX::FXMMATRIX *pShadow = nullptr, bool isTemporal = true);
+			DirectX::FXMMATRIX *pShadow = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
 		void SetSkinningPipeline();
 		void Skinning(bool reset = false);
-		void RenderTransformed(SubsetFlags subsetFlags = SUBSET_FULL, bool isShadow = false, bool reset = false);
+		void RenderTransformed(SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
+			PipelineLayoutIndex layout = NUM_PIPE_LAYOUT);
 
 		const DirectX::XMFLOAT4 &GetPosition() const;
 		DirectX::FXMMATRIX GetWorldMatrix() const;
@@ -68,15 +69,15 @@ namespace XUSG
 		bool createTransformedStates();
 		bool createTransformedVBs(VertexBuffer &vertexBuffer);
 		bool createBuffers();
-		void createPipelineLayout();
+		void createPipelineLayouts();
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world,
 			DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pShadow, bool isTemporal);
 		void skinning(bool reset);
-		void renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool reset);
-		void renderLinked(uint32_t mesh, bool isShadow, bool reset);
+		void renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout);
+		void renderLinked(uint32_t mesh, uint8_t matrixTableIndex, PipelineLayoutIndex layout);
 		void setSkeletalMatrices(uint32_t numMeshes);
 		void setBoneMatrices(uint32_t mesh);
 		void convertToDQ(DirectX::XMFLOAT4 &dqTran, DirectX::CXMVECTOR quat,

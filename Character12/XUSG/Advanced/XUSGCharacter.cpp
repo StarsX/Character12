@@ -54,7 +54,7 @@ bool Character::Init(const InputLayout &inputLayout,
 	N_RETURN(createTransformedStates(), false);
 
 	// Create pipeline layout, pipelines, and descriptor tables
-	createPipelineLayout();
+	createPipelineLayouts();
 	createPipelines(inputLayout);
 	createDescriptorTables();
 
@@ -73,7 +73,7 @@ void Character::FrameMove(double time)
 }
 
 void Character::FrameMove(double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
-	FXMMATRIX *pShadow, bool isTemporal)
+	FXMMATRIX *pShadow, uint8_t numShadows, bool isTemporal)
 {
 	Model::FrameMove();
 
@@ -82,11 +82,12 @@ void Character::FrameMove(double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	m_mesh->TransformMesh(XMMatrixIdentity(), time);
 	setSkeletalMatrices(numMeshes);
 
-	SetMatrices(viewProj, pWorld, pShadow, isTemporal);
+	SetMatrices(viewProj, pWorld, pShadow, numShadows, isTemporal);
 	m_time = -1.0;
 }
 
-void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld, FXMMATRIX *pShadow, bool isTemporal)
+void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld,
+	FXMMATRIX *pShadow, uint8_t numShadows, bool isTemporal)
 {
 	XMMATRIX world;
 	if (!pWorld)
@@ -120,13 +121,14 @@ void Character::Skinning(bool reset)
 	skinning(reset);
 }
 
-void Character::RenderTransformed(SubsetFlags subsetFlags, bool isShadow, bool reset)
+void Character::RenderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+	PipelineLayoutIndex layout)
 {
-	renderTransformed(subsetFlags, isShadow, reset);
+	renderTransformed(subsetFlags, matrixTableIndex, layout);
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
-		//for (auto m = 0ui8; m < numLinks; ++m) renderLinked(uVS, uGS, uPS, m, bReset);
+		//for (auto m = 0ui8; m < numLinks; ++m) renderLinked(uVS, uGS, uPS, m, layout);
 	}
 }
 
@@ -236,7 +238,7 @@ bool Character::createBuffers()
 	return true;
 }
 
-void Character::createPipelineLayout()
+void Character::createPipelineLayouts()
 {
 	// Skinning
 	{
@@ -276,7 +278,7 @@ void Character::createPipelineLayout()
 			D3D12_ROOT_SIGNATURE_FLAG_NONE);
 	}
 
-	// Rendering
+	// Base pass
 	{
 #if	TEMPORAL
 		auto roVertices = 0u;
@@ -298,7 +300,33 @@ void Character::createPipelineLayout()
 		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
 
-		m_pipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+		m_pipelineLayouts[BASE_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	}
+
+	// Depth pass
+	{
+#if	TEMPORAL
+		auto roVertices = 0u;
+
+		// Get shader resource slots
+		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_DEPTH);
+		if (reflector)
+		{
+			auto hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
+			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
+		}
+#endif
+
+		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
+
+#if	TEMPORAL
+		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
+		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
+#endif
+
+		m_pipelineLayouts[DEPTH_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 	}
 }
@@ -329,15 +357,18 @@ void Character::createPipelines(const InputLayout &inputLayout, const Format *rt
 
 		Graphics::State state;
 
-		// Get opaque pipeline
+		// Get opaque pipelines
 		state.IASetInputLayout(inputLayout);
 		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		state.SetPipelineLayout(m_pipelineLayout);
+		state.SetPipelineLayout(m_pipelineLayouts[BASE_PASS]);
 		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_BASE_PASS));
 		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
 		state.OMSetRTVFormats(rtvFormats, numRTVs);
 		state.OMSetDSVFormat(dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT);
 		m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelineCache);
+
+		state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_EQUAL, *m_pipelineCache);
+		m_pipelines[OPAQUE_FRONT_EQUAL] = state.GetPipeline(*m_pipelineCache);
 
 		// Get transparent pipeline
 		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
@@ -345,12 +376,28 @@ void Character::createPipelines(const InputLayout &inputLayout, const Format *rt
 		state.OMSetBlendState(Graphics::BlendPreset::AUTO_NON_PREMUL, *m_pipelineCache);
 		m_pipelines[ALPHA_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
 
-		// Get alpha-test pipeline
-		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_ALPHA_TEST));
+		// Get alpha-test pipelines
 		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_ALPHA_TEST));
 		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
 		state.OMSetBlendState(Graphics::DEFAULT_OPAQUE, *m_pipelineCache);
 		m_pipelines[OPAQUE_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
+
+		state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_EQUAL, *m_pipelineCache);
+		m_pipelines[OPAQUE_TWO_SIDE_EQUAL] = state.GetPipeline(*m_pipelineCache);
+
+		// Get depth pipeline
+		state.SetPipelineLayout(m_pipelineLayouts[DEPTH_PASS]);
+		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_DEPTH));
+		state.SetShader(Shader::Stage::PS, nullptr);
+		state.RSSetState(Graphics::RasterizerPreset::CULL_BACK, *m_pipelineCache);
+		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
+		m_pipelines[DEPTH_FRONT] = state.GetPipeline(*m_pipelineCache);
+
+		// Get depth alpha-test pipeline
+		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_DEPTH));
+		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_DEPTH));
+		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
+		m_pipelines[DEPTH_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
 
 		// Get reflected pipeline
 		//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelineCache);
@@ -459,9 +506,10 @@ void Character::skinning(bool reset)
 	}
 }
 
-void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool reset)
+void Character::renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+	PipelineLayoutIndex layout)
 {
-	if (reset)
+	if (layout != NUM_PIPE_LAYOUT)
 	{
 		const DescriptorPool descriptorPools[] =
 		{
@@ -469,13 +517,12 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 			m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
 		};
 		m_commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-		m_commandList.SetGraphicsPipelineLayout(m_pipelineLayout);
+		m_commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 	}
 
 	// Set matrices
-	m_commandList.SetGraphicsDescriptorTable(MATRICES,
-		m_cbvTables[m_currentFrame][isShadow ? CBV_SHADOW_MATRIX : CBV_MATRICES]);
+	m_commandList.SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
 
 	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 
@@ -505,7 +552,7 @@ void Character::renderTransformed(SubsetFlags subsetFlags, bool isShadow, bool r
 #endif
 
 				// Render mesh
-				render(m, ~SUBSET_FULL & subsetFlags | subsetMask, reset);
+				render(m, ~SUBSET_FULL & subsetFlags | subsetMask, layout);
 			}
 		}
 	}

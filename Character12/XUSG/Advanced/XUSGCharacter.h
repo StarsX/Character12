@@ -42,9 +42,11 @@ namespace XUSG
 		void InitPosition(const DirectX::XMFLOAT4 &posRot);
 		void FrameMove(double time);
 		void FrameMove(double time, DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
-			DirectX::FXMMATRIX *pShadow = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
+			DirectX::FXMMATRIX *pShadowView = nullptr, DirectX::FXMMATRIX *pShadows = nullptr,
+			uint8_t numShadows = 0, bool isTemporal = true);
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
-			DirectX::FXMMATRIX *pShadow = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
+			DirectX::FXMMATRIX *pShadowView = nullptr, DirectX::FXMMATRIX *pShadows = nullptr,
+			uint8_t numShadows = 0, bool isTemporal = true);
 		void SetSkinningPipeline();
 		void Skinning(bool reset = false);
 		void RenderTransformed(SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
@@ -73,8 +75,9 @@ namespace XUSG
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
 			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
 		void createDescriptorTables();
-		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world,
-			DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pShadow, bool isTemporal);
+		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX viewProj,
+			DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView,
+			DirectX::FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal);
 		void skinning(bool reset);
 		void renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout);
 		void renderLinked(uint32_t mesh, uint8_t matrixTableIndex, PipelineLayoutIndex layout);

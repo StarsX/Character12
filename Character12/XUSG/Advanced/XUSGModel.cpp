@@ -56,8 +56,8 @@ void Model::FrameMove()
 	m_currentFrame = (m_currentFrame + 1) % FrameCount;
 }
 
-void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj,
-	FXMMATRIX *pShadow, uint8_t numShadows, bool isTemporal)
+void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX *pShadowView,
+	FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto worldViewProj = XMMatrixMultiply(world, viewProj);
@@ -70,15 +70,19 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj,
 	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose once
 	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose twice
 	
-	if (pShadow)
+	if (pShadowView)
+	{
+		const auto shadow = XMMatrixMultiply(world, *pShadowView);
+		pCBData->Shadow = XMMatrixTranspose(shadow);
+	}
+
+	if (pShadows)
 	{
 		for (auto i = 0ui8; i < numShadows; ++i)
 		{
-			const auto shadow = XMMatrixMultiply(world, pShadow[i]);
-			pCBData->ShadowProj = XMMatrixTranspose(shadow);
-
+			const auto shadow = XMMatrixMultiply(world, pShadows[i]);
 			auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrices.Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
-			cbData = pCBData->ShadowProj;
+			cbData = XMMatrixTranspose(shadow);
 		}
 	}
 
@@ -92,18 +96,35 @@ void Model::SetMatrices(CXMMATRIX world, CXMMATRIX viewProj,
 #endif
 }
 
-void Model::SetPipeline(SubsetFlags subsetFlags, PipelineLayoutIndex layout)
+void Model::SetPipelineLayout(PipelineLayoutIndex layout)
 {
 	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
-	setPipelineState(subsetFlags, layout);
 }
 
-void Model::SetPipeline(PipelineIndex pipeline, PipelineLayoutIndex layout)
+void Model::SetPipeline(PipelineIndex pipeline)
 {
-	m_commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
-	m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 	m_commandList.SetPipelineState(m_pipelines[pipeline]);
+}
+
+void Model::SetPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout)
+{
+	subsetFlags = subsetFlags & SUBSET_FULL;
+	assert(subsetFlags != SUBSET_FULL);
+
+	switch (subsetFlags)
+	{
+	case SUBSET_ALPHA_TEST:
+		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_TWO_SIDE : OPAQUE_TWO_SIDE]);
+		break;
+	case SUBSET_ALPHA:
+		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDE]);
+		break;
+	default:
+		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_FRONT : OPAQUE_FRONT]);
+	}
+	//if (subsetFlags == SUBSET_REFLECTED)
+		//m_commandList->SetPipelineState(m_pipelines[REFLECTED]); 
 }
 
 void Model::Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout)
@@ -165,8 +186,8 @@ void Model::SetShadowMap(const CommandList &commandList, const DescriptorTable &
 
 bool Model::createConstantBuffers()
 {
-	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices) * FrameCount, FrameCount), false);
-	N_RETURN(m_cbShadowMatrices.Create(m_device, sizeof(XMFLOAT4) * MAX_SHADOW_CASCADES * FrameCount,
+	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount), false);
+	N_RETURN(m_cbShadowMatrices.Create(m_device, sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
 		MAX_SHADOW_CASCADES * FrameCount), false);
 
 	return true;
@@ -228,26 +249,6 @@ void Model::createDescriptorTables()
 	}
 }
 
-void Model::setPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout)
-{
-	subsetFlags = subsetFlags & SUBSET_FULL;
-	assert(subsetFlags != SUBSET_FULL);
-
-	switch (subsetFlags)
-	{
-	case SUBSET_ALPHA_TEST:
-		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_TWO_SIDE : OPAQUE_TWO_SIDE]);
-		break;
-	case SUBSET_ALPHA:
-		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDE]);
-		break;
-	default:
-		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_FRONT : OPAQUE_FRONT]);
-	}
-	//if (subsetFlags == SUBSET_REFLECTED)
-		//m_commandList->SetPipelineState(m_pipelines[REFLECTED]); 
-}
-
 void Model::render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout)
 {
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
@@ -256,7 +257,7 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex l
 	m_commandList.IASetIndexBuffer(m_mesh->GetIndexBufferView(mesh));
 
 	// Set pipeline state
-	if (layout != NUM_PIPE_LAYOUT) setPipelineState(subsetFlags, layout);
+	if (layout != NUM_PIPE_LAYOUT) SetPipelineState(subsetFlags, layout);
 
 	const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
 	const auto numSubsets = m_mesh->GetNumSubsets(mesh, materialType);
@@ -305,6 +306,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 #endif
 	}
 
+	auto cbShadow = cbPerFrame;
 	reflector = m_shaderPool->GetReflector(Shader::Stage::PS, ps);
 	if (reflector)
 	{
@@ -317,6 +319,9 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		if (SUCCEEDED(hr)) txShadow = desc.BindPoint;
 
 		// Get constants slot
+		hr = reflector->GetResourceBindingDescByName("cbPerFrame", &desc);
+		cbShadow = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
+
 		hr = reflector->GetResourceBindingDescByName("cbPerObject", &desc);
 		if (SUCCEEDED(hr)) cbPerObject = desc.BindPoint;
 
@@ -340,37 +345,24 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 #endif
 
 	// Textures (material and shadow)
-	if (txNormal == txDiffuse + 1)
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 2, txDiffuse,
+	utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txDiffuse,
 			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-	else
-	{
-		utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txDiffuse,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		if (ps != PS_DEPTH)
-			utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV, 1, txNormal,
-				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-	}
+	if (ps != PS_DEPTH) utilPipelineLayout.SetRange(MATERIAL, DescriptorType::SRV,
+		1, txNormal, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	utilPipelineLayout.SetShaderStage(MATERIAL, Shader::Stage::PS);
 
-	if (ps == PS_DEPTH)
-		utilPipelineLayout.SetConstants(ALPHA_REF, 2, cbPerObject, 0, Shader::Stage::PS);
+	if (ps == PS_DEPTH) utilPipelineLayout.SetConstants(ALPHA_REF, 2, cbPerObject, 0, Shader::Stage::PS);
 	else
 	{
-		utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::SRV, 1, txShadow);
+		if (cbShadow != UINT32_MAX) utilPipelineLayout.SetRange(SHADOW_MAP, DescriptorType::CBV,
+			1, cbShadow, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 		utilPipelineLayout.SetShaderStage(SHADOW_MAP, Shader::Stage::PS);
 	}
 
 	// Samplers
-	if (smpLinearCmp == smpAnisoWrap + 2)
-		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 3, smpAnisoWrap);
-	else
-	{
-		utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 2, smpAnisoWrap);
-		if (ps != PS_DEPTH)
-			utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 1, smpLinearCmp);
-	}
+	utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 2, smpAnisoWrap);
+	if (ps != PS_DEPTH) utilPipelineLayout.SetRange(SAMPLERS, DescriptorType::SAMPLER, 1, smpLinearCmp);
 	utilPipelineLayout.SetShaderStage(SAMPLERS, Shader::Stage::PS);
 
 	return utilPipelineLayout;

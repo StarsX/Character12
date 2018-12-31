@@ -2,7 +2,8 @@
 // By Stars XU Tianchen
 //--------------------------------------------------------------------------------------
 
-#pragma once
+#ifndef _XUSG_SHARED_CONST_H_
+#define _XUSG_SHARED_CONST_H_
 
 #ifndef FRAME_COUNT
 #define	FRAME_COUNT		3
@@ -39,3 +40,5 @@
 static const float g_FOVAngleY	= PIDIV4;
 static const float g_zNear		= 1.0f;
 static const float g_zFar		= 1000.0f;
+
+#endif

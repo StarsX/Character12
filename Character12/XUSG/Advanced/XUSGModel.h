@@ -33,6 +33,8 @@ namespace XUSG
 			ALPHA_TWO_SIDE,
 			DEPTH_FRONT,
 			DEPTH_TWO_SIDE,
+			SHADOW_FRONT,
+			SHADOW_TWO_SIDE,
 			REFLECTED,
 
 			NUM_PIPELINE
@@ -70,11 +72,11 @@ namespace XUSG
 			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
 			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache);
 		void FrameMove();
-		void SetMatrices(DirectX::CXMMATRIX world, DirectX::CXMMATRIX viewProj,
-			DirectX::FXMMATRIX *pShadow = nullptr, uint8_t numShadows = 0,
-			bool isTemporal = true);
-		void SetPipeline(SubsetFlags subsetFlags, PipelineLayoutIndex layout);
-		void SetPipeline(PipelineIndex pipeline, PipelineLayoutIndex layout);
+		void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView = nullptr,
+			DirectX::FXMMATRIX *pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
+		void SetPipelineLayout(PipelineLayoutIndex layout);
+		void SetPipeline(PipelineIndex pipeline);
+		void SetPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout);
 		void Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout = NUM_PIPE_LAYOUT);
 
 		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
@@ -90,7 +92,7 @@ namespace XUSG
 			DirectX::XMMATRIX WorldViewProj;
 			DirectX::XMMATRIX World;
 			DirectX::XMMATRIX Normal;
-			DirectX::XMMATRIX ShadowProj;
+			DirectX::XMMATRIX Shadow;
 #if	TEMPORAL
 			DirectX::XMMATRIX WorldViewProjPrev;
 #endif
@@ -99,7 +101,6 @@ namespace XUSG
 		bool createConstantBuffers();
 		virtual void createPipelineLayouts();
 		void createDescriptorTables();
-		void setPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout);
 		void render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
 
 		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);

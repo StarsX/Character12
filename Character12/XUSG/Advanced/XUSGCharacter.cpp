@@ -73,7 +73,7 @@ void Character::FrameMove(double time)
 }
 
 void Character::FrameMove(double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
-	FXMMATRIX *pShadow, uint8_t numShadows, bool isTemporal)
+	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
 {
 	Model::FrameMove();
 
@@ -82,12 +82,12 @@ void Character::FrameMove(double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	m_mesh->TransformMesh(XMMatrixIdentity(), time);
 	setSkeletalMatrices(numMeshes);
 
-	SetMatrices(viewProj, pWorld, pShadow, numShadows, isTemporal);
+	SetMatrices(viewProj, pWorld, pShadowView, pShadows, numShadows, isTemporal);
 	m_time = -1.0;
 }
 
 void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld,
-	FXMMATRIX *pShadow, uint8_t numShadows, bool isTemporal)
+	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
 {
 	XMMATRIX world;
 	if (!pWorld)
@@ -99,13 +99,13 @@ void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	}
 	else world = *pWorld;
 
-	Model::SetMatrices(world, viewProj, pShadow, isTemporal);
+	Model::SetMatrices(viewProj, world, pShadowView, pShadows, isTemporal);
 
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
 		for (auto m = 0ui8; m < numLinks; ++m)
-			setLinkedMatrices(m, world, viewProj, pShadow, isTemporal);
+			setLinkedMatrices(m, viewProj, world, pShadowView, pShadows, numShadows, isTemporal);
 	}
 }
 
@@ -229,11 +229,12 @@ bool Character::createBuffers()
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrices : m_cbLinkedMatrices)
-		N_RETURN(cbLinkedMatrices.Create(m_device, sizeof(CBMatrices) * FrameCount, FrameCount), false);
+		N_RETURN(cbLinkedMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount), false);
 
 	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
 	for (auto &cbLinkedMatrix : m_cbLinkedShadowMatrices)
-		N_RETURN(cbLinkedMatrix.Create(m_device, sizeof(XMFLOAT4) * FrameCount, FrameCount), false);
+		N_RETURN(cbLinkedMatrix.Create(m_device, sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
+			MAX_SHADOW_CASCADES * FrameCount), false);
 
 	return true;
 }
@@ -386,18 +387,28 @@ void Character::createPipelines(const InputLayout &inputLayout, const Format *rt
 		m_pipelines[OPAQUE_TWO_SIDE_EQUAL] = state.GetPipeline(*m_pipelineCache);
 
 		// Get depth pipeline
+		const Format nullRtvFormats[8] = {};
 		state.SetPipelineLayout(m_pipelineLayouts[DEPTH_PASS]);
 		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_DEPTH));
 		state.SetShader(Shader::Stage::PS, nullptr);
 		state.RSSetState(Graphics::RasterizerPreset::CULL_BACK, *m_pipelineCache);
 		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
+		state.OMSetRTVFormats(nullRtvFormats, 8);
+		state.OMSetNumRenderTargets(0);
 		m_pipelines[DEPTH_FRONT] = state.GetPipeline(*m_pipelineCache);
+
+		state.OMSetDSVFormat(DXGI_FORMAT_D16_UNORM);
+		m_pipelines[SHADOW_FRONT] = state.GetPipeline(*m_pipelineCache);
 
 		// Get depth alpha-test pipeline
 		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, VS_DEPTH));
 		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_DEPTH));
 		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
+		state.OMSetDSVFormat(DXGI_FORMAT_D24_UNORM_S8_UINT);
 		m_pipelines[DEPTH_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
+
+		state.OMSetDSVFormat(DXGI_FORMAT_D16_UNORM);
+		m_pipelines[SHADOW_TWO_SIDE] = state.GetPipeline(*m_pipelineCache);
 
 		// Get reflected pipeline
 		//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelineCache);
@@ -438,8 +449,8 @@ void Character::createDescriptorTables()
 	}
 }
 
-void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX world,
-	CXMMATRIX viewProj, FXMMATRIX *pShadow, bool isTemporal)
+void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX world,
+	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).uBone);
@@ -453,14 +464,21 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX world,
 	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose once
 	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose twice
 
-	if (pShadow)
+	const auto model = XMMatrixMultiply(influenceMatrix, world);
+	if (pShadowView)
 	{
-		const auto model = XMMatrixMultiply(influenceMatrix, world);
-		const auto shadow = XMMatrixMultiply(model, *pShadow);
-		pCBData->ShadowProj = XMMatrixTranspose(shadow);
+		const auto shadow = XMMatrixMultiply(model, *pShadowView);
+		pCBData->Shadow = XMMatrixTranspose(shadow);
+	}
 
-		auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh].Map());
-		cbData = pCBData->ShadowProj;
+	if (pShadows)
+	{
+		for (auto i = 0ui8; i < numShadows; ++i)
+		{
+			const auto shadow = XMMatrixMultiply(model, pShadows[i]);
+			auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh].Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
+			cbData = XMMatrixTranspose(shadow);
+		}
 	}
 
 #if	TEMPORAL

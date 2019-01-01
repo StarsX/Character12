@@ -192,23 +192,100 @@ bool Model::createConstantBuffers()
 	return true;
 }
 
-void Model::createPipelineLayouts()
+void Model::createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
+	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
+	const Format defaultRtvFormats[] =
+	{
+		DXGI_FORMAT_B8G8R8A8_UNORM,
+		DXGI_FORMAT_R10G10B10A2_UNORM,
+		DXGI_FORMAT_B8G8R8A8_UNORM,
+		DXGI_FORMAT_R16G16_FLOAT
+	};
+
+	numRTVs = numRTVs > 0 ? numRTVs : static_cast<uint32_t>(size(defaultRtvFormats));
+	rtvFormats = rtvFormats ? rtvFormats : defaultRtvFormats;
+	dsvFormat = dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT;
+	shadowFormat = shadowFormat ? shadowFormat : DXGI_FORMAT_D16_UNORM;
+
+	Graphics::State state;
+
 	// Base pass
 	{
-		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
-		m_pipelineLayouts[BASE_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str());
+		const auto vsBasePass = isStatic ? VS_BASE_PASS_STATIC : VS_BASE_PASS;
+		const auto psBasePass = isStatic ? PS_BASE_PASS_STATIC : PS_BASE_PASS;
+		const auto psAlphaTest = isStatic ? PS_ALPHA_TEST_STATIC : PS_ALPHA_TEST;
+
+		// Get opaque pipeline
+		state.IASetInputLayout(inputLayout);
+		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		state.SetPipelineLayout(m_pipelineLayouts[BASE_PASS]);
+		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsBasePass));
+		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psBasePass));
+		state.OMSetRTVFormats(rtvFormats, numRTVs);
+		state.OMSetDSVFormat(dsvFormat);
+		m_pipelines[OPAQUE_FRONT] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".OpaqueFront").c_str());
+
+		state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_EQUAL, *m_pipelineCache);
+		m_pipelines[OPAQUE_FRONT_EQUAL] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".OpaqueFrontZEqual").c_str());
+
+		// Get transparent pipeline
+		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
+		state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS_EQUAL, *m_pipelineCache);
+		state.OMSetBlendState(Graphics::BlendPreset::AUTO_NON_PREMUL, *m_pipelineCache);
+		m_pipelines[ALPHA_TWO_SIDED] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".AlphaTwoSided").c_str());
+
+		// Get alpha-test pipeline
+		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psAlphaTest));
+		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
+		state.OMSetBlendState(Graphics::DEFAULT_OPAQUE, *m_pipelineCache);
+		m_pipelines[OPAQUE_TWO_SIDED] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".OpaqueTwoSided").c_str());
+
+		state.DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_EQUAL, *m_pipelineCache);
+		m_pipelines[OPAQUE_TWO_SIDED_EQUAL] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".OpaqueTwoSidedZEqual").c_str());
 	}
 
 	// Depth pass
 	{
-		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
-		m_pipelineLayouts[DEPTH_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str());
+		const Format nullRtvFormats[8] = {};
+		const auto vsDepthPass = isStatic ? VS_DEPTH_STATIC : VS_DEPTH;
+
+		// Get depth pipeline
+		state.SetPipelineLayout(m_pipelineLayouts[DEPTH_PASS]);
+		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsDepthPass));
+		state.SetShader(Shader::Stage::PS, nullptr);
+		state.RSSetState(Graphics::RasterizerPreset::CULL_BACK, *m_pipelineCache);
+		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
+		state.OMSetRTVFormats(nullRtvFormats, 8);
+		state.OMSetNumRenderTargets(0);
+		m_pipelines[DEPTH_FRONT] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".DepthFront").c_str());
+
+		state.OMSetDSVFormat(shadowFormat);
+		m_pipelines[SHADOW_FRONT] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".ShadowFront").c_str());
+
+		// Get depth alpha-test pipeline
+		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_DEPTH));
+		state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
+		state.OMSetDSVFormat(dsvFormat);
+		m_pipelines[DEPTH_TWO_SIDED] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".DepthTwoSided").c_str());
+
+		state.OMSetDSVFormat(shadowFormat);
+		m_pipelines[SHADOW_TWO_SIDED] = state.GetPipeline(*m_pipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".ShadowTwoSided").c_str());
 	}
+
+	// Get reflected pipeline
+	//state.RSSetState(Graphics::RasterizerPreset::CULL_FRONT, *m_pipelineCache);
+	//state.OMSetBlendState(Graphics::BlendPreset::DEFAULT_OPAQUE, *m_pipelineCache);
+	//m_pipelines[REFLECTED] = state.GetPipeline(*m_pipelineCache);
 }
 
 void Model::createDescriptorTables()

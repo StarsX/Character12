@@ -73,7 +73,7 @@ namespace XUSG
 		bool createBuffers();
 		void createPipelineLayouts();
 		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
-			uint32_t numRTVs = 0, Format dsvFormat = Format(0));
+			uint32_t numRTVs = 0, Format dsvFormat = Format(0), Format shadowFormat = Format(0));
 		void createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX viewProj,
 			DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView,

@@ -98,7 +98,8 @@ namespace XUSG
 		};
 
 		bool createConstantBuffers();
-		virtual void createPipelineLayouts();
+		void createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
+			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		void createDescriptorTables();
 		void render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
 

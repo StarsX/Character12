@@ -181,11 +181,6 @@ shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &mesh
 	return mesh;
 }
 
-void Model::SetShadowMap(const CommandList &commandList, const DescriptorTable &shadowTable)
-{
-	commandList.SetGraphicsDescriptorTable(SHADOW_MAP, shadowTable);
-}
-
 bool Model::createConstantBuffers()
 {
 	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount,

@@ -82,12 +82,11 @@ namespace XUSG
 		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
 			const TextureCache &textureCache, bool isStaticMesh);
-		static void SetShadowMap(const CommandList &commandList, const DescriptorTable &shadowTable);
 
 		static constexpr uint32_t GetFrameCount() { return FrameCount; }
 
 	protected:
-		struct alignas(16) CBMatrices
+		struct CBMatrices
 		{
 			DirectX::XMMATRIX WorldViewProj;
 			DirectX::XMMATRIX World;

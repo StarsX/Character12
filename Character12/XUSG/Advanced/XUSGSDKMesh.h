@@ -380,6 +380,7 @@ namespace XUSG
 		std::vector<uint8_t*>			m_indices;
 
 		// Keep track of the path
+		std::wstring					m_name;
 		std::wstring					m_filePathW;
 		std::string						m_filePath;
 

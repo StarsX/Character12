@@ -175,7 +175,7 @@ void CharacterX::LoadAssets()
 		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
 			L"Media/Bright/Stars.sdkmesh_anim", textureCache);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
-		m_character = make_unique<Character>(m_device, m_commandList);
+		m_character = make_unique<Character>(m_device, m_commandList, L"Stars");
 		if (!m_character) ThrowIfFailed(E_FAIL);
 		if (!m_character->Init(m_inputLayout, characterMesh, m_shaderPool,
 			m_graphicsPipelineCache, m_computePipelineCache,

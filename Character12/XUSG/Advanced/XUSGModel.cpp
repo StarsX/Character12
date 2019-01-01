@@ -9,7 +9,7 @@ using namespace DirectX;
 using namespace XUSG;
 using namespace XUSG::Graphics;
 
-Model::Model(const Device &device, const CommandList &commandList) :
+Model::Model(const Device &device, const CommandList &commandList, const wchar_t *name) :
 	m_device(device),
 	m_commandList(commandList),
 	m_currentFrame(0),
@@ -23,6 +23,8 @@ Model::Model(const Device &device, const CommandList &commandList) :
 	m_samplerTable(nullptr),
 	m_srvTables(0)
 {
+	if (name) m_name = name;
+	else m_name = L"";
 }
 
 Model::~Model()
@@ -115,10 +117,10 @@ void Model::SetPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout
 	switch (subsetFlags)
 	{
 	case SUBSET_ALPHA_TEST:
-		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_TWO_SIDE : OPAQUE_TWO_SIDE]);
+		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_TWO_SIDED : OPAQUE_TWO_SIDED]);
 		break;
 	case SUBSET_ALPHA:
-		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDE]);
+		m_commandList.SetPipelineState(m_pipelines[ALPHA_TWO_SIDED]);
 		break;
 	default:
 		m_commandList.SetPipelineState(m_pipelines[layout ? DEPTH_FRONT : OPAQUE_FRONT]);
@@ -186,9 +188,11 @@ void Model::SetShadowMap(const CommandList &commandList, const DescriptorTable &
 
 bool Model::createConstantBuffers()
 {
-	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount), false);
+	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount,
+		nullptr, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 	N_RETURN(m_cbShadowMatrices.Create(m_device, sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
-		MAX_SHADOW_CASCADES * FrameCount), false);
+		MAX_SHADOW_CASCADES * FrameCount, nullptr, m_name.empty() ? nullptr :
+		(m_name + L".CBShadowMatrices").c_str()), false);
 
 	return true;
 }
@@ -199,14 +203,16 @@ void Model::createPipelineLayouts()
 	{
 		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 		m_pipelineLayouts[BASE_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str());
 	}
 
 	// Depth pass
 	{
 		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
 		m_pipelineLayouts[DEPTH_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str());
 	}
 }
 

@@ -21,6 +21,7 @@ SDKMesh::SDKMesh() :
 	m_animation(0),
 	m_vertices(0),
 	m_indices(0),
+	m_name(),
 	m_filePathW(),
 	m_filePath(),
 	m_pMeshHeader(nullptr),
@@ -566,7 +567,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(Resource());
 
-				filePathW.assign(filePath.begin(), filePath.end());
+				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, true, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
@@ -593,7 +594,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(Resource());
 
-				filePathW.assign(filePath.begin(), filePath.end());
+				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
@@ -620,7 +621,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(Resource());
 
-				filePathW.assign(filePath.begin(), filePath.end());
+				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back()))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
@@ -652,7 +653,8 @@ bool SDKMesh::createVertexBuffer(const CommandList &commandList, std::vector<Res
 	N_RETURN(m_vertexBuffer.Create(m_device, numVertices, stride, D3D12_RESOURCE_FLAG_NONE,
 		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST,
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
-		m_pMeshHeader->NumVertexBuffers, firstVertices.data()), false);
+		m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
+		1, nullptr, m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
 
 	// Copy vertices into one buffer
 	auto offset = 0u;
@@ -688,7 +690,8 @@ bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Reso
 	N_RETURN(m_indexBuffer.Create(m_device, byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
 		DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT, D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE,
 		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST,
-		m_pMeshHeader->NumIndexBuffers, offsets.data()), false);
+		m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1, nullptr,
+		m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
 	
 	// Copy indices into one buffer
 	auto offset = 0u;
@@ -722,8 +725,9 @@ bool SDKMesh::createFromFile(const Device &device, const wchar_t *fileName,
 
 	// Change the path to just the directory
 	const auto found = m_filePathW.find_last_of(L"/\\");
+	m_name = m_filePathW.substr(found + 1);
 	m_filePathW = m_filePathW.substr(0, found + 1);
-	m_filePath.assign(m_filePathW.begin(), m_filePathW.end());
+	m_filePath.assign(m_filePathW.cbegin(), m_filePathW.cend());
 
 	// Get the file size
 	F_RETURN(!fileStream.seekg(0, fileStream.end), fileStream.close(); cerr, E_FAIL, false);

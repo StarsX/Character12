@@ -28,13 +28,13 @@ namespace XUSG
 		{
 			OPAQUE_FRONT,
 			OPAQUE_FRONT_EQUAL,
-			OPAQUE_TWO_SIDE,
-			OPAQUE_TWO_SIDE_EQUAL,
-			ALPHA_TWO_SIDE,
+			OPAQUE_TWO_SIDED,
+			OPAQUE_TWO_SIDED_EQUAL,
+			ALPHA_TWO_SIDED,
 			DEPTH_FRONT,
-			DEPTH_TWO_SIDE,
+			DEPTH_TWO_SIDED,
 			SHADOW_FRONT,
-			SHADOW_TWO_SIDE,
+			SHADOW_TWO_SIDED,
 			REFLECTED,
 
 			NUM_PIPELINE
@@ -63,7 +63,7 @@ namespace XUSG
 			NUM_CBV = CBV_SHADOW_MATRIX + MAX_SHADOW_CASCADES
 		};
 
-		Model(const Device &device, const CommandList &commandList);
+		Model(const Device &device, const CommandList &commandList, const wchar_t *name);
 		virtual ~Model();
 
 		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
@@ -109,6 +109,8 @@ namespace XUSG
 
 		Device		m_device;
 		CommandList	m_commandList;
+
+		std::wstring m_name;
 
 		uint8_t		m_currentFrame;
 		uint8_t		m_previousFrame;

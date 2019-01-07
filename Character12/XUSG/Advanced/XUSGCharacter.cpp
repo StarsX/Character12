@@ -66,16 +66,16 @@ void Character::InitPosition(const XMFLOAT4 &posRot)
 	m_vPosRot = posRot;
 }
 
-void Character::FrameMove(double time)
+void Character::Update(uint8_t frameIndex, double time)
 {
-	Model::FrameMove();
+	Model::Update(frameIndex);
 	m_time = time;
 }
 
-void Character::FrameMove(double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
+void Character::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
 {
-	Model::FrameMove();
+	Model::Update(frameIndex);
 
 	// Set the bone matrices
 	const auto numMeshes = m_mesh->GetNumMeshes();

@@ -40,10 +40,10 @@ namespace XUSG
 			const std::shared_ptr<std::vector<SDKMesh>> &linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr);
 		void InitPosition(const DirectX::XMFLOAT4 &posRot);
-		void FrameMove(double time);
-		void FrameMove(double time, DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
-			DirectX::FXMMATRIX *pShadowView = nullptr, DirectX::FXMMATRIX *pShadows = nullptr,
-			uint8_t numShadows = 0, bool isTemporal = true);
+		void Update(uint8_t frameIndex, double time);
+		void Update(uint8_t frameIndex, double time, DirectX::CXMMATRIX viewProj,
+			DirectX::FXMMATRIX *pWorld = nullptr, DirectX::FXMMATRIX *pShadowView = nullptr,
+			DirectX::FXMMATRIX *pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
 			DirectX::FXMMATRIX *pShadowView = nullptr, DirectX::FXMMATRIX *pShadows = nullptr,
 			uint8_t numShadows = 0, bool isTemporal = true);

@@ -52,10 +52,10 @@ bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh
 	return true;
 }
 
-void Model::FrameMove()
+void Model::Update(uint8_t frameIndex)
 {
-	m_previousFrame = m_currentFrame;
-	m_currentFrame = (m_currentFrame + 1) % FrameCount;
+	m_currentFrame = frameIndex;
+	m_previousFrame = (frameIndex + FrameCount - 1) % FrameCount;
 }
 
 void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX *pShadowView,

@@ -242,7 +242,7 @@ void CharacterX::OnUpdate()
 	const auto viewProj = view * proj;
 
 	// Character
-	m_character->FrameMove(time, viewProj, &XMMatrixIdentity(), nullptr, false);
+	m_character->Update(m_frameIndex, time, viewProj, &XMMatrixIdentity(), nullptr, false);
 }
 
 // Render the scene.

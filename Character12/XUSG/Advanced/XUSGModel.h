@@ -71,7 +71,7 @@ namespace XUSG
 			const std::shared_ptr<Graphics::PipelineCache> &pipelineCache,
 			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
 			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache);
-		void FrameMove();
+		void Update(uint8_t frameIndex);
 		void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView = nullptr,
 			DirectX::FXMMATRIX *pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
 		void SetPipelineLayout(PipelineLayoutIndex layout);

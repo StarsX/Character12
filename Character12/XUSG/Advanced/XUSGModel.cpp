@@ -384,7 +384,8 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 #endif
 	}
 
-	auto cbShadow = cbPerFrame;
+	auto cbImmutable = cbMatrices;
+	auto cbShadow = cbPerObject;
 	reflector = m_shaderPool->GetReflector(Shader::Stage::PS, ps);
 	if (reflector)
 	{
@@ -396,8 +397,11 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		hr = reflector->GetResourceBindingDescByName("g_txShadow", &desc);
 		if (SUCCEEDED(hr)) txShadow = desc.BindPoint;
 
-		// Get constants slot
-		hr = reflector->GetResourceBindingDescByName("cbPerFrame", &desc);
+		// Get constant buffer slots
+		hr = reflector->GetResourceBindingDescByName("cbImmutable", &desc);
+		cbImmutable = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
+
+		hr = reflector->GetResourceBindingDescByName("cbShadow", &desc);
 		cbShadow = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
 
 		hr = reflector->GetResourceBindingDescByName("cbPerObject", &desc);
@@ -417,6 +421,13 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices,
 		0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
+
+	if (ps != PS_DEPTH && cbImmutable != UINT32_MAX)
+	{
+		utilPipelineLayout.SetRange(IMMUTABLE, DescriptorType::CBV, 1, cbImmutable,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		utilPipelineLayout.SetShaderStage(IMMUTABLE, Shader::Stage::PS);
+	}
 
 #if TEMPORAL_AA
 	utilPipelineLayout.SetConstants(TEMPORAL_BIAS, 2, cbTempBias, 0, Shader::Stage::VS);

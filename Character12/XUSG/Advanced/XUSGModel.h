@@ -53,6 +53,7 @@ namespace XUSG
 			MATRICES,
 			PER_OBJECT,
 			PER_FRAME,
+			IMMUTABLE
 		};
 
 		enum CBVTableIndex : uint8_t

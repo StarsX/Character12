@@ -282,18 +282,31 @@ void Character::createPipelineLayouts()
 
 	// Base pass
 	{
+		auto cbPerFrame = 1u;
 #if	TEMPORAL
 		auto roVertices = 0u;
 
 		// Get shader resource slots
 		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
-		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
+		auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
 		if (reflector)
 		{
 			auto hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
 			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
 		}
+
+		// Get constant buffer slots
+		reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS);
+#else
+		// Get constant buffer slots
+		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+		auto reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS_STATIC);
 #endif
+		if (reflector)
+		{
+			auto hr = reflector->GetResourceBindingDescByName("cbPerFrame", &desc);
+			cbPerFrame = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
+		}
 
 		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 
@@ -301,6 +314,13 @@ void Character::createPipelineLayouts()
 		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
 		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
+
+		if (cbPerFrame != UINT32_MAX)
+		{
+			utilPipelineLayout.SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame,
+				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+			utilPipelineLayout.SetShaderStage(PER_FRAME, Shader::Stage::PS);
+		}
 
 		m_pipelineLayouts[BASE_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,

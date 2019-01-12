@@ -195,16 +195,9 @@ bool Model::createConstantBuffers()
 void Model::createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
-	const Format defaultRtvFormats[] =
-	{
-		DXGI_FORMAT_B8G8R8A8_UNORM,
-		DXGI_FORMAT_R10G10B10A2_UNORM,
-		DXGI_FORMAT_B8G8R8A8_UNORM,
-		DXGI_FORMAT_R16G16_FLOAT
-	};
-
-	numRTVs = numRTVs > 0 ? numRTVs : static_cast<uint32_t>(size(defaultRtvFormats));
-	rtvFormats = rtvFormats ? rtvFormats : defaultRtvFormats;
+	const auto defaultRtvFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+	numRTVs = numRTVs > 0 ? numRTVs : 1;
+	rtvFormats = rtvFormats ? rtvFormats : &defaultRtvFormat;
 	dsvFormat = dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT;
 	shadowFormat = shadowFormat ? shadowFormat : DXGI_FORMAT_D16_UNORM;
 

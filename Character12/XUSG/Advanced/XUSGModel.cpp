@@ -414,7 +414,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		if (SUCCEEDED(hr)) smpLinearCmp = desc.BindPoint;
 	}
 
-	// Get pipeline layout
+	// Pipeline layout utility
 	Util::PipelineLayout utilPipelineLayout;
 
 	// Constant buffers

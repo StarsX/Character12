@@ -38,7 +38,9 @@ namespace XUSG
 			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
 			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache,
 			const std::shared_ptr<std::vector<SDKMesh>> &linkedMeshes = nullptr,
-			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr);
+			const std::shared_ptr<std::vector<MeshLink>> &meshLinks = nullptr,
+			const Format *rtvFormats = nullptr, uint32_t numRTVs = 0,
+			Format dsvFormat = Format(0), Format shadowFormat = Format(0));
 		void InitPosition(const DirectX::XMFLOAT4 &posRot);
 		void Update(uint8_t frameIndex, double time);
 		void Update(uint8_t frameIndex, double time, DirectX::CXMMATRIX viewProj,
@@ -72,8 +74,8 @@ namespace XUSG
 		bool createTransformedVBs(VertexBuffer &vertexBuffer);
 		bool createBuffers();
 		void createPipelineLayouts();
-		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats = nullptr,
-			uint32_t numRTVs = 0, Format dsvFormat = Format(0), Format shadowFormat = Format(0));
+		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
+			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		void createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX viewProj,
 			DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView,

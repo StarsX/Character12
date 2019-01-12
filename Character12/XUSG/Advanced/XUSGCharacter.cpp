@@ -35,7 +35,9 @@ bool Character::Init(const InputLayout &inputLayout,
 	const shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
 	const shared_ptr<DescriptorTableCache> &descriptorTableCache,
 	const shared_ptr<vector<SDKMesh>> &linkedMeshes,
-	const shared_ptr<vector<MeshLink>> &meshLinks)
+	const shared_ptr<vector<MeshLink>> &meshLinks,
+	const Format *rtvFormats, uint32_t numRTVs,
+	Format dsvFormat, Format shadowFormat)
 {
 	m_computePipelineCache = computePipelineCache;
 
@@ -55,7 +57,7 @@ bool Character::Init(const InputLayout &inputLayout,
 
 	// Create pipeline layout, pipelines, and descriptor tables
 	createPipelineLayouts();
-	createPipelines(inputLayout);
+	createPipelines(inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
 	createDescriptorTables();
 
 	return true;
@@ -263,7 +265,7 @@ void Character::createPipelineLayouts()
 			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
 		}
 
-		// Get pipeline layout
+		// Pipeline layout utility
 		Util::PipelineLayout utilPipelineLayout;
 
 		// Input vertices and bone matrices
@@ -276,6 +278,7 @@ void Character::createPipelineLayouts()
 		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices);
 		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
 
+		// Get pipeline layout
 		m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str());
 	}

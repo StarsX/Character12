@@ -31,11 +31,8 @@ struct IOStruct
 	min16float3	BiNorm	: BINORMAL;		// Normalized BiNormal vector
 #endif
 
-#if	defined(_BASEPASS_) && TEMPORAL_AA
-	float4	CSPos	: POSCURRENT;		// Current motion-state position
-#endif
-
 #if	defined(_BASEPASS_) && TEMPORAL
+	float4	CSPos	: POSCURRENT;		// Current motion-state position
 	float4	TSPos	: POSHISTORY;		// Historical motion-state position
 #endif
 

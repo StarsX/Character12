@@ -38,7 +38,7 @@ StructuredBuffer<Vertex>	g_roVertices	: register (t0);
 //--------------------------------------------------------------------------------------
 // Vertex shader used for the static mesh with shadow mapping
 //--------------------------------------------------------------------------------------
-VS_Output main(const uint vid : SV_VERTEXID, const VS_Input input)
+VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 {
 	VS_Output output;
 	float4 vPos = { input.Pos, 1.0 };
@@ -46,7 +46,7 @@ VS_Output main(const uint vid : SV_VERTEXID, const VS_Input input)
 #if defined(_BASEPASS_) && TEMPORAL	// Temporal tracking
 
 #ifdef	_CHARACTER_
-	const float4 vHPos = { g_roVertices[uIdx].Pos, 1.0 };
+	const float4 vHPos = { g_roVertices[vid].Pos, 1.0 };
 #elif	defined(_VEGETATION_)
 	float4 vHPos = vPos;
 	VegetationWave(vHPos, 1.0);
@@ -61,7 +61,7 @@ VS_Output main(const uint vid : SV_VERTEXID, const VS_Input input)
 #endif
 
 	output.Pos = mul(vPos, g_mWorldViewProj);
-#if	defined(_BASEPASS_) && TEMPORAL_AA
+#if	defined(_BASEPASS_) && TEMPORAL
 	output.CSPos = output.Pos;
 #endif
 #if	TEMPORAL_AA

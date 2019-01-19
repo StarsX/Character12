@@ -22,9 +22,9 @@ namespace XUSG
 
 		struct MeshLink
 		{
-			std::wstring		szMeshName;
-			std::string			szBoneName;
-			uint32_t			uBone;
+			std::wstring		MeshName;
+			std::string			BoneName;
+			uint32_t			BoneIndex;
 		};
 
 		Character(const Device &device, const CommandList &commandList, const wchar_t *name = nullptr);
@@ -89,24 +89,15 @@ namespace XUSG
 			const DirectX::XMFLOAT3 &tran) const;
 		DirectX::FXMMATRIX getDualQuat(uint32_t mesh, uint32_t influence) const;
 
-		std::shared_ptr<std::vector<SDKMesh>>	m_linkedMeshes;
-		std::shared_ptr<std::vector<MeshLink>>	m_meshLinks;
-
 		std::shared_ptr<Compute::PipelineCache> m_computePipelineCache;
 
 		VertexBuffer m_transformedVBs[FrameCount];
 		DirectX::XMFLOAT4X4	m_mWorld;
 		DirectX::XMFLOAT4	m_vPosRot;
 
-#if	TEMPORAL
-		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[FrameCount];
-#endif
-
 		double m_time;
 
 		StructuredBuffer m_boneWorlds[FrameCount];
-		std::vector<ConstantBuffer> m_cbLinkedMatrices;
-		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
 
 		PipelineLayout	m_skinningPipelineLayout;
 		Pipeline		m_skinningPipeline;
@@ -114,6 +105,14 @@ namespace XUSG
 		std::vector<DescriptorTable> m_uavSkinningTables[FrameCount];
 #if	TEMPORAL
 		std::vector<DescriptorTable> m_srvSkinnedTables[FrameCount];
+
+		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[FrameCount];
 #endif
+
+		std::shared_ptr<std::vector<SDKMesh>>	m_linkedMeshes;
+		std::shared_ptr<std::vector<MeshLink>>	m_meshLinks;
+
+		std::vector<ConstantBuffer> m_cbLinkedMatrices;
+		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
 	};
 }

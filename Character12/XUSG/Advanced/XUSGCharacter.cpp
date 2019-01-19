@@ -10,16 +10,19 @@ using namespace XUSG;
 
 Character::Character(const Device &device, const CommandList &commandList, const wchar_t *name) :
 	Model(device, commandList, name),
-	m_linkedMeshes(nullptr),
-	m_meshLinks(nullptr),
 	m_computePipelineCache(nullptr),
-	m_transformedVBs(),
-	m_cbLinkedMatrices(0),
-	m_cbLinkedShadowMatrices(0),
 	m_skinningPipelineLayout(nullptr),
 	m_skinningPipeline(nullptr),
 	m_srvSkinningTables(),
-	m_uavSkinningTables()
+	m_uavSkinningTables(),
+#if	TEMPORAL
+	m_srvSkinnedTables(),
+	m_linkedWorldViewProjs(),
+#endif
+	m_linkedMeshes(nullptr),
+	m_meshLinks(nullptr),
+	m_cbLinkedMatrices(0),
+	m_cbLinkedShadowMatrices(0)
 {
 }
 
@@ -172,8 +175,8 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 		for (auto m = 0ui8; m < numLinks; ++m)
 		{
 			auto &meshInfo = meshLinks->at(m);
-			meshInfo.uBone = mesh->FindFrameIndex(meshInfo.szBoneName.c_str());
-			N_RETURN(linkedMeshes->at(m).Create(device.get(), meshInfo.szMeshName.c_str(),
+			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
+			N_RETURN(linkedMeshes->at(m).Create(device.get(), meshInfo.MeshName.c_str(),
 				textureCache), nullptr);
 		}
 	}
@@ -410,7 +413,7 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
 {
 	// Set World-View-Proj matrix
-	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).uBone);
+	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).BoneIndex);
 	const auto worldViewProj = influenceMatrix * world * viewProj;
 
 	// Update constant buffers

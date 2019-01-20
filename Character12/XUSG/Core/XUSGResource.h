@@ -94,16 +94,18 @@ namespace XUSG
 		bool Create(const Device &device, uint32_t width, uint32_t height, Format format,
 			uint32_t arraySize = 1, ResourceFlags resourceFlags = ResourceFlags(0),
 			uint8_t numMips = 1, uint8_t sampleCount = 1, PoolType poolType = PoolType(1),
-			ResourceState state = ResourceState(0), const wchar_t *name = nullptr);
+			ResourceState state = ResourceState(0), bool isCubeMap = false,
+			const wchar_t *name = nullptr);
 		bool Upload(const CommandList &commandList, Resource &resourceUpload,
 			SubresourceData *pSubresourceData, uint32_t numSubresources = 1,
 			ResourceState dstState = ResourceState(0));
 		bool Upload(const CommandList &commandList, Resource &resourceUpload, const uint8_t *pData,
 			uint8_t stride = sizeof(float), ResourceState dstState = ResourceState(0));
 
-		void CreateSRVs(uint32_t arraySize, Format format = Format(0),
-			uint8_t numMips = 1, uint8_t sampleCount = 1);
-		void CreateSRVLevels(uint32_t arraySize, uint8_t numMips, Format format = Format(0), uint8_t sampleCount = 1);
+		void CreateSRVs(uint32_t arraySize, Format format = Format(0), uint8_t numMips = 1,
+			uint8_t sampleCount = 1, bool isCubeMap = false);
+		void CreateSRVLevels(uint32_t arraySize, uint8_t numMips, Format format = Format(0),
+			uint8_t sampleCount = 1, bool isCubeMap = false);
 		void CreateUAVs(uint32_t arraySize, Format format = Format(0), uint8_t numMips = 1);
 
 		Descriptor GetUAV(uint8_t i = 0) const;

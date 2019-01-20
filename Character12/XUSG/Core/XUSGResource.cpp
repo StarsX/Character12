@@ -258,7 +258,7 @@ Texture2D::~Texture2D()
 
 bool Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Format format,
 	uint32_t arraySize, ResourceFlags resourceFlags, uint8_t numMips, uint8_t sampleCount,
-	PoolType poolType, ResourceState state, const wchar_t *name)
+	PoolType poolType, ResourceState state, bool isCubeMap, const wchar_t *name)
 {
 	M_RETURN(!device, cerr, "The device is NULL.", false);
 	setDevice(device);
@@ -299,13 +299,13 @@ bool Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Fo
 	N_RETURN(allocateDescriptorPool(numDescriptors), false);
 
 	// Create SRV
-	if (hasSRV) CreateSRVs(arraySize, format, numMips, sampleCount);
+	if (hasSRV) CreateSRVs(arraySize, format, numMips, sampleCount, isCubeMap);
 
 	// Create UAVs
 	if (hasUAV) CreateUAVs(arraySize, formatUAV, numMips);
 
 	// Create SRV for each level
-	if (hasSRV && hasUAV) CreateSRVLevels(arraySize, numMips, format, sampleCount);
+	if (hasSRV && hasUAV) CreateSRVLevels(arraySize, numMips, format, sampleCount, isCubeMap);
 
 	return true;
 }
@@ -352,7 +352,8 @@ bool Texture2D::Upload(const CommandList &commandList, Resource &resourceUpload,
 	return Upload(commandList, resourceUpload, &subresourceData, 1, dstState);
 }
 
-void Texture2D::CreateSRVs(uint32_t arraySize, Format format, uint8_t numMips, uint8_t sampleCount)
+void Texture2D::CreateSRVs(uint32_t arraySize, Format format, uint8_t numMips,
+	uint8_t sampleCount, bool isCubeMap)
 {
 	// Setup the description of the shader resource view.
 	D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
@@ -364,7 +365,24 @@ void Texture2D::CreateSRVs(uint32_t arraySize, Format format, uint8_t numMips, u
 
 	for (auto &descriptor : m_srvs)
 	{
-		if (arraySize > 1)
+		if (isCubeMap)
+		{
+			assert(arraySize % 6 == 0);
+			if (arraySize > 6)
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+				desc.TextureCubeArray.MipLevels = numMips - mipLevel;
+				desc.TextureCubeArray.MostDetailedMip = mipLevel++;
+				desc.TextureCubeArray.NumCubes = arraySize / 6;
+			}
+			else
+			{
+				desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+				desc.TextureCube.MipLevels = numMips - mipLevel;
+				desc.TextureCube.MostDetailedMip = mipLevel++;
+			}
+		}
+		else if (arraySize > 1)
 		{
 			if (sampleCount > 1)
 			{
@@ -398,7 +416,8 @@ void Texture2D::CreateSRVs(uint32_t arraySize, Format format, uint8_t numMips, u
 	}
 }
 
-void Texture2D::CreateSRVLevels(uint32_t arraySize, uint8_t numMips, Format format, uint8_t sampleCount)
+void Texture2D::CreateSRVLevels(uint32_t arraySize, uint8_t numMips, Format format,
+	uint8_t sampleCount, bool isCubeMap)
 {
 	if (numMips > 1)
 	{
@@ -413,7 +432,24 @@ void Texture2D::CreateSRVLevels(uint32_t arraySize, uint8_t numMips, Format form
 		for (auto &descriptor : m_srvLevels)
 		{
 			// Setup the description of the shader resource view.
-			if (arraySize > 1)
+			if (isCubeMap)
+			{
+				assert(arraySize % 6 == 0);
+				if (arraySize > 6)
+				{
+					desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+					desc.TextureCubeArray.MostDetailedMip = mipLevel++;
+					desc.TextureCubeArray.MipLevels = 1;
+					desc.TextureCubeArray.NumCubes = arraySize / 6;
+				}
+				else
+				{
+					desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+					desc.TextureCube.MostDetailedMip = mipLevel++;
+					desc.TextureCube.MipLevels = 1;
+				}
+			}
+			else if (arraySize > 1)
 			{
 				desc.Texture2DArray.MostDetailedMip = mipLevel++;
 				desc.Texture2DArray.MipLevels = 1;

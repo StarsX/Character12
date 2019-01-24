@@ -73,10 +73,10 @@ namespace XUSG
 		bool createTransformedStates();
 		bool createTransformedVBs(VertexBuffer &vertexBuffer);
 		bool createBuffers();
-		void createPipelineLayouts();
-		void createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
+		bool createPipelineLayouts();
+		bool createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
-		void createDescriptorTables();
+		bool createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX viewProj,
 			DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView,
 			DirectX::FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal);
@@ -103,7 +103,7 @@ namespace XUSG
 		Pipeline		m_skinningPipeline;
 		std::vector<DescriptorTable> m_srvSkinningTables[FrameCount];
 		std::vector<DescriptorTable> m_uavSkinningTables[FrameCount];
-#if	TEMPORAL
+#if TEMPORAL
 		std::vector<DescriptorTable> m_srvSkinnedTables[FrameCount];
 
 		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[FrameCount];

@@ -15,7 +15,7 @@ Character::Character(const Device &device, const CommandList &commandList, const
 	m_skinningPipeline(nullptr),
 	m_srvSkinningTables(),
 	m_uavSkinningTables(),
-#if	TEMPORAL
+#if TEMPORAL
 	m_srvSkinnedTables(),
 	m_linkedWorldViewProjs(),
 #endif
@@ -59,9 +59,9 @@ bool Character::Init(const InputLayout &inputLayout,
 	N_RETURN(createTransformedStates(), false);
 
 	// Create pipeline layout, pipelines, and descriptor tables
-	createPipelineLayouts();
-	createPipelines(inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
-	createDescriptorTables();
+	N_RETURN(createPipelineLayouts(), false);
+	N_RETURN(createPipelines(inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat), false);
+	N_RETURN(createDescriptorTables(), false);
 
 	return true;
 }
@@ -245,7 +245,7 @@ bool Character::createBuffers()
 	return true;
 }
 
-void Character::createPipelineLayouts()
+bool Character::createPipelineLayouts()
 {
 	// Skinning
 	{
@@ -282,14 +282,14 @@ void Character::createPipelineLayouts()
 		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
-		m_skinningPipelineLayout = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str());
+		X_RETURN(m_skinningPipelineLayout, utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+			D3D12_ROOT_SIGNATURE_FLAG_NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str()), false);
 	}
 
 	// Base pass
 	{
 		auto cbPerFrame = 1u;
-#if	TEMPORAL
+#if TEMPORAL
 		auto roVertices = 0u;
 
 		// Get shader resource slots
@@ -316,7 +316,7 @@ void Character::createPipelineLayouts()
 
 		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 
-#if	TEMPORAL
+#if TEMPORAL
 		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
 		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
@@ -328,14 +328,14 @@ void Character::createPipelineLayouts()
 			utilPipelineLayout.SetShaderStage(PER_FRAME, Shader::Stage::PS);
 		}
 
-		m_pipelineLayouts[BASE_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str());
+			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str()), false);
 	}
 
 	// Depth pass
 	{
-#if	TEMPORAL
+#if TEMPORAL
 		auto roVertices = 0u;
 
 		// Get shader resource slots
@@ -350,18 +350,20 @@ void Character::createPipelineLayouts()
 
 		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
 
-#if	TEMPORAL
+#if TEMPORAL
 		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
 		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
 
-		m_pipelineLayouts[DEPTH_PASS] = utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
-			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str());
+			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str()), false);
 	}
+
+	return true;
 }
 
-void Character::createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
+bool Character::createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
 	// Skinning
@@ -369,15 +371,15 @@ void Character::createPipelines(const InputLayout &inputLayout, const Format *rt
 		Compute::State state;
 		state.SetPipelineLayout(m_skinningPipelineLayout);
 		state.SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
-		m_skinningPipeline = state.GetPipeline(*m_computePipelineCache,
-			m_name.empty() ? nullptr : (m_name + L".SkinningPipe").c_str());
+		X_RETURN(m_skinningPipeline, state.GetPipeline(*m_computePipelineCache,
+			m_name.empty() ? nullptr : (m_name + L".SkinningPipe").c_str()), false);
 	}
 
 	// Rendering
-	Model::createPipelines(false, inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
+	return Model::createPipelines(false, inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
 }
 
-void Character::createDescriptorTables()
+bool Character::createDescriptorTables()
 {
 	const auto numMeshes = m_mesh->GetNumMeshes();
 
@@ -385,7 +387,7 @@ void Character::createDescriptorTables()
 	{
 		m_srvSkinningTables[i].resize(numMeshes);
 		m_uavSkinningTables[i].resize(numMeshes);
-#if	TEMPORAL
+#if TEMPORAL
 		m_srvSkinnedTables[i].resize(numMeshes);
 #endif
 
@@ -394,19 +396,21 @@ void Character::createDescriptorTables()
 			Util::DescriptorTable srvSkinningTable;
 			const Descriptor srvs[] = { m_boneWorlds[i].GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
 			srvSkinningTable.SetDescriptors(0, static_cast<uint32_t>(size(srvs)), srvs);
-			m_srvSkinningTables[i][m] = srvSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+			X_RETURN(m_srvSkinningTables[i][m], srvSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
 
 			Util::DescriptorTable uavSkinningTable;
 			uavSkinningTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetUAV(m));
-			m_uavSkinningTables[i][m] = uavSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+			X_RETURN(m_uavSkinningTables[i][m], uavSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
 
-#if	TEMPORAL
+#if TEMPORAL
 			Util::DescriptorTable srvSkinnedTable;
 			srvSkinnedTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetSRV(m));
-			m_srvSkinnedTables[i][m] = srvSkinnedTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+			X_RETURN(m_srvSkinnedTables[i][m], srvSkinnedTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
 #endif
 		}
 	}
+
+	return true;
 }
 
 void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX world,
@@ -441,7 +445,7 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 		}
 	}
 
-#if	TEMPORAL
+#if TEMPORAL
 	if (isTemporal)
 	{
 		XMStoreFloat4x4(&m_linkedWorldViewProjs[m_currentFrame][mesh], worldViewProj);
@@ -508,7 +512,7 @@ void Character::renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIn
 	auto &vertexBuffer = m_transformedVBs[m_currentFrame];
 	vertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
-#if	TEMPORAL
+#if TEMPORAL
 	// Prepare SRV state for the vertex buffer of the previous frame, if neccessary
 	auto &prevVertexBuffer = m_transformedVBs[m_previousFrame];
 	prevVertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -524,7 +528,7 @@ void Character::renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIn
 				// Set IA parameters
 				m_commandList.IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV(m));
 
-#if	TEMPORAL
+#if TEMPORAL
 				// Set historical motion states, if neccessary
 				m_commandList.SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
 #endif

@@ -8,14 +8,14 @@
 //--------------------------------------------------------------------------------------
 // Constant buffers
 //--------------------------------------------------------------------------------------
-#if	TEMPORAL_AA
+#if TEMPORAL_AA
 cbuffer cbTempBias	: register (b3)
 {
 	float2	g_vProjBias;
 };
 #endif
 
-#if	TEMPORAL
+#if TEMPORAL
 //--------------------------------------------------------------------------------------
 // Input/Output structures
 //--------------------------------------------------------------------------------------
@@ -45,46 +45,46 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 
 #if defined(_BASEPASS_) && TEMPORAL	// Temporal tracking
 
-#ifdef	_CHARACTER_
+#ifdef _CHARACTER_
 	const float4 vHPos = { g_roVertices[vid].Pos, 1.0 };
 #elif	defined(_VEGETATION_)
 	float4 vHPos = vPos;
 	VegetationWave(vHPos, 1.0);
 #else
-#define	vHPos	vPos
+#define vHPos	vPos
 #endif
 	output.TSPos = mul(vHPos, g_mWVPPrev);
 #endif
 
-#ifdef	_VEGETATION_
+#ifdef _VEGETATION_
 	VegetationWave(vPos);
 #endif
 
 	output.Pos = mul(vPos, g_mWorldViewProj);
-#if	defined(_BASEPASS_) && TEMPORAL
+#if defined(_BASEPASS_) && TEMPORAL
 	output.CSPos = output.Pos;
 #endif
-#if	TEMPORAL_AA
+#if TEMPORAL_AA
 	output.Pos.xy += g_vProjBias * output.Pos.w;
 #endif
 
-#ifdef	_SHADOW_MAP_
+#ifdef _SHADOW_MAP_
 	output.LSPos = mul(vPos, g_mShadow);
 #endif
 
-#if	defined(_POSWORLD_) || defined(_CLIP_)
+#if defined(_POSWORLD_) || defined(_CLIP_)
 	vPos = mul(vPos, g_mWorld);
 #endif
 
-#ifdef	_POSWORLD_
+#ifdef _POSWORLD_
 	output.WSPos = vPos.xyz;
 #endif
 
-#ifdef	_NORMAL_
+#ifdef _NORMAL_
 	output.Norm = min16float3(normalize(mul(input.Norm, (float3x3)g_mNormal)));
 #endif
 
-#ifdef	_TANGENTS_
+#ifdef _TANGENTS_
 	output.Tangent = min16float3(normalize(mul(input.Tan, (float3x3)g_mWorld)));
 	output.BiNorm = min16float3(normalize(mul(input.BiNorm, (float3x3)g_mWorld)));
 #endif

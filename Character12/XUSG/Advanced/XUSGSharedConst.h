@@ -6,7 +6,7 @@
 #define _XUSG_SHARED_CONST_H_
 
 #ifndef FRAME_COUNT
-#define	FRAME_COUNT		3
+#define FRAME_COUNT		3
 #endif
 
 #ifndef TAA_SHOW_DIFF
@@ -16,26 +16,26 @@
 #define TAA_SHOW_DIFF	0
 #endif
 
-#ifndef	TEMPORAL_SSAA
+#ifndef TEMPORAL_SSAA
 #define TEMPORAL_SSAA	1
-#endif
-#ifndef	TEMPORAL_MSAA
+#endif  
+#ifndef TEMPORAL_MSAA
 #define TEMPORAL_MSAA	2
 #endif
 
-#ifndef	TEMPORAL_AA
+#ifndef TEMPORAL_AA
 #define TEMPORAL_AA		0//TEMPORAL_SSAA
 #endif
 
-#ifndef	TEMPORAL
+#ifndef TEMPORAL
 #define TEMPORAL		1//TEMPORAL_AA
-#endif
+#endif  
 
 #ifndef NUM_CASCADE
-#define	NUM_CASCADE		3
+#define NUM_CASCADE		3
 #endif
 
-#define	PIDIV4		0.785398163f
+#define PIDIV4		0.785398163f
 
 static const float g_FOVAngleY	= PIDIV4;
 static const float g_zNear		= 1.0f;

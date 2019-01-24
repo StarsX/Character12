@@ -23,7 +23,7 @@ cbuffer cbMatrices : register (b0)
 	matrix	g_mWorld;
 	matrix	g_mNormal;
 	matrix	g_mShadow;
-#if	TEMPORAL
+#if TEMPORAL
 	matrix	g_mWVPPrev;
 #endif
 };

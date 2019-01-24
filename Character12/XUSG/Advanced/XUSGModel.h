@@ -9,7 +9,7 @@
 #include "XUSGSDKMesh.h"
 #include "XUSGSharedConst.h"
 
-#define	MAX_SHADOW_CASCADES	8
+#define MAX_SHADOW_CASCADES	8
 
 namespace XUSG
 {
@@ -93,15 +93,15 @@ namespace XUSG
 			DirectX::XMMATRIX World;
 			DirectX::XMMATRIX Normal;
 			DirectX::XMMATRIX Shadow;
-#if	TEMPORAL
+#if TEMPORAL
 			DirectX::XMMATRIX WorldViewProjPrev;
 #endif
 		};
 
 		bool createConstantBuffers();
-		void createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
+		bool createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
-		void createDescriptorTables();
+		bool createDescriptorTables();
 		void render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
 
 		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);
@@ -122,7 +122,7 @@ namespace XUSG
 		std::shared_ptr<PipelineLayoutCache>		m_pipelineLayoutCache;
 		std::shared_ptr<DescriptorTableCache>		m_descriptorTableCache;
 
-#if	TEMPORAL
+#if TEMPORAL
 		DirectX::XMFLOAT4X4	m_worldViewProjs[FrameCount];
 #endif
 

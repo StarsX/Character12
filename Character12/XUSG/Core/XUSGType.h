@@ -12,6 +12,7 @@
 
 #define C_RETURN(x, r)			if (x) return r;
 #define N_RETURN(x, r)			C_RETURN(!(x), r)
+#define X_RETURN(x, f, r)		{ x = f; N_RETURN(x, r); }
 
 namespace XUSG
 {

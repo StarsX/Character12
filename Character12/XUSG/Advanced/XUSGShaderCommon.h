@@ -4,8 +4,8 @@
 
 #pragma once
 
-#ifndef	BASIC_SHADER_IDS
-#define	BASIC_SHADER_IDS
+#ifndef BASIC_SHADER_IDS
+#define BASIC_SHADER_IDS
 
 // Vertex shaders
 enum VertexShader : uint8_t
@@ -17,6 +17,8 @@ enum VertexShader : uint8_t
 	VS_DEPTH,
 	VS_DEPTH_STATIC,
 	VS_SKINNING,
+
+	VS_SKYDOME,
 
 	VS_REFLECT,
 	VS_BOUND
@@ -36,7 +38,7 @@ enum PixelShader : uint8_t
 	PS_OCCLUSION_STATIC,
 
 	PS_SS_REFLECT,
-	PS_SKY,
+	PS_SKYDOME,
 	PS_WATER,
 	PS_RESAMPLE,
 

@@ -5,7 +5,7 @@
 #include "DXFrameworkHelper.h"
 #include "XUSGResource.h"
 
-#define	REMOVE_PACKED_UAV	ResourceFlags(~0x8000)
+#define REMOVE_PACKED_UAV	ResourceFlags(~0x8000)
 
 using namespace std;
 using namespace XUSG;

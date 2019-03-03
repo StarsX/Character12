@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "XUSGModel.h"
 #include "Core/XUSGComputeState.h"
+#include "XUSGModel.h"
 
 namespace XUSG
 {
@@ -52,7 +52,7 @@ namespace XUSG
 		void SetSkinningPipeline();
 		void Skinning(bool reset = false);
 		void RenderTransformed(SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
-			PipelineLayoutIndex layout = NUM_PIPE_LAYOUT);
+			PipelineLayoutIndex layout = NUM_PIPE_LAYOUT, uint32_t numInstances = 1);
 
 		const DirectX::XMFLOAT4 &GetPosition() const;
 		DirectX::FXMMATRIX GetWorldMatrix() const;
@@ -81,8 +81,10 @@ namespace XUSG
 			DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView,
 			DirectX::FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal);
 		void skinning(bool reset);
-		void renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout);
-		void renderLinked(uint32_t mesh, uint8_t matrixTableIndex, PipelineLayoutIndex layout);
+		void renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+			PipelineLayoutIndex layout, uint32_t numInstances);
+		void renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
+			PipelineLayoutIndex layout, uint32_t numInstances);
 		void setSkeletalMatrices(uint32_t numMeshes);
 		void setBoneMatrices(uint32_t mesh);
 		void convertToDQ(DirectX::XMFLOAT4 &dqTran, DirectX::CXMVECTOR quat,

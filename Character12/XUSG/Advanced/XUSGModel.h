@@ -4,7 +4,9 @@
 
 #pragma once
 
+#include "Core/XUSGPipelineLayout.h"
 #include "Core/XUSGGraphicsState.h"
+#include "Core/XUSGDescriptor.h"
 #include "XUSGShaderCommon.h"
 #include "XUSGSDKMesh.h"
 #include "XUSGSharedConst.h"
@@ -61,7 +63,7 @@ namespace XUSG
 			CBV_MATRICES,
 			CBV_SHADOW_MATRIX,
 
-			NUM_CBV = CBV_SHADOW_MATRIX + MAX_SHADOW_CASCADES
+			NUM_CBV_TABLE = CBV_SHADOW_MATRIX + MAX_SHADOW_CASCADES
 		};
 
 		Model(const Device &device, const CommandList &commandList, const wchar_t *name);
@@ -78,7 +80,8 @@ namespace XUSG
 		void SetPipelineLayout(PipelineLayoutIndex layout);
 		void SetPipeline(PipelineIndex pipeline);
 		void SetPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout);
-		void Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout = NUM_PIPE_LAYOUT);
+		void Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+			PipelineLayoutIndex layout = NUM_PIPE_LAYOUT, uint32_t numInstances = 1);
 
 		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
@@ -102,7 +105,8 @@ namespace XUSG
 		bool createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		bool createDescriptorTables();
-		void render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
+		void render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout,
+			uint32_t numInstances);
 
 		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);
 
@@ -131,7 +135,7 @@ namespace XUSG
 
 		PipelineLayout		m_pipelineLayouts[NUM_PIPE_LAYOUT];
 		Pipeline			m_pipelines[NUM_PIPELINE];
-		DescriptorTable		m_cbvTables[FrameCount][NUM_CBV];
+		DescriptorTable		m_cbvTables[FrameCount][NUM_CBV_TABLE];
 		DescriptorTable		m_samplerTable;
 		std::vector<DescriptorTable> m_srvTables;
 	};

@@ -129,7 +129,8 @@ void Model::SetPipelineState(SubsetFlags subsetFlags, PipelineLayoutIndex layout
 		//m_commandList->SetPipelineState(m_pipelines[REFLECTED]); 
 }
 
-void Model::Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLayoutIndex layout)
+void Model::Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+	PipelineLayoutIndex layout, uint32_t numInstances)
 {
 	const DescriptorPool descriptorPools[] =
 	{
@@ -148,7 +149,7 @@ void Model::Render(SubsetFlags subsetFlags, uint8_t matrixTableIndex, PipelineLa
 		m_commandList.IASetVertexBuffers(0, 1, &m_mesh->GetVertexBufferView(m, 0));
 
 		// Render mesh
-		render(m, subsetFlags, layout);
+		render(m, subsetFlags, layout, numInstances);
 	}
 
 	// Clear out the vb bindings for the next pass
@@ -243,39 +244,50 @@ bool Model::createPipelines(bool isStatic, const InputLayout &inputLayout, const
 			m_name.empty() ? nullptr : (m_name + L".OpaqueTwoSidedZEqual").c_str()), false);
 	}
 
-	// Depth pass
+	// Depth and shadow passes
 	const auto vsDepthPass = isStatic ? VS_DEPTH_STATIC : VS_DEPTH;
+	const auto vsShadowPass = isStatic ? VS_SHADOW_STATIC : VS_SHADOW;
 	const auto vsDepth = m_shaderPool->GetShader(Shader::Stage::VS, vsDepthPass);
-	if (vsDepth)
+	const auto vsShadow = m_shaderPool->GetShader(Shader::Stage::VS, vsShadowPass);
+	const auto psDepth = m_shaderPool->GetShader(Shader::Stage::PS, PS_DEPTH);
+	if (vsDepth || vsShadow)
 	{
 		const Format nullRtvFormats[8] = {};
 		
 		// Get depth pipelines
 		state.SetPipelineLayout(m_pipelineLayouts[DEPTH_PASS]);
-		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsDepthPass));
-		state.SetShader(Shader::Stage::PS, nullptr);
 		state.RSSetState(Graphics::RasterizerPreset::CULL_BACK, *m_pipelineCache);
 		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
 		state.OMSetRTVFormats(nullRtvFormats, 8);
 		state.OMSetNumRenderTargets(0);
-		X_RETURN(m_pipelines[DEPTH_FRONT], state.GetPipeline(*m_pipelineCache,
-			m_name.empty() ? nullptr : (m_name + L".DepthFront").c_str()), false);
 
-		state.OMSetDSVFormat(shadowFormat);
-		X_RETURN(m_pipelines[SHADOW_FRONT], state.GetPipeline(*m_pipelineCache,
-			m_name.empty() ? nullptr : (m_name + L".ShadowFront").c_str()), false);
-
-		// Get depth alpha-test pipelines
-		const auto psDepth = m_shaderPool->GetShader(Shader::Stage::PS, PS_DEPTH);
-		if (psDepth)
+		if (vsDepth)
 		{
+			// Get depth opaque pipeline
+			state.SetShader(Shader::Stage::VS, vsDepth);
+			state.SetShader(Shader::Stage::PS, nullptr);
+			X_RETURN(m_pipelines[DEPTH_FRONT], state.GetPipeline(*m_pipelineCache,
+				m_name.empty() ? nullptr : (m_name + L".DepthFront").c_str()), false);
+
+			// Get depth alpha-test pipeline
 			state.SetShader(Shader::Stage::PS, psDepth);
 			state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
-			state.OMSetDSVFormat(dsvFormat);
 			X_RETURN(m_pipelines[DEPTH_TWO_SIDED], state.GetPipeline(*m_pipelineCache,
 				m_name.empty() ? nullptr : (m_name + L".DepthTwoSided").c_str()), false);
+		}
 
+		if (vsShadow)
+		{
+			// Get shadow opaque pipeline
+			state.SetShader(Shader::Stage::VS, vsShadow);
+			state.SetShader(Shader::Stage::PS, nullptr);
 			state.OMSetDSVFormat(shadowFormat);
+			X_RETURN(m_pipelines[SHADOW_FRONT], state.GetPipeline(*m_pipelineCache,
+				m_name.empty() ? nullptr : (m_name + L".ShadowFront").c_str()), false);
+
+			// Get shadow alpha-test pipeline
+			state.SetShader(Shader::Stage::PS, psDepth);
+			state.RSSetState(Graphics::RasterizerPreset::CULL_NONE, *m_pipelineCache);
 			X_RETURN(m_pipelines[SHADOW_TWO_SIDED], state.GetPipeline(*m_pipelineCache,
 				m_name.empty() ? nullptr : (m_name + L".ShadowTwoSided").c_str()), false);
 		}
@@ -330,7 +342,7 @@ bool Model::createDescriptorTables()
 	return true;
 }
 
-void Model::render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout)
+void Model::render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex layout, uint32_t numInstances)
 {
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
 
@@ -354,13 +366,15 @@ void Model::render(uint32_t mesh, SubsetFlags subsetFlags, PipelineLayoutIndex l
 			m_commandList.SetGraphicsDescriptorTable(MATERIAL, m_srvTables[pSubset->MaterialID]);
 
 		// Draw
-		m_commandList.DrawIndexed(static_cast<uint32_t>(pSubset->IndexCount), 1,
+		m_commandList.DrawIndexed(static_cast<uint32_t>(pSubset->IndexCount), numInstances,
 			static_cast<uint32_t>(pSubset->IndexStart), static_cast<int32_t>(pSubset->VertexStart), 0);
 	}
 }
 
 Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 {
+	D3D12_SHADER_INPUT_BIND_DESC desc;
+
 	auto cbMatrices = 0u;
 	auto cbPerFrame = cbMatrices + 1;
 	auto cbPerObject = cbPerFrame + 1;
@@ -373,11 +387,11 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	auto smpAnisoWrap = 0u;
 	auto smpLinearCmp = smpAnisoWrap + 2;
 
-	// Get constant buffer slots
-	auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+	// Get vertex shader slots
 	auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, vs);
 	if (reflector)
 	{
+		// Get constant buffer slots
 		auto hr = reflector->GetResourceBindingDescByName("cbMatrices", &desc);
 		if (SUCCEEDED(hr)) cbMatrices = desc.BindPoint;
 
@@ -387,6 +401,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 #endif
 	}
 
+	// Get pixel shader slots
 	auto cbImmutable = cbMatrices;
 	auto cbShadow = cbPerObject;
 	reflector = m_shaderPool->GetReflector(Shader::Stage::PS, ps);

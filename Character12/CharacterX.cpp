@@ -365,7 +365,7 @@ void CharacterX::PopulateCommandList()
 	// Indicate that the back buffer will be used as a render target.
 	m_commandList.Barrier(1, &ResourceBarrier::Transition(m_renderTargets[m_frameIndex].get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	m_commandList.OMSetRenderTargets(1, m_rtvTables[m_frameIndex], m_depth.GetDSV());
+	m_commandList.OMSetRenderTargets(1, m_rtvTables[m_frameIndex], &m_depth.GetDSV());
 	
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
@@ -413,10 +413,11 @@ void CharacterX::MoveToNextFrame()
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;
 }
 
-double CharacterX::CalculateFrameStats(float *fTimeStep)
+double CharacterX::CalculateFrameStats(float *pTimeStep)
 {
 	static int frameCnt = 0;
 	static double elapsedTime = 0.0;
+	static double previousTime = 0.0;
 	const auto totalTime = m_timer.GetTotalSeconds();
 	++frameCnt;
 
@@ -435,7 +436,8 @@ double CharacterX::CalculateFrameStats(float *fTimeStep)
 		SetCustomWindowText(windowText.str().c_str());
 	}
 
-	if (fTimeStep) *fTimeStep = timeStep;
+	if (pTimeStep) *pTimeStep = static_cast<float>(totalTime - previousTime);
+	previousTime = totalTime;
 
 	return totalTime;
 }

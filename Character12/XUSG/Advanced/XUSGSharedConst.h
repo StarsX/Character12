@@ -24,11 +24,11 @@
 #endif
 
 #ifndef TEMPORAL_AA
-#define TEMPORAL_AA		0//TEMPORAL_SSAA
+#define TEMPORAL_AA		TEMPORAL_SSAA
 #endif
 
 #ifndef TEMPORAL
-#define TEMPORAL		1//TEMPORAL_AA
+#define TEMPORAL		TEMPORAL_AA
 #endif  
 
 #ifndef NUM_CASCADE

@@ -104,7 +104,7 @@ void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	}
 	else world = *pWorld;
 
-	Model::SetMatrices(viewProj, world, pShadowView, pShadows, isTemporal);
+	Model::SetMatrices(viewProj, world, pShadowView, pShadows, numShadows, isTemporal);
 
 	if (m_meshLinks)
 	{
@@ -127,13 +127,14 @@ void Character::Skinning(bool reset)
 }
 
 void Character::RenderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-	PipelineLayoutIndex layout)
+	PipelineLayoutIndex layout, uint32_t numInstances)
 {
-	renderTransformed(subsetFlags, matrixTableIndex, layout);
+	renderTransformed(subsetFlags, matrixTableIndex, layout, numInstances);
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
-		//for (auto m = 0ui8; m < numLinks; ++m) renderLinked(uVS, uGS, uPS, m, layout);
+		//for (auto m = 0ui8; m < numLinks; ++m)
+		//	renderLinked(m, matrixTableIndex, layout, numInstances);
 	}
 }
 
@@ -247,17 +248,19 @@ bool Character::createBuffers()
 
 bool Character::createPipelineLayouts()
 {
+	D3D12_SHADER_INPUT_BIND_DESC desc;
+
 	// Skinning
 	{
 		auto roBoneWorld = 0u;
 		auto rwVertices = 0u;
 		auto roVertices = roBoneWorld + 1;
 
-		// Get shader resource slots
-		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+		// Get compute shader slots
 		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
 		if (reflector)
 		{
+			// Get shader resource slots
 			auto hr = reflector->GetResourceBindingDescByName("g_rwVertices", &desc);
 			if (SUCCEEDED(hr)) rwVertices = desc.BindPoint;
 
@@ -292,24 +295,21 @@ bool Character::createPipelineLayouts()
 #if TEMPORAL
 		auto roVertices = 0u;
 
-		// Get shader resource slots
-		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+		// Get vertex shader slots
 		auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
 		if (reflector)
 		{
+			// Get shader resource slots
 			auto hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
 			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
-		}
-
-		// Get constant buffer slots
-		reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS);
-#else
-		// Get constant buffer slots
-		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
-		auto reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS_STATIC);
+		}	
 #endif
+
+		// Get pixel shader slots
+		reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS);
 		if (reflector)
 		{
+			// Get constant buffer slots
 			auto hr = reflector->GetResourceBindingDescByName("cbPerFrame", &desc);
 			cbPerFrame = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
 		}
@@ -338,11 +338,11 @@ bool Character::createPipelineLayouts()
 #if TEMPORAL
 		auto roVertices = 0u;
 
-		// Get shader resource slots
-		auto desc = D3D12_SHADER_INPUT_BIND_DESC();
+		// Get vertex shader slots
 		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_DEPTH);
 		if (reflector)
 		{
+			// Get shader resource slots
 			auto hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
 			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
 		}
@@ -489,7 +489,7 @@ void Character::skinning(bool reset)
 }
 
 void Character::renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-	PipelineLayoutIndex layout)
+	PipelineLayoutIndex layout, uint32_t numInstances)
 {
 	if (layout != NUM_PIPE_LAYOUT)
 	{
@@ -534,7 +534,7 @@ void Character::renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIn
 #endif
 
 				// Render mesh
-				render(m, ~SUBSET_FULL & subsetFlags | subsetMask, layout);
+				render(m, ~SUBSET_FULL & subsetFlags | subsetMask, layout, numInstances);
 			}
 		}
 	}
@@ -544,7 +544,8 @@ void Character::renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIn
 }
 
 #if 0
-void Character::renderLinked(uint32_t mesh, bool isShadow, bool reset)
+void Character::renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
+	PipelineLayoutIndex layout, uint32_t numInstances)
 {
 	// Set constant buffers
 	m_pDXContext->VSSetConstantBuffers(m_uCBMatrices, 1, m_vpCBLinkedMats[uMesh].GetAddressOf());

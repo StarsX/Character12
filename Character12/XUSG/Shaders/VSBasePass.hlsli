@@ -47,7 +47,7 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 
 #ifdef _CHARACTER_
 	const float4 vHPos = { g_roVertices[vid].Pos, 1.0 };
-#elif	defined(_VEGETATION_)
+#elif defined(_VEGETATION_)
 	float4 vHPos = vPos;
 	VegetationWave(vHPos, 1.0);
 #else

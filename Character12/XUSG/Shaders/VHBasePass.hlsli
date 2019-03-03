@@ -19,11 +19,11 @@ struct VS_Input
 //--------------------------------------------------------------------------------------
 cbuffer cbMatrices : register (b0)
 {
-	matrix	g_mWorldViewProj;
-	matrix	g_mWorld;
-	matrix	g_mNormal;
-	matrix	g_mShadow;
+	matrix	g_worldViewProj;
+	matrix	g_world;
+	matrix	g_normal;
+	matrix	g_shadow;
 #if TEMPORAL
-	matrix	g_mWVPPrev;
+	matrix	g_previousWVP;
 #endif
 };

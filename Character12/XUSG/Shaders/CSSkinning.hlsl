@@ -70,11 +70,11 @@ float3 DecodeRGB16f(uint2 u)
 //--------------------------------------------------------------------------------------
 // Load vertex data
 //--------------------------------------------------------------------------------------
-VS_Input LoadVertex(uint uIdx)
+VS_Input LoadVertex(uint i)
 {
 	VS_Input vertex;
 
-	CS_Input vertexIn = g_roVertices[uIdx];
+	CS_Input vertexIn = g_roVertices[i];
 	vertex.Pos = vertexIn.Pos;
 	vertex.Weights = DecodeRGBA8(vertexIn.Weights);
 	vertex.Bones = DecodeRGBA8u(vertexIn.Bones);
@@ -89,7 +89,7 @@ VS_Input LoadVertex(uint uIdx)
 //--------------------------------------------------------------------------------------
 // Store vertex data
 //--------------------------------------------------------------------------------------
-void StoreVertex(const SkinnedInfo skinned, uint uIdx)
+void StoreVertex(const SkinnedInfo skinned, uint i)
 {
 	CS_Output output;
 	output.Pos = skinned.Pos;
@@ -98,7 +98,7 @@ void StoreVertex(const SkinnedInfo skinned, uint uIdx)
 	output.Tan = EncodeRGB16f(skinned.Tan);
 	output.BiNorm = EncodeRGB16f(skinned.BiNorm);
 
-	g_rwVertices[uIdx] = output;
+	g_rwVertices[i] = output;
 }
 
 //--------------------------------------------------------------------------------------

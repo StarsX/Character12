@@ -89,7 +89,7 @@ VS_Input LoadVertex(uint i)
 //--------------------------------------------------------------------------------------
 // Store vertex data
 //--------------------------------------------------------------------------------------
-void StoreVertex(const SkinnedInfo skinned, uint i)
+void StoreVertex(SkinnedInfo skinned, uint i)
 {
 	CS_Output output;
 	output.Pos = skinned.Pos;
@@ -105,7 +105,7 @@ void StoreVertex(const SkinnedInfo skinned, uint i)
 // Compute shader used for skinning the mesh for stream out
 //--------------------------------------------------------------------------------------
 [numthreads(64, 1, 1)]
-void main(const uint3 DTid : SV_DispatchThreadID)
+void main(uint3 DTid : SV_DispatchThreadID)
 {
 	VS_Input vertex = LoadVertex(DTid.x);
 	StoreVertex(SkinVert(vertex), DTid.x);

@@ -37,7 +37,7 @@ struct SkinnedInfo
 //--------------------------------------------------------------------------------------
 // Translation with DQ
 //--------------------------------------------------------------------------------------
-float3 TranslateWithDQ(const float3 vec, const float2x4 dual)
+float3 TranslateWithDQ(float3 vec, float2x4 dual)
 {
 	float3 disp = cross(dual[0].xyz, dual[1].xyz);
 	disp += dual[0].w * dual[1].xyz;
@@ -49,7 +49,7 @@ float3 TranslateWithDQ(const float3 vec, const float2x4 dual)
 //--------------------------------------------------------------------------------------
 // Rotations with DQ
 //--------------------------------------------------------------------------------------
-float3 RotateWithDQ(const float3 vec, const float2x4 dual)
+float3 RotateWithDQ(float3 vec, float2x4 dual)
 {
 	float3 disp = cross(dual[0].xyz, cross(dual[0].xyz, vec) + dual[0].w * vec);
 
@@ -59,7 +59,7 @@ float3 RotateWithDQ(const float3 vec, const float2x4 dual)
 //--------------------------------------------------------------------------------------
 // SkinVert skins a single vertex
 //--------------------------------------------------------------------------------------
-SkinnedInfo SkinVert(const VS_Input input)
+SkinnedInfo SkinVert(VS_Input input)
 {
 	SkinnedInfo output;
 	

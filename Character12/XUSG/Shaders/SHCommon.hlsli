@@ -41,12 +41,12 @@ struct IOStruct
 #endif
 
 #if defined(_BASEPASS_) && TEMPORAL
-	float4	CSPos	: POSCURRENT;		// Current motion-state position
-	float4	TSPos	: POSHISTORY;		// Historical motion-state position
+	float4	CSPos		: POSCURRENT;	// Current motion-state position
+	float4	TSPos		: POSHISTORY;	// Historical motion-state position
 #endif
 
 #ifdef _CLIP_
-	float	Clip	: SV_CLIPDISTANCE;
+	float	Clip		: SV_CLIPDISTANCE;
 #endif
 };
 

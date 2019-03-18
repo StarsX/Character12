@@ -60,12 +60,11 @@ private:
 	XUSG::CommandQueue		m_commandQueue;
 
 	XUSG::Device			m_device;
-	XUSG::Resource			m_renderTargets[FrameCount];
+	XUSG::RenderTarget		m_renderTargets[FrameCount];
 	XUSG::CommandList		m_commandList;
 
 	// App resources.
 	std::unique_ptr<XUSG::Character> m_character;
-	XUSG::DescriptorPool	m_rtvPool;
 	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
 	XUSG::DepthStencil		m_depth;
 	XMFLOAT4X4	m_proj;

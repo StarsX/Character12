@@ -112,35 +112,17 @@ void CharacterX::LoadPipeline()
 	m_descriptorTableCache = make_shared<DescriptorTableCache>();
 	m_descriptorTableCache->SetDevice(m_device);
 
-	// Create descriptor heaps.
-	{
-		// Describe and create a render target view (RTV) descriptor heap.
-		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-		rtvHeapDesc.NumDescriptors = FrameCount;
-		rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-		ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvPool)));
-	}
-
 	// Create frame resources.
+	// Create a RTV and a command allocator for each frame.
+	for (auto n = 0u; n < FrameCount; n++)
 	{
-		const auto strideRtv = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		Descriptor rtv(m_rtvPool->GetCPUDescriptorHandleForHeapStart());
+		m_renderTargets[n].CreateFromSwapChain(m_device, m_swapChain, n);
 
-		// Create a RTV and a command allocator for each frame.
-		for (auto n = 0u; n < FrameCount; n++)
-		{
-			ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
-			m_device->CreateRenderTargetView(m_renderTargets[n].get(), nullptr, rtv);
+		Util::DescriptorTable rtvTable;
+		rtvTable.SetDescriptors(0, 1, &m_renderTargets[n].GetRTV());
+		m_rtvTables[n] = rtvTable.GetRtvTable(*m_descriptorTableCache);
 
-			Util::DescriptorTable rtvTable;
-			rtvTable.SetDescriptors(0, 1, &rtv);
-			m_rtvTables[n] = rtvTable.GetRtvTable(*m_descriptorTableCache);
-
-			rtv.Offset(strideRtv);
-
-			ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
-		}
+		ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
 	}
 
 	// Create a DSV
@@ -363,8 +345,7 @@ void CharacterX::PopulateCommandList()
 	m_commandList.RSSetScissorRects(1, &m_scissorRect);
 
 	// Indicate that the back buffer will be used as a render target.
-	m_commandList.Barrier(1, &ResourceBarrier::Transition(m_renderTargets[m_frameIndex].get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
+	m_renderTargets[m_frameIndex].Barrier(m_commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	m_commandList.OMSetRenderTargets(1, m_rtvTables[m_frameIndex], &m_depth.GetDSV());
 	
 	// Record commands.
@@ -376,7 +357,7 @@ void CharacterX::PopulateCommandList()
 	m_character->RenderTransformed(SUBSET_FULL, Model::CBV_MATRICES, Model::BASE_PASS);
 
 	// Indicate that the back buffer will now be used to present.
-	m_commandList.Barrier(1, &ResourceBarrier::Transition(m_renderTargets[m_frameIndex].get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	m_renderTargets[m_frameIndex].Barrier(m_commandList, D3D12_RESOURCE_STATE_PRESENT);
 
 	ThrowIfFailed(m_commandList.Close());
 }

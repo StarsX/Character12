@@ -4,12 +4,14 @@
 
 #include "XUSGCharacter.h"
 
+#define ALIGNED_DIV(x, n)	(((x) - 1) / (n) + 1)
+
 using namespace std;
 using namespace DirectX;
 using namespace XUSG;
 
-Character::Character(const Device &device, const CommandList &commandList, const wchar_t *name) :
-	Model(device, commandList, name),
+Character::Character(const Device &device, const wchar_t *name) :
+	Model(device, name),
 	m_computePipelineCache(nullptr),
 	m_skinningPipelineLayout(nullptr),
 	m_skinningPipeline(nullptr),
@@ -114,22 +116,28 @@ void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	}
 }
 
-void Character::SetSkinningPipeline()
+void Character::SetSkinningPipeline(const CommandList &commandList)
 {
-	m_commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
-	m_commandList.SetPipelineState(m_skinningPipeline);
+	commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
+	commandList.SetPipelineState(m_skinningPipeline);
 }
 
-void Character::Skinning(bool reset)
+void Character::Skinning(const CommandList &commandList, uint32_t &numBarriers,
+	ResourceBarrier *pBarriers, bool reset)
 {
 	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
-	skinning(reset);
+	m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	skinning(commandList, reset);
+
+	// Prepare VBV | SRV states for the vertex buffer
+	numBarriers = m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER |
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, numBarriers);
 }
 
-void Character::RenderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-	PipelineLayoutIndex layout, uint32_t numInstances)
+void Character::RenderTransformed(const CommandList &commandList, PipelineLayoutIndex layout,
+	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
 {
-	renderTransformed(subsetFlags, matrixTableIndex, layout, numInstances);
+	renderTransformed(commandList, layout, subsetFlags, matrixTableIndex, numInstances);
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
@@ -187,13 +195,16 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 
 bool Character::createTransformedStates()
 {
-	for (auto &vertexBuffers : m_transformedVBs)
-		N_RETURN(createTransformedVBs(vertexBuffers), false);
+	for (auto i = 0u; i < FrameCount; ++i)
+		N_RETURN(createTransformedVBs(m_transformedVBs[i],
+			i + 1 < FrameCount ? D3D12_RESOURCE_STATE_COMMON :
+			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER |
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE), false);
 
 	return true;
 }
 
-bool Character::createTransformedVBs(VertexBuffer &vertexBuffer)
+bool Character::createTransformedVBs(VertexBuffer &vertexBuffer, ResourceState state)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
 	auto numVertices = 0u;
@@ -207,7 +218,7 @@ bool Character::createTransformedVBs(VertexBuffer &vertexBuffer)
 	}
 
 	N_RETURN(vertexBuffer.Create(m_device, numVertices, sizeof(Vertex),
-		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, PoolType(1), ResourceState(0),
+		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_HEAP_TYPE_DEFAULT, state,
 		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
 		numMeshes, firstVertices.data(), m_name.empty() ? nullptr : (m_name + L".TransformedVB").c_str()), false);
 
@@ -276,12 +287,15 @@ bool Character::createPipelineLayouts()
 
 		// Input vertices and bone matrices
 		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld,
-				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices);
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
 		utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
 
 		// Output vertices
-		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices);
+		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices,
+			0, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
+			D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
@@ -335,29 +349,20 @@ bool Character::createPipelineLayouts()
 
 	// Depth pass
 	{
-#if TEMPORAL
-		auto roVertices = 0u;
-
-		// Get vertex shader slots
-		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_DEPTH);
-		if (reflector)
-		{
-			// Get shader resource slots
-			auto hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
-			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
-		}
-#endif
-
-		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
-
-#if TEMPORAL
-		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
-		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
-#endif
+		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_NULL_INDEX);
 
 		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str()), false);
+	}
+
+	// Depth alpha pass
+	{
+		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
+
+		X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+			m_name.empty() ? nullptr : (m_name + L".DepthAlphaPassLayout").c_str()), false);
 	}
 
 	return true;
@@ -455,15 +460,15 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 #endif
 }
 
-void Character::skinning(bool reset)
+void Character::skinning(const CommandList &commandList, bool reset)
 {
 	if (reset)
 	{
 		const DescriptorPool descriptorPools[] =
 		{ m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL) };
-		m_commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-		m_commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
-		m_commandList.SetPipelineState(m_skinningPipeline);
+		commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
+		commandList.SetPipelineState(m_skinningPipeline);
 	}
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -471,76 +476,66 @@ void Character::skinning(bool reset)
 	// Set the bone matrices
 	if (m_time >= 0.0) setSkeletalMatrices(numMeshes);
 
-	// Prepare UAV state
-	m_transformedVBs[m_currentFrame].Barrier(m_commandList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
 	// Skin the vertices and output them to buffers
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Setup descriptor tables
-		m_commandList.SetComputeDescriptorTable(INPUT, m_srvSkinningTables[m_currentFrame][m]);
-		m_commandList.SetComputeDescriptorTable(OUTPUT, m_uavSkinningTables[m_currentFrame][m]);
+		commandList.SetComputeDescriptorTable(INPUT, m_srvSkinningTables[m_currentFrame][m]);
+		commandList.SetComputeDescriptorTable(OUTPUT, m_uavSkinningTables[m_currentFrame][m]);
 		
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
-		const auto numGroups = ALIGN(numVertices, 64) / 64;
-		m_commandList.Dispatch(static_cast<uint32_t>(numGroups), 1, 1);
+		commandList.Dispatch(ALIGNED_DIV(numVertices, 64), 1, 1);
 	}
 }
 
-void Character::renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-	PipelineLayoutIndex layout, uint32_t numInstances)
+void Character::renderTransformed(const CommandList &commandList, PipelineLayoutIndex layout,
+	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
 {
-	if (layout != NUM_PIPE_LAYOUT)
+	if (layout < GLOBAL_BASE_PASS)
 	{
 		const DescriptorPool descriptorPools[] =
 		{
 			m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
 			m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
 		};
-		m_commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-		m_commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
-		m_commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+		commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
+		commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 	}
 
 	// Set matrices
-	m_commandList.SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
+	commandList.SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
 
 	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
-
-	// Prepare VBV state for the vertex buffer of the current frame
-	auto &vertexBuffer = m_transformedVBs[m_currentFrame];
-	vertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-
-#if TEMPORAL
-	// Prepare SRV state for the vertex buffer of the previous frame, if neccessary
-	auto &prevVertexBuffer = m_transformedVBs[m_previousFrame];
-	prevVertexBuffer.Barrier(m_commandList, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-#endif
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
 	for (const auto &subsetMask : subsetMasks)
 	{
+		if (layout < GLOBAL_BASE_PASS && subsetMask != SUBSET_OPAQUE)
+			commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+
 		if (subsetFlags & subsetMask)
 		{
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
 				// Set IA parameters
-				m_commandList.IASetVertexBuffers(0, 1, &vertexBuffer.GetVBV(m));
+				commandList.IASetVertexBuffers(0, 1, &m_transformedVBs[m_currentFrame].GetVBV(m));
 
 #if TEMPORAL
 				// Set historical motion states, if neccessary
-				m_commandList.SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
+				if (layout == BASE_PASS || layout == GLOBAL_BASE_PASS)
+					commandList.SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
 #endif
 
 				// Render mesh
-				render(m, ~SUBSET_FULL & subsetFlags | subsetMask, layout, numInstances);
+				render(commandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, numInstances);
 			}
 		}
 	}
 
 	// Clear out the vb bindings for the next pass
-	//if (reset) m_commandList->IASetVertexBuffers(0, 1, nullptr);
+	//if (layout < GLOBAL_BASS_PASS) m_commandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
 #if 0
@@ -565,7 +560,7 @@ void Character::renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
 void Character::setSkeletalMatrices(uint32_t numMeshes)
 {
 	for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
-	m_boneWorlds[m_currentFrame].Unmap();
+	//m_boneWorlds[m_currentFrame].Unmap();
 }
 
 void Character::setBoneMatrices(uint32_t mesh)

@@ -44,7 +44,9 @@ enum PixelShader : uint8_t
 	PS_TONE_MAP,
 	PS_TEMPORAL_AA,
 	PS_UNSHARP,
-	PS_FXAA
+	PS_FXAA,
+
+	PS_NULL_INDEX
 };
 
 // Compute shaders

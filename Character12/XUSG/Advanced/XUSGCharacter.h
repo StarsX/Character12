@@ -27,7 +27,7 @@ namespace XUSG
 			uint32_t			BoneIndex;
 		};
 
-		Character(const Device &device, const CommandList &commandList, const wchar_t *name = nullptr);
+		Character(const Device &device, const wchar_t *name = nullptr);
 		virtual ~Character();
 
 		bool Init(const InputLayout &inputLayout,
@@ -49,10 +49,12 @@ namespace XUSG
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX *pWorld = nullptr,
 			DirectX::FXMMATRIX *pShadowView = nullptr, DirectX::FXMMATRIX *pShadows = nullptr,
 			uint8_t numShadows = 0, bool isTemporal = true);
-		void SetSkinningPipeline();
-		void Skinning(bool reset = false);
-		void RenderTransformed(SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
-			PipelineLayoutIndex layout = NUM_PIPE_LAYOUT, uint32_t numInstances = 1);
+		void SetSkinningPipeline(const CommandList &commandList);
+		void Skinning(const CommandList &commandList, uint32_t &numBarriers,
+			ResourceBarrier *pBarriers, bool reset = false);
+		void RenderTransformed(const CommandList &commandList, PipelineLayoutIndex layout,
+			SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
+			uint32_t numInstances = 1);
 
 		const DirectX::XMFLOAT4 &GetPosition() const;
 		DirectX::FXMMATRIX GetWorldMatrix() const;
@@ -63,15 +65,21 @@ namespace XUSG
 			std::vector<SDKMesh> *pLinkedMeshes = nullptr);
 
 	protected:
-		enum DescriptorTableSlot : uint8_t
+		enum InternalDescriptorTableSlot : uint8_t
 		{
 			INPUT,
 			OUTPUT,
-			HISTORY = PER_OBJECT
+			SAMPLERS = BASE_SLOT,
+			MATERIAL,
+			SHADOW_ALPHA_REF,
+#if TEMPORAL
+			HISTORY,
+#endif
+			PER_FRAME
 		};
 
 		bool createTransformedStates();
-		bool createTransformedVBs(VertexBuffer &vertexBuffer);
+		bool createTransformedVBs(VertexBuffer &vertexBuffer, ResourceState state = ResourceState(0));
 		bool createBuffers();
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
@@ -80,9 +88,9 @@ namespace XUSG
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX viewProj,
 			DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView,
 			DirectX::FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal);
-		void skinning(bool reset);
-		void renderTransformed(SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-			PipelineLayoutIndex layout, uint32_t numInstances);
+		void skinning(const CommandList &commandList, bool reset);
+		void renderTransformed(const CommandList &commandList, PipelineLayoutIndex layout,
+			SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances);
 		void renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
 			PipelineLayoutIndex layout, uint32_t numInstances);
 		void setSkeletalMatrices(uint32_t numMeshes);
@@ -116,5 +124,13 @@ namespace XUSG
 
 		std::vector<ConstantBuffer> m_cbLinkedMatrices;
 		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
+
+public:
+		enum DescriptorTableSlot : uint8_t
+		{
+			SHADOW_MAP = SHADOW_ALPHA_REF,
+			ALPHA_REF = SHADOW_ALPHA_REF,
+			IMMUATABLE = PER_FRAME + 1
+		};
 	};
 }

@@ -157,7 +157,7 @@ void CharacterX::LoadAssets()
 		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
 			L"Media/Bright/Stars.sdkmesh_anim", textureCache);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
-		m_character = make_unique<Character>(m_device, m_commandList, L"Stars");
+		m_character = make_unique<Character>(m_device, L"Stars");
 		if (!m_character) ThrowIfFailed(E_FAIL);
 		if (!m_character->Init(m_inputLayout, characterMesh, m_shaderPool,
 			m_graphicsPipelineCache, m_computePipelineCache,
@@ -338,14 +338,18 @@ void CharacterX::PopulateCommandList()
 	ThrowIfFailed(m_commandList.Reset(m_commandAllocators[m_frameIndex], nullptr));
 
 	// Skinning
-	m_character->Skinning(true);
+	auto numBarriers = 0u;
+	ResourceBarrier barriers[1];
+	m_character->Skinning(m_commandList, numBarriers, barriers, true);
+	m_commandList.Barrier(numBarriers, barriers);
 
 	// Set necessary state.
 	m_commandList.RSSetViewports(1, &m_viewport);
 	m_commandList.RSSetScissorRects(1, &m_scissorRect);
 
 	// Indicate that the back buffer will be used as a render target.
-	m_renderTargets[m_frameIndex].Barrier(m_commandList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	m_commandList.Barrier(numBarriers, barriers);
 	m_commandList.OMSetRenderTargets(1, m_rtvTables[m_frameIndex], &m_depth.GetDSV());
 	
 	// Record commands.
@@ -354,10 +358,11 @@ void CharacterX::PopulateCommandList()
 	m_commandList.ClearDepthStencilView(m_depth.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	//m_commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	m_character->RenderTransformed(SUBSET_FULL, Model::CBV_MATRICES, Model::BASE_PASS);
+	m_character->RenderTransformed(m_commandList, Character::BASE_PASS, SUBSET_FULL, Character::CBV_MATRICES);
 
 	// Indicate that the back buffer will now be used to present.
-	m_renderTargets[m_frameIndex].Barrier(m_commandList, D3D12_RESOURCE_STATE_PRESENT);
+	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, D3D12_RESOURCE_STATE_PRESENT);
+	m_commandList.Barrier(numBarriers, barriers);
 
 	ThrowIfFailed(m_commandList.Close());
 }

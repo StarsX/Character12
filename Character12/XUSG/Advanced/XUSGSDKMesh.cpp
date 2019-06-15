@@ -671,7 +671,7 @@ bool SDKMesh::createVertexBuffer(const CommandList &commandList, std::vector<Res
 	uploaders.push_back(nullptr);
 	
 	return m_vertexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		bufferData.size(), 0, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		bufferData.size(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 }
 
 bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders)
@@ -708,7 +708,7 @@ bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Reso
 	uploaders.push_back(nullptr);
 
 	return m_indexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		bufferData.size(), 0, D3D12_RESOURCE_STATE_INDEX_BUFFER);
+		bufferData.size(), D3D12_RESOURCE_STATE_INDEX_BUFFER);
 }
 
 //--------------------------------------------------------------------------------------

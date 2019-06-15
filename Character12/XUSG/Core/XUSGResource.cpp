@@ -1345,7 +1345,7 @@ bool RawBuffer::Create(const Device &device, uint32_t byteWidth, ResourceFlags r
 }
 
 bool RawBuffer::Upload(const CommandList &commandList, Resource &uploader,
-	const void *pData, size_t size, uint32_t i, ResourceState dstState)
+	const void *pData, size_t size, ResourceState dstState, uint32_t i)
 {
 	// Create the GPU upload buffer.
 	const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.get(), 0, 1);

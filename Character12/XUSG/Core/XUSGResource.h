@@ -241,7 +241,7 @@ namespace XUSG
 			uint32_t numUAVs = 1, const uint32_t *firstUAVElements = nullptr,
 			const wchar_t *name = nullptr);
 		bool Upload(const CommandList &commandList, Resource &uploader, const void *pData,
-			size_t size, uint32_t i, ResourceState dstState = ResourceState(0));
+			size_t size, ResourceState dstState = ResourceState(0), uint32_t i = 0);
 		bool CreateSRVs(uint32_t byteWidth, const uint32_t *firstElements = nullptr,
 			uint32_t numDescriptors = 1);
 		bool CreateUAVs(uint32_t byteWidth, const uint32_t *firstElements = nullptr,

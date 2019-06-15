@@ -565,7 +565,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 			else
 			{
 				shared_ptr<ResourceBase> texture;
-				uploaders.push_back(Resource());
+				uploaders.push_back(nullptr);
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
@@ -592,7 +592,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 			else
 			{
 				shared_ptr<ResourceBase> texture;
-				uploaders.push_back(Resource());
+				uploaders.push_back(nullptr);
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
@@ -619,7 +619,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 			else
 			{
 				shared_ptr<ResourceBase> texture;
-				uploaders.push_back(Resource());
+				uploaders.push_back(nullptr);
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
@@ -668,10 +668,10 @@ bool SDKMesh::createVertexBuffer(const CommandList &commandList, std::vector<Res
 	}
 
 	// Upload vertices
-	uploaders.push_back(Resource());
+	uploaders.push_back(nullptr);
 	
 	return m_vertexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		bufferData.size(), 0, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 }
 
 bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders)
@@ -705,10 +705,10 @@ bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Reso
 	}
 
 	// Upload indices
-	uploaders.push_back(Resource());
+	uploaders.push_back(nullptr);
 
 	return m_indexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		D3D12_RESOURCE_STATE_INDEX_BUFFER);
+		bufferData.size(), 0, D3D12_RESOURCE_STATE_INDEX_BUFFER);
 }
 
 //--------------------------------------------------------------------------------------

@@ -97,7 +97,7 @@ namespace XUSG
 			const wchar_t *name = nullptr);
 		bool Upload(const CommandList &commandList, Resource &uploader,
 			SubresourceData *pSubresourceData, uint32_t numSubresources = 1,
-			ResourceState dstState = ResourceState(0));
+			ResourceState dstState = ResourceState(0), uint32_t i = 0);
 		bool Upload(const CommandList &commandList, Resource &uploader, const void *pData,
 			uint8_t stride = sizeof(float), ResourceState dstState = ResourceState(0));
 		bool CreateSRVs(uint32_t arraySize, Format format = Format(0), uint8_t numMips = 1,

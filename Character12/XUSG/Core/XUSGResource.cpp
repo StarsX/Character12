@@ -131,21 +131,19 @@ bool ConstantBuffer::Create(const Device &device, uint32_t byteWidth, uint32_t n
 bool ConstantBuffer::Upload(const CommandList &commandList, Resource &uploader,
 	const void *pData, size_t size, uint32_t i)
 {
-	const auto desc = m_resource->GetDesc();
-
+	const auto offset = m_cbvOffsets.empty() ? 0 : m_cbvOffsets[i];
 	SubresourceData subresourceData;
 	subresourceData.pData = pData;
 	subresourceData.RowPitch = static_cast<uint32_t>(size);
-	subresourceData.SlicePitch = static_cast<uint32_t>(desc.Width);
+	subresourceData.SlicePitch = static_cast<uint32_t>(m_resource->GetDesc().Width);
 
 	// Create the GPU upload buffer.
 	if (!uploader)
 	{
-		const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.get(), 0, 1);
 		V_RETURN(m_device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
+			&CD3DX12_RESOURCE_DESC::Buffer(ALIGN(offset + size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT)),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&uploader)), clog, false);
@@ -156,8 +154,8 @@ bool ConstantBuffer::Upload(const CommandList &commandList, Resource &uploader,
 	commandList.Barrier(1, &ResourceBarrier::Transition(m_resource.get(),
 		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST));
 	M_RETURN(UpdateSubresources(const_cast<CommandList&>(commandList).GetCommandList().get(),
-		m_resource.get(), uploader.get(), m_cbvOffsets.empty() ? 0 : m_cbvOffsets[i], 0, 1,
-		&subresourceData) <= 0, clog, "Failed to upload the resource.", false);
+		m_resource.get(), uploader.get(), offset, 0, 1, &subresourceData) <= 0,
+		clog, "Failed to upload the resource.", false);
 	commandList.Barrier(1, &ResourceBarrier::Transition(m_resource.get(),
 		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
@@ -345,14 +343,15 @@ bool Texture2D::Create(const Device &device, uint32_t width, uint32_t height, Fo
 }
 
 bool Texture2D::Upload(const CommandList &commandList, Resource &uploader,
-	SubresourceData *pSubresourceData, uint32_t numSubresources, ResourceState dstState)
+	SubresourceData *pSubresourceData, uint32_t numSubresources,
+	ResourceState dstState, uint32_t i)
 {
 	N_RETURN(pSubresourceData, false);
 
 	// Create the GPU upload buffer.
 	if (!uploader)
 	{
-		const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.get(), 0, numSubresources);
+		const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.get(), i, numSubresources);
 		V_RETURN(m_device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
@@ -370,7 +369,7 @@ bool Texture2D::Upload(const CommandList &commandList, Resource &uploader,
 	auto numBarriers = SetBarrier(&barrier, D3D12_RESOURCE_STATE_COPY_DEST);
 	commandList.Barrier(numBarriers, &barrier);
 	M_RETURN(UpdateSubresources(const_cast<CommandList&>(commandList).GetCommandList().get(),
-		m_resource.get(), uploader.get(), 0, 0, numSubresources, pSubresourceData) <= 0,
+		m_resource.get(), uploader.get(), 0, i, numSubresources, pSubresourceData) <= 0,
 		clog, "Failed to upload the resource.", false);
 	numBarriers = SetBarrier(&barrier, dstState);
 	commandList.Barrier(numBarriers, &barrier);
@@ -1347,14 +1346,19 @@ bool RawBuffer::Create(const Device &device, uint32_t byteWidth, ResourceFlags r
 bool RawBuffer::Upload(const CommandList &commandList, Resource &uploader,
 	const void *pData, size_t size, ResourceState dstState, uint32_t i)
 {
+	const auto offset = m_srvOffsets.empty() ? 0 : m_srvOffsets[i];
+	D3D12_SUBRESOURCE_DATA subresourceData;
+	subresourceData.pData = pData;
+	subresourceData.RowPitch = static_cast<uint32_t>(size);
+	subresourceData.SlicePitch = static_cast<uint32_t>(m_resource->GetDesc().Width);
+
 	// Create the GPU upload buffer.
-	const auto uploadBufferSize = GetRequiredIntermediateSize(m_resource.get(), 0, 1);
 	if (!uploader)
 	{
 		V_RETURN(m_device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
+			&CD3DX12_RESOURCE_DESC::Buffer(offset + size),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&uploader)), clog, false);
@@ -1363,18 +1367,13 @@ bool RawBuffer::Upload(const CommandList &commandList, Resource &uploader,
 
 	// Copy data to the intermediate upload heap and then schedule a copy 
 	// from the upload heap to the buffer.
-	D3D12_SUBRESOURCE_DATA subresourceData;
-	subresourceData.pData = pData;
-	subresourceData.RowPitch = static_cast<uint32_t>(uploadBufferSize);
-	subresourceData.SlicePitch = subresourceData.RowPitch;
-
 	ResourceBarrier barrier;
 	dstState = dstState ? dstState : m_states[0];
 	auto numBarriers = SetBarrier(&barrier, D3D12_RESOURCE_STATE_COPY_DEST);
 	commandList.Barrier(numBarriers, &barrier);
 	M_RETURN(UpdateSubresources(const_cast<CommandList&>(commandList).GetCommandList().get(),
-		m_resource.get(), uploader.get(), m_srvOffsets.empty() ? 0 : m_srvOffsets[i], 0, 1,
-		&subresourceData) <= 0, clog, "Failed to upload the resource.", false);
+		m_resource.get(), uploader.get(), offset, 0, 1, &subresourceData) <= 0,
+		clog, "Failed to upload the resource.", false);
 	numBarriers = SetBarrier(&barrier, dstState);
 	commandList.Barrier(numBarriers, &barrier);
 

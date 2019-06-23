@@ -541,6 +541,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 	wstring filePathW;
 	DDS::Loader textureLoader;
 	DDS::AlphaMode alphaMode;
+	wstring_convert<codecvt_utf8<wchar_t>> converter;
 
 	for (auto m = 0u; m < numMaterials; ++m)
 	{
@@ -567,7 +568,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(nullptr);
 
-				filePathW.assign(filePath.cbegin(), filePath.cend());
+				filePathW = converter.from_bytes(filePath);
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, true, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
@@ -594,7 +595,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(nullptr);
 
-				filePathW.assign(filePath.cbegin(), filePath.cend());
+				filePathW = converter.from_bytes(filePath);
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
@@ -621,7 +622,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 				shared_ptr<ResourceBase> texture;
 				uploaders.push_back(nullptr);
 
-				filePathW.assign(filePath.cbegin(), filePath.cend());
+				filePathW = converter.from_bytes(filePath);
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back()))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
@@ -727,7 +728,7 @@ bool SDKMesh::createFromFile(const Device &device, const wchar_t *fileName,
 	const auto found = m_filePathW.find_last_of(L"/\\");
 	m_name = m_filePathW.substr(found + 1);
 	m_filePathW = m_filePathW.substr(0, found + 1);
-	m_filePath.assign(m_filePathW.cbegin(), m_filePathW.cend());
+	m_filePath = wstring_convert<codecvt_utf8<wchar_t>>().to_bytes(m_filePathW);
 
 	// Get the file size
 	F_RETURN(!fileStream.seekg(0, fileStream.end), fileStream.close(); cerr, E_FAIL, false);

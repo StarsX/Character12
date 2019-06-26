@@ -46,11 +46,11 @@
     <Filter Include="XUSG\Advanced\Source Files">
       <UniqueIdentifier>{09acbe24-03b1-4e2e-af2a-8e29e5018b7b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="XUSG\Core\Inc">
-      <UniqueIdentifier>{99189be3-54e9-497f-9c45-4ddfea69de2e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="XUSG\Shaders">
       <UniqueIdentifier>{a7e87b53-c6f7-4e4f-be00-ed8d3e071330}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="XUSG\Core\Source Files\Inc">
+      <UniqueIdentifier>{99189be3-54e9-497f-9c45-4ddfea69de2e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -126,6 +126,12 @@
     <ClInclude Include="XUSG\Core\XUSGReflector.h">
       <Filter>XUSG\Core\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Common\dxcapi.h">
+      <Filter>Common\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\StepTimer.h">
+      <Filter>Common\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Common\DXFramework.cpp">
@@ -185,16 +191,16 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="XUSG\Core\XUSGBlend.inl">
-      <Filter>XUSG\Core\Inc</Filter>
+      <Filter>XUSG\Core\Source Files\Inc</Filter>
     </None>
     <None Include="XUSG\Core\XUSGDepthStencil.inl">
-      <Filter>XUSG\Core\Inc</Filter>
+      <Filter>XUSG\Core\Source Files\Inc</Filter>
     </None>
     <None Include="XUSG\Core\XUSGRasterizer.inl">
-      <Filter>XUSG\Core\Inc</Filter>
+      <Filter>XUSG\Core\Source Files\Inc</Filter>
     </None>
     <None Include="XUSG\Core\XUSGSampler.inl">
-      <Filter>XUSG\Core\Inc</Filter>
+      <Filter>XUSG\Core\Source Files\Inc</Filter>
     </None>
     <None Include="XUSG\Shaders\CSSkinning.hlsli">
       <Filter>XUSG\Shaders</Filter>

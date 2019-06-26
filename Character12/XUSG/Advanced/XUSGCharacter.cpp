@@ -259,8 +259,6 @@ bool Character::createBuffers()
 
 bool Character::createPipelineLayouts()
 {
-	D3D12_SHADER_INPUT_BIND_DESC desc;
-
 	// Skinning
 	{
 		auto roBoneWorld = 0u;
@@ -269,17 +267,12 @@ bool Character::createPipelineLayouts()
 
 		// Get compute shader slots
 		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
-		if (reflector)
+		if (reflector && reflector->IsValid())
 		{
 			// Get shader resource slots
-			auto hr = reflector->GetResourceBindingDescByName("g_rwVertices", &desc);
-			if (SUCCEEDED(hr)) rwVertices = desc.BindPoint;
-
-			hr = reflector->GetResourceBindingDescByName("g_roDualQuat", &desc);
-			if (SUCCEEDED(hr)) roBoneWorld = desc.BindPoint;
-
-			hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
-			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
+			rwVertices = reflector->GetResourceBindingPointByName("g_rwVertices", rwVertices);
+			roBoneWorld = reflector->GetResourceBindingPointByName("g_roDualQuat", roBoneWorld);
+			roVertices = reflector->GetResourceBindingPointByName("g_roVertices", roVertices);
 		}
 
 		// Pipeline layout utility
@@ -311,22 +304,16 @@ bool Character::createPipelineLayouts()
 
 		// Get vertex shader slots
 		auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
-		if (reflector)
-		{
-			// Get shader resource slots
-			auto hr = reflector->GetResourceBindingDescByName("g_roVertices", &desc);
-			if (SUCCEEDED(hr)) roVertices = desc.BindPoint;
-		}	
+		if (reflector && reflector->IsValid())
+			// Get shader resource slot
+			roVertices = reflector->GetResourceBindingPointByName("g_roVertices", roVertices);
 #endif
 
 		// Get pixel shader slots
 		reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS);
-		if (reflector)
-		{
-			// Get constant buffer slots
-			auto hr = reflector->GetResourceBindingDescByName("cbPerFrame", &desc);
-			cbPerFrame = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
-		}
+		if (reflector && reflector->IsValid())
+			// Get constant buffer slot
+			cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame");
 
 		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 

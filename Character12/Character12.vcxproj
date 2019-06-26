@@ -183,6 +183,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"</Command>
     <ClInclude Include="XUSG\Core\XUSGGraphicsState.h" />
     <ClInclude Include="XUSG\Core\XUSGInputLayout.h" />
     <ClInclude Include="XUSG\Core\XUSGPipelineLayout.h" />
+    <ClInclude Include="XUSG\Core\XUSGReflector.h" />
     <ClInclude Include="XUSG\Core\XUSGResource.h" />
     <ClInclude Include="XUSG\Core\XUSGShader.h" />
     <ClInclude Include="XUSG\Core\XUSGType.h" />
@@ -273,6 +274,12 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"</Command>
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdafx.h</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="XUSG\Core\XUSGPipelineLayout.cpp">
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">stdafx.h</ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">stdafx.h</ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</ForcedIncludeFiles>
+      <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdafx.h</ForcedIncludeFiles>
+    </ClCompile>
+    <ClCompile Include="XUSG\Core\XUSGReflector.cpp">
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">stdafx.h</ForcedIncludeFiles>
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">stdafx.h</ForcedIncludeFiles>
       <ForcedIncludeFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</ForcedIncludeFiles>

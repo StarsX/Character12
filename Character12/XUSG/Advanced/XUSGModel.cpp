@@ -384,8 +384,6 @@ void Model::render(const CommandList &commandList, uint32_t mesh, PipelineLayout
 
 Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 {
-	D3D12_SHADER_INPUT_BIND_DESC desc;
-
 	auto cbMatrices = 0u;
 	auto cbPerFrame = cbMatrices + 1;
 	auto cbPerObject = cbPerFrame + 1;
@@ -400,15 +398,12 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 
 	// Get vertex shader slots
 	auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, vs);
-	if (reflector)
+	if (reflector && reflector->IsValid())
 	{
 		// Get constant buffer slots
-		auto hr = reflector->GetResourceBindingDescByName("cbMatrices", &desc);
-		if (SUCCEEDED(hr)) cbMatrices = desc.BindPoint;
-
+		cbMatrices = reflector->GetResourceBindingPointByName("cbMatrices", cbMatrices);
 #if TEMPORAL_AA
-		hr = reflector->GetResourceBindingDescByName("cbTempBias", &desc);
-		if (SUCCEEDED(hr)) cbTempBias = desc.BindPoint;
+		cbTempBias = reflector->GetResourceBindingPointByName("cbTempBias", cbTempBias);
 #endif
 	}
 
@@ -418,31 +413,21 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	if (ps != PS_NULL_INDEX)
 	{
 		reflector = m_shaderPool->GetReflector(Shader::Stage::PS, ps);
-		if (reflector)
+		if (reflector && reflector->IsValid())
 		{
 			// Get constant buffer slots
-			auto hr = reflector->GetResourceBindingDescByName("cbImmutable", &desc);
-			cbImmutable = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
-
-			hr = reflector->GetResourceBindingDescByName("cbShadow", &desc);
-			cbShadow = SUCCEEDED(hr) ? desc.BindPoint : UINT32_MAX;
-
-			hr = reflector->GetResourceBindingDescByName("cbPerObject", &desc);
-			if (SUCCEEDED(hr)) cbPerObject = desc.BindPoint;
+			cbImmutable = reflector->GetResourceBindingPointByName("cbImmutable");
+			cbShadow = reflector->GetResourceBindingPointByName("cbShadow");
+			cbPerObject = reflector->GetResourceBindingPointByName("cbPerObject", cbPerObject);
 
 			// Get shader resource slots
-			hr = reflector->GetResourceBindingDescByName("g_txAlbedo", &desc);
-			if (SUCCEEDED(hr)) txDiffuse = desc.BindPoint;
-			hr = reflector->GetResourceBindingDescByName("g_txNormal", &desc);
-			if (SUCCEEDED(hr)) txNormal = desc.BindPoint;
-			hr = reflector->GetResourceBindingDescByName("g_txShadow", &desc);
-			if (SUCCEEDED(hr)) txShadow = desc.BindPoint;
+			txDiffuse = reflector->GetResourceBindingPointByName("g_txAlbedo", txDiffuse);
+			txNormal = reflector->GetResourceBindingPointByName("g_txNormal", txNormal);
+			txShadow = reflector->GetResourceBindingPointByName("g_txShadow", txShadow);
 
 			// Get sampler slots
-			hr = reflector->GetResourceBindingDescByName("g_smpLinear", &desc);
-			if (SUCCEEDED(hr)) smpAnisoWrap = desc.BindPoint;
-			hr = reflector->GetResourceBindingDescByName("g_smpCmpLinear", &desc);
-			if (SUCCEEDED(hr)) smpLinearCmp = desc.BindPoint;
+			smpAnisoWrap = reflector->GetResourceBindingPointByName("g_smpLinear", smpAnisoWrap);
+			smpLinearCmp = reflector->GetResourceBindingPointByName("g_smpCmpLinear", smpLinearCmp);
 		}
 	}
 

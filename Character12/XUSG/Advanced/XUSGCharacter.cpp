@@ -4,7 +4,7 @@
 
 #include "XUSGCharacter.h"
 
-#define ALIGNED_DIV(x, n)	(((x) - 1) / (n) + 1)
+#define DIV_UP(x, n)	(((x) - 1) / (n) + 1)
 
 using namespace std;
 using namespace DirectX;
@@ -472,7 +472,7 @@ void Character::skinning(const CommandList &commandList, bool reset)
 		
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
-		commandList.Dispatch(ALIGNED_DIV(numVertices, 64), 1, 1);
+		commandList.Dispatch(DIV_UP(numVertices, 64), 1, 1);
 	}
 }
 

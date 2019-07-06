@@ -4,8 +4,6 @@
 
 #include "XUSGCharacter.h"
 
-#define DIV_UP(x, n)	(((x) - 1) / (n) + 1)
-
 using namespace std;
 using namespace DirectX;
 using namespace XUSG;

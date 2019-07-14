@@ -46,20 +46,20 @@ SDKMesh::~SDKMesh()
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh::Create(const Device &device, const wchar_t *fileName,
-	const TextureCache &textureCache, bool isStaticMesh)
+bool SDKMesh::Create(const Device& device, const wchar_t* fileName,
+	const TextureCache& textureCache, bool isStaticMesh)
 {
 	return createFromFile(device, fileName, textureCache, isStaticMesh);
 }
 
-bool SDKMesh::Create(const Device &device, uint8_t *pData,
-	const TextureCache &textureCache, size_t dataBytes,
+bool SDKMesh::Create(const Device& device, uint8_t* pData,
+	const TextureCache& textureCache, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
 	return createFromMemory(device, pData, textureCache, dataBytes, isStaticMesh, copyStatic);
 }
 
-bool SDKMesh::LoadAnimation(const wchar_t *fileName)
+bool SDKMesh::LoadAnimation(const wchar_t* fileName)
 {
 	wchar_t filePath[MAX_PATH];
 
@@ -78,7 +78,7 @@ bool SDKMesh::LoadAnimation(const wchar_t *fileName)
 
 	// Allocate
 	m_animation.resize(static_cast<size_t>(sizeof(SDKAnimationFileHeader) + fileheader.AnimationDataSize));
-	
+
 	// Read it all in
 	F_RETURN(!fileStream.seekg(0), fileStream.close(); cerr, GetLastError(), false);
 
@@ -192,33 +192,33 @@ PrimitiveTopology SDKMesh::GetPrimitiveType(SDKMeshPrimitiveType primType)
 
 	switch (primType)
 	{
-		case PT_TRIANGLE_LIST:
-			retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-			break;
-		case PT_TRIANGLE_STRIP:
-			retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
-			break;
-		case PT_LINE_LIST:
-			retType = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-			break;
-		case PT_LINE_STRIP:
-			retType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
-			break;
-		case PT_POINT_LIST:
-			retType = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-			break;
-		case PT_TRIANGLE_LIST_ADJ:
-			retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ;
-			break;
-		case PT_TRIANGLE_STRIP_ADJ:
-			retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ;
-			break;
-		case PT_LINE_LIST_ADJ:
-			retType = D3D_PRIMITIVE_TOPOLOGY_LINELIST_ADJ;
-			break;
-		case PT_LINE_STRIP_ADJ:
-			retType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP_ADJ;
-			break;
+	case PT_TRIANGLE_LIST:
+		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		break;
+	case PT_TRIANGLE_STRIP:
+		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+		break;
+	case PT_LINE_LIST:
+		retType = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+		break;
+	case PT_LINE_STRIP:
+		retType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+		break;
+	case PT_POINT_LIST:
+		retType = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+		break;
+	case PT_TRIANGLE_LIST_ADJ:
+		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ;
+		break;
+	case PT_TRIANGLE_STRIP_ADJ:
+		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ;
+		break;
+	case PT_LINE_LIST_ADJ:
+		retType = D3D_PRIMITIVE_TOPOLOGY_LINELIST_ADJ;
+		break;
+	case PT_LINE_STRIP_ADJ:
+		retType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP_ADJ;
+		break;
 	};
 
 	return retType;
@@ -228,10 +228,10 @@ Format SDKMesh::GetIBFormat(uint32_t mesh) const
 {
 	switch (m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].IndexType)
 	{
-		case IT_16BIT:
-			return DXGI_FORMAT_R16_UINT;
-		case IT_32BIT:
-			return DXGI_FORMAT_R32_UINT;
+	case IT_16BIT:
+		return DXGI_FORMAT_R16_UINT;
+	case IT_32BIT:
+		return DXGI_FORMAT_R32_UINT;
 	};
 
 	return DXGI_FORMAT_R16_UINT;
@@ -278,12 +278,12 @@ IndexBufferView SDKMesh::GetIndexBufferViewAt(uint32_t ib) const
 }
 
 //--------------------------------------------------------------------------------------
-const char *SDKMesh::GetMeshPathA() const
+const char* SDKMesh::GetMeshPathA() const
 {
 	return m_filePath.c_str();
 }
 
-const wchar_t *SDKMesh::GetMeshPathW() const
+const wchar_t* SDKMesh::GetMeshPathW() const
 {
 	return m_filePathW.c_str();
 }
@@ -308,22 +308,22 @@ uint32_t SDKMesh::GetNumIndexBuffers() const
 	return m_pMeshHeader ? m_pMeshHeader->NumIndexBuffers : 0;
 }
 
-uint8_t *SDKMesh::GetRawVerticesAt(uint32_t vb) const
+uint8_t* SDKMesh::GetRawVerticesAt(uint32_t vb) const
 {
 	return m_vertices[vb];
 }
 
-uint8_t *SDKMesh::GetRawIndicesAt(uint32_t ib) const
+uint8_t* SDKMesh::GetRawIndicesAt(uint32_t ib) const
 {
 	return m_indices[ib];
 }
 
-SDKMeshMaterial *SDKMesh::GetMaterial(uint32_t material) const
+SDKMeshMaterial* SDKMesh::GetMaterial(uint32_t material) const
 {
 	return &m_pMaterialArray[material];
 }
 
-SDKMeshData *SDKMesh::GetMesh(uint32_t mesh) const
+SDKMeshData* SDKMesh::GetMesh(uint32_t mesh) const
 {
 	return &m_pMeshArray[mesh];
 }
@@ -340,12 +340,12 @@ uint32_t SDKMesh::GetNumSubsets(uint32_t mesh, SubsetFlags materialType) const
 	return static_cast<uint32_t>(m_classifiedSubsets[materialType - 1][mesh].size());
 }
 
-SDKMeshSubset *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset) const
+SDKMeshSubset* SDKMesh::GetSubset(uint32_t mesh, uint32_t subset) const
 {
 	return &m_pSubsetArray[m_pMeshArray[mesh].pSubsets[subset]];
 }
 
-SDKMeshSubset *SDKMesh::GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const
+SDKMeshSubset* SDKMesh::GetSubset(uint32_t mesh, uint32_t subset, SubsetFlags materialType) const
 {
 	assert(materialType == SUBSET_OPAQUE || materialType == SUBSET_ALPHA);
 
@@ -362,21 +362,21 @@ uint32_t SDKMesh::GetNumFrames() const
 	return m_pMeshHeader->NumFrames;
 }
 
-SDKMeshFrame *SDKMesh::GetFrame(uint32_t frame) const
+SDKMeshFrame* SDKMesh::GetFrame(uint32_t frame) const
 {
 	assert(frame < m_pMeshHeader->NumFrames);
 
 	return &m_pFrameArray[frame];
 }
 
-SDKMeshFrame *SDKMesh::FindFrame(const char *name) const
+SDKMeshFrame* SDKMesh::FindFrame(const char* name) const
 {
 	const auto i = FindFrameIndex(name);
 
 	return i == INVALID_FRAME ? nullptr : &m_pFrameArray[i];
 }
 
-uint32_t SDKMesh::FindFrameIndex(const char *name) const
+uint32_t SDKMesh::FindFrameIndex(const char* name) const
 {
 	for (auto i = 0u; i < m_pMeshHeader->NumFrames; ++i)
 		if (_stricmp(m_pFrameArray[i].Name, name) == 0)
@@ -455,7 +455,7 @@ bool SDKMesh::CheckLoadDone()
 
 bool SDKMesh::IsLoaded() const
 {
-	if( m_pStaticMeshData && !m_isLoading )
+	if (m_pStaticMeshData && !m_isLoading)
 	{
 		return true;
 	}
@@ -517,7 +517,7 @@ uint32_t SDKMesh::GetAnimationKeyFromTime(double time) const
 	return ++tick;
 }
 
-bool SDKMesh::GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) const
+bool SDKMesh::GetAnimationProperties(uint32_t* pNumKeys, float* pFrameTime) const
 {
 	if (!m_pAnimationHeader)
 	{
@@ -534,8 +534,8 @@ bool SDKMesh::GetAnimationProperties(uint32_t *pNumKeys, float *pFrameTime) cons
 }
 
 //--------------------------------------------------------------------------------------
-void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMaterials,
-	uint32_t numMaterials, vector<Resource> &uploaders)
+void SDKMesh::loadMaterials(const CommandList& commandList, SDKMeshMaterial* pMaterials,
+	uint32_t numMaterials, vector<Resource>& uploaders)
 {
 	string filePath;
 	wstring filePathW;
@@ -637,7 +637,7 @@ void SDKMesh::loadMaterials(const CommandList &commandList, SDKMeshMaterial *pMa
 	}
 }
 
-bool SDKMesh::createVertexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders)
+bool SDKMesh::createVertexBuffer(const CommandList& commandList, std::vector<Resource>& uploaders)
 {
 	// Vertex buffer info
 	auto numVertices = 0u;
@@ -670,12 +670,12 @@ bool SDKMesh::createVertexBuffer(const CommandList &commandList, std::vector<Res
 
 	// Upload vertices
 	uploaders.push_back(nullptr);
-	
+
 	return m_vertexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
 		bufferData.size(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 }
 
-bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Resource> &uploaders)
+bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Resource>& uploaders)
 {
 	// Index buffer info
 	auto byteWidth = 0u;
@@ -693,7 +693,7 @@ bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Reso
 		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST,
 		m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1, nullptr,
 		m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
-	
+
 	// Copy indices into one buffer
 	auto offset = 0u;
 	vector<uint8_t> bufferData(byteWidth);
@@ -713,8 +713,8 @@ bool SDKMesh::createIndexBuffer(const CommandList &commandList, std::vector<Reso
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh::createFromFile(const Device &device, const wchar_t *fileName,
-	const TextureCache &textureCache, bool isStaticMesh)
+bool SDKMesh::createFromFile(const Device& device, const wchar_t* fileName,
+	const TextureCache& textureCache, bool isStaticMesh)
 {
 	// Find the path for the file
 	m_filePathW = fileName;
@@ -747,13 +747,13 @@ bool SDKMesh::createFromFile(const Device &device, const wchar_t *fileName,
 	return createFromMemory(device, m_pStaticMeshData, textureCache, cBytes, isStaticMesh, false);
 }
 
-bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
-	const TextureCache &textureCache, size_t dataBytes,
+bool SDKMesh::createFromMemory(const Device& device, uint8_t* pData,
+	const TextureCache& textureCache, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
-	XMFLOAT3 lower; 
-	XMFLOAT3 upper; 
-	
+	XMFLOAT3 lower;
+	XMFLOAT3 upper;
+
 	m_device = device;
 	CommandAllocator commandAllocator = nullptr;
 	CommandList commandList;
@@ -794,7 +794,7 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	m_pMaterialArray = reinterpret_cast<SDKMeshMaterial*>(m_pStaticMeshData + m_pMeshHeader->MaterialDataOffset);
 
 	// Setup subsets
-	for(auto i = 0u; i < m_pMeshHeader->NumMeshes; ++i)
+	for (auto i = 0u; i < m_pMeshHeader->NumMeshes; ++i)
 	{
 		m_pMeshArray[i].pSubsets = reinterpret_cast<uint32_t*>(m_pStaticMeshData + m_pMeshArray[i].SubsetOffset);
 		m_pMeshArray[i].pFrameInfluences = reinterpret_cast<uint32_t*>(m_pStaticMeshData + m_pMeshArray[i].FrameInfluenceOffset);
@@ -805,7 +805,7 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 
 	// Create VBs
 	m_vertices.resize(m_pMeshHeader->NumVertexBuffers);
-	for(auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
+	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 		m_vertices[i] = reinterpret_cast<uint8_t*>(pData + m_pVertexBufferArray[i].DataOffset);
 
 	// Create IBs
@@ -834,7 +834,7 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 	PrimitiveTopology primType;
 
 	// update bounding volume
-	SDKMeshData *currentMesh = m_pMeshArray;
+	SDKMeshData* currentMesh = m_pMeshArray;
 	auto tris = 0;
 
 	for (auto m = 0u; m < m_pMeshHeader->NumMeshes; ++m)
@@ -865,7 +865,7 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 			const auto indices = reinterpret_cast<uint32_t*>(m_indices[currentMesh->IndexBuffer]);
 			const auto vertices = reinterpret_cast<float*>(m_vertices[currentMesh->VertexBuffers[0]]);
 			auto stride = static_cast<uint32_t>(m_pVertexBufferArray[currentMesh->VertexBuffers[0]].StrideBytes);
-			assert (stride % 4 == 0);
+			assert(stride % 4 == 0);
 			stride /= 4;
 
 			for (auto vertIdx = indexStart; vertIdx < indexStart + indexCount; ++vertIdx)
@@ -879,7 +879,8 @@ bool SDKMesh::createFromMemory(const Device &device, uint8_t *pData,
 					{
 						currentIndex = currentIndex << 16;
 						currentIndex = currentIndex >> 16;
-					}else
+					}
+					else
 					{
 						currentIndex = currentIndex >> 16;
 					}
@@ -941,11 +942,11 @@ void SDKMesh::createAsStaticMesh()
 		}
 	}
 	TransformBindPose(XMMatrixIdentity());
-	
+
 	// Recompute vertex buffers
 	for (auto i = 0u; i < m_pMeshHeader->NumFrames; ++i)
 	{
-		const auto &m = m_pFrameArray[i].Mesh;
+		const auto& m = m_pFrameArray[i].Mesh;
 		if (m != INVALID_MESH)
 		{
 			const auto numVerts = GetNumVertices(m, 0);
@@ -958,16 +959,16 @@ void SDKMesh::createAsStaticMesh()
 			for (auto i = 0u; i < numVerts; ++i)
 			{
 				auto loc = stride * i;
-				auto &pos = reinterpret_cast<XMFLOAT3&>(verts[loc]);
+				auto& pos = reinterpret_cast<XMFLOAT3&>(verts[loc]);
 
 				loc += sizeof(XMFLOAT3);
-				auto &norm = reinterpret_cast<XMHALF4&>(verts[loc]);
+				auto& norm = reinterpret_cast<XMHALF4&>(verts[loc]);
 
 				loc += sizeof(XMFLOAT3);
-				auto &tan = reinterpret_cast<XMHALF4&>(verts[loc]);
+				auto& tan = reinterpret_cast<XMHALF4&>(verts[loc]);
 
 				loc += sizeof(XMHALF4);
-				auto &biNorm = reinterpret_cast<XMHALF4&>(verts[loc]);
+				auto& biNorm = reinterpret_cast<XMHALF4&>(verts[loc]);
 
 				XMStoreFloat3(&pos, XMVector3TransformCoord(XMLoadFloat3(&pos), local));
 				XMStoreHalf4(&norm, XMVector3TransformNormal(XMLoadHalf4(&norm), localIT));
@@ -981,18 +982,18 @@ void SDKMesh::createAsStaticMesh()
 void SDKMesh::classifyMaterialType()
 {
 	const auto numMeshes = GetNumMeshes();
-	for (auto &subsets : m_classifiedSubsets)
+	for (auto& subsets : m_classifiedSubsets)
 		subsets.resize(numMeshes);
 
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
-		const auto &numSubsets = m_pMeshArray[m].NumSubsets;
+		const auto& numSubsets = m_pMeshArray[m].NumSubsets;
 		for (auto s = 0u; s < numSubsets; ++s)
 		{
-			const auto &subsetIdx = m_pMeshArray[m].pSubsets[s];
-			const auto &pSubset = m_pSubsetArray[subsetIdx];
+			const auto& subsetIdx = m_pMeshArray[m].pSubsets[s];
+			const auto& pSubset = m_pSubsetArray[subsetIdx];
 			const auto pMaterial = GetMaterial(pSubset.MaterialID);
-			
+
 			auto subsetType = SUBSET_OPAQUE - 1;
 			if (pMaterial && pMaterial->pAlbedo && !IsErrorResource(pMaterial->Albedo64))
 			{
@@ -1028,7 +1029,7 @@ void SDKMesh::classifyMaterialType()
 	}
 }
 
-bool SDKMesh::executeCommandList(CommandList &commandList)
+bool SDKMesh::executeCommandList(CommandList& commandList)
 {
 	if (commandList.GetCommandList())
 	{
@@ -1042,7 +1043,7 @@ bool SDKMesh::executeCommandList(CommandList &commandList)
 
 		// Close the command list and execute it to begin the initial GPU setup.
 		V_RETURN(commandList.Close(), cerr, false);
-		ID3D12CommandList *const ppCommandLists[] = { commandList.GetCommandList().get() };
+		ID3D12CommandList* const ppCommandLists[] = { commandList.GetCommandList().get() };
 		commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
 
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
@@ -1090,7 +1091,7 @@ void SDKMesh::transformBindPoseFrame(uint32_t frame, CXMMATRIX parentWorld)
 		transformBindPoseFrame(m_pFrameArray[frame].SiblingFrame, parentWorld);
 
 	// Transform our children
-	if( m_pFrameArray[frame].ChildFrame != INVALID_FRAME)
+	if (m_pFrameArray[frame].ChildFrame != INVALID_FRAME)
 		transformBindPoseFrame(m_pFrameArray[frame].ChildFrame, mLocalWorld);
 }
 

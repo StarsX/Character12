@@ -9,7 +9,7 @@ using namespace DirectX;
 using namespace XUSG;
 using namespace XUSG::Graphics;
 
-Model::Model(const Device &device, const wchar_t *name) :
+Model::Model(const Device& device, const wchar_t* name) :
 	m_device(device),
 	m_currentFrame(0),
 	m_baseSlot(BASE_SLOT),
@@ -31,10 +31,10 @@ Model::~Model()
 {
 }
 
-bool Model::Init(const InputLayout &inputLayout, const shared_ptr<SDKMesh> &mesh,
-	const shared_ptr<ShaderPool> &shaderPool, const shared_ptr<PipelineCache> &pipelineCache,
-	const shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
-	const shared_ptr <DescriptorTableCache> &descriptorTableCache)
+bool Model::Init(const InputLayout& inputLayout, const shared_ptr<SDKMesh>& mesh,
+	const shared_ptr<ShaderPool>& shaderPool, const shared_ptr<PipelineCache>& pipelineCache,
+	const shared_ptr<PipelineLayoutCache>& pipelineLayoutCache,
+	const shared_ptr <DescriptorTableCache>& descriptorTableCache)
 {
 	// Set shader pool and states
 	m_shaderPool = shaderPool;
@@ -58,8 +58,8 @@ void Model::Update(uint8_t frameIndex)
 	m_previousFrame = (frameIndex + FrameCount - 1) % FrameCount;
 }
 
-void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX *pShadowView,
-	FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
+void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX* pShadowView,
+	FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto worldViewProj = XMMatrixMultiply(world, viewProj);
@@ -71,7 +71,7 @@ void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX *pShadowV
 	pCBData->Normal = XMMatrixInverse(nullptr, world);
 	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose once
 	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose twice
-	
+
 	if (pShadowView)
 	{
 		const auto shadow = XMMatrixMultiply(world, *pShadowView);
@@ -83,7 +83,7 @@ void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX *pShadowV
 		for (auto i = 0ui8; i < numShadows; ++i)
 		{
 			const auto shadow = XMMatrixMultiply(world, pShadows[i]);
-			auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrices.Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
+			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrices.Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
 			cbData = XMMatrixTranspose(shadow);
 		}
 	}
@@ -98,19 +98,19 @@ void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX *pShadowV
 #endif
 }
 
-void Model::SetPipelineLayout(const CommandList &commandList, PipelineLayoutIndex layout)
+void Model::SetPipelineLayout(const CommandList& commandList, PipelineLayoutIndex layout)
 {
 	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 	if (layout != DEPTH_PASS)
 		commandList.SetGraphicsDescriptorTable(m_baseSlot + SAMPLERS_OFFSET, m_samplerTable);
 }
 
-void Model::SetPipeline(const CommandList &commandList, PipelineIndex pipeline)
+void Model::SetPipeline(const CommandList& commandList, PipelineIndex pipeline)
 {
 	commandList.SetPipelineState(m_pipelines[pipeline]);
 }
 
-void Model::SetPipeline(const CommandList &commandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout)
+void Model::SetPipeline(const CommandList& commandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout)
 {
 	subsetFlags = subsetFlags & SUBSET_FULL;
 	assert(subsetFlags != SUBSET_FULL);
@@ -130,7 +130,7 @@ void Model::SetPipeline(const CommandList &commandList, SubsetFlags subsetFlags,
 		//SetPipeline(commandList, REFLECTED); 
 }
 
-void Model::Render(const CommandList &commandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+void Model::Render(const CommandList& commandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
 	PipelineLayoutIndex layout, uint32_t numInstances)
 {
 	if (layout < GLOBAL_BASE_PASS)
@@ -160,7 +160,7 @@ void Model::Render(const CommandList &commandList, SubsetFlags subsetFlags, uint
 	if (layout < GLOBAL_BASE_PASS) commandList.IASetVertexBuffers(0, 1, nullptr);
 }
 
-InputLayout Model::CreateInputLayout(PipelineCache &pipelineCache)
+InputLayout Model::CreateInputLayout(PipelineCache& pipelineCache)
 {
 	// Define vertex data layout for post-transformed objects
 	const auto offset = 0xffffffff;
@@ -176,8 +176,8 @@ InputLayout Model::CreateInputLayout(PipelineCache &pipelineCache)
 	return pipelineCache.CreateInputLayout(inputElementDescs);
 }
 
-shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device &device, const wstring &meshFileName,
-	const TextureCache &textureCache, bool isStaticMesh)
+shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device& device, const wstring& meshFileName,
+	const TextureCache& textureCache, bool isStaticMesh)
 {
 	// Load the mesh
 	const auto mesh = make_shared<SDKMesh>();
@@ -197,7 +197,7 @@ bool Model::createConstantBuffers()
 	return true;
 }
 
-bool Model::createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
+bool Model::createPipelines(bool isStatic, const InputLayout& inputLayout, const Format* rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
 	const auto defaultRtvFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -257,7 +257,7 @@ bool Model::createPipelines(bool isStatic, const InputLayout &inputLayout, const
 	if (vsDepth || vsShadow)
 	{
 		const Format nullRtvFormats[8] = {};
-		
+
 		// Get depth pipelines
 		state.RSSetState(Graphics::RasterizerPreset::CULL_BACK, *m_pipelineCache);
 		state.DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, *m_pipelineCache);
@@ -328,7 +328,7 @@ bool Model::createDescriptorTables()
 	const SamplerPreset samplers[] = { ANISOTROPIC_WRAP, POINT_WRAP, LINEAR_LESS_EQUAL };
 	samplerTable.SetSamplers(0, static_cast<uint32_t>(size(samplers)), samplers, *m_descriptorTableCache);
 	X_RETURN(m_samplerTable, samplerTable.GetSamplerTable(*m_descriptorTableCache), false);
-	
+
 	// Materials
 	const auto numMaterials = m_mesh->GetNumMaterials();
 	m_srvTables.resize(numMaterials);
@@ -349,7 +349,7 @@ bool Model::createDescriptorTables()
 	return true;
 }
 
-void Model::render(const CommandList &commandList, uint32_t mesh, PipelineLayoutIndex layout,
+void Model::render(const CommandList& commandList, uint32_t mesh, PipelineLayoutIndex layout,
 	SubsetFlags subsetFlags, uint32_t numInstances)
 {
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
@@ -450,7 +450,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 			const uint8_t immutableSlot = m_baseSlot + IMMUTABLE_OFFSET;
 			utilPipelineLayout.SetRange(immutableSlot, DescriptorType::CBV, 1, cbImmutable,
 				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-				utilPipelineLayout.SetShaderStage(immutableSlot, Shader::Stage::PS);
+			utilPipelineLayout.SetShaderStage(immutableSlot, Shader::Stage::PS);
 		}
 
 		// Textures (material and shadow)

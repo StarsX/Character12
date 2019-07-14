@@ -8,7 +8,7 @@ using namespace std;
 using namespace DirectX;
 using namespace XUSG;
 
-Character::Character(const Device &device, const wchar_t *name) :
+Character::Character(const Device& device, const wchar_t* name) :
 	Model(device, name),
 	m_computePipelineCache(nullptr),
 	m_skinningPipelineLayout(nullptr),
@@ -30,16 +30,16 @@ Character::~Character(void)
 {
 }
 
-bool Character::Init(const InputLayout &inputLayout,
-	const shared_ptr<SDKMesh> &mesh,
-	const shared_ptr<ShaderPool> &shaderPool,
-	const shared_ptr<Graphics::PipelineCache> &graphicsPipelineCache,
-	const shared_ptr<Compute::PipelineCache> &computePipelineCache,
-	const shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
-	const shared_ptr<DescriptorTableCache> &descriptorTableCache,
-	const shared_ptr<vector<SDKMesh>> &linkedMeshes,
-	const shared_ptr<vector<MeshLink>> &meshLinks,
-	const Format *rtvFormats, uint32_t numRTVs,
+bool Character::Init(const InputLayout& inputLayout,
+	const shared_ptr<SDKMesh>& mesh,
+	const shared_ptr<ShaderPool>& shaderPool,
+	const shared_ptr<Graphics::PipelineCache>& graphicsPipelineCache,
+	const shared_ptr<Compute::PipelineCache>& computePipelineCache,
+	const shared_ptr<PipelineLayoutCache>& pipelineLayoutCache,
+	const shared_ptr<DescriptorTableCache>& descriptorTableCache,
+	const shared_ptr<vector<SDKMesh>>& linkedMeshes,
+	const shared_ptr<vector<MeshLink>>& meshLinks,
+	const Format* rtvFormats, uint32_t numRTVs,
 	Format dsvFormat, Format shadowFormat)
 {
 	m_computePipelineCache = computePipelineCache;
@@ -66,7 +66,7 @@ bool Character::Init(const InputLayout &inputLayout,
 	return true;
 }
 
-void Character::InitPosition(const XMFLOAT4 &posRot)
+void Character::InitPosition(const XMFLOAT4& posRot)
 {
 	m_vPosRot = posRot;
 }
@@ -77,8 +77,8 @@ void Character::Update(uint8_t frameIndex, double time)
 	m_time = time;
 }
 
-void Character::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj, FXMMATRIX *pWorld,
-	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
+void Character::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj, FXMMATRIX* pWorld,
+	FXMMATRIX* pShadowView, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
 {
 	Model::Update(frameIndex);
 
@@ -91,8 +91,8 @@ void Character::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj, FXMM
 	m_time = -1.0;
 }
 
-void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld,
-	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
+void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX* pWorld,
+	FXMMATRIX* pShadowView, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
 {
 	XMMATRIX world;
 	if (!pWorld)
@@ -114,14 +114,14 @@ void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX *pWorld,
 	}
 }
 
-void Character::SetSkinningPipeline(const CommandList &commandList)
+void Character::SetSkinningPipeline(const CommandList& commandList)
 {
 	commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
 	commandList.SetPipelineState(m_skinningPipeline);
 }
 
-void Character::Skinning(const CommandList &commandList, uint32_t &numBarriers,
-	ResourceBarrier *pBarriers, bool reset)
+void Character::Skinning(const CommandList& commandList, uint32_t& numBarriers,
+	ResourceBarrier* pBarriers, bool reset)
 {
 	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
 	m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -132,7 +132,7 @@ void Character::Skinning(const CommandList &commandList, uint32_t &numBarriers,
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, numBarriers);
 }
 
-void Character::RenderTransformed(const CommandList &commandList, PipelineLayoutIndex layout,
+void Character::RenderTransformed(const CommandList& commandList, PipelineLayoutIndex layout,
 	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
 {
 	renderTransformed(commandList, layout, subsetFlags, matrixTableIndex, numInstances);
@@ -144,7 +144,7 @@ void Character::RenderTransformed(const CommandList &commandList, PipelineLayout
 	}
 }
 
-const XMFLOAT4 &Character::GetPosition() const
+const XMFLOAT4& Character::GetPosition() const
 {
 	return m_vPosRot;
 }
@@ -154,10 +154,10 @@ FXMMATRIX Character::GetWorldMatrix() const
 	return XMLoadFloat4x4(&m_mWorld);
 }
 
-shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &meshFileName,
-	const wstring &animFileName, const TextureCache &textureCache,
-	const shared_ptr<vector<MeshLink>> &meshLinks,
-	vector<SDKMesh> *linkedMeshes)
+shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device& device, const wstring& meshFileName,
+	const wstring& animFileName, const TextureCache& textureCache,
+	const shared_ptr<vector<MeshLink>>& meshLinks,
+	vector<SDKMesh>* linkedMeshes)
 {
 	// Load the animated mesh
 	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache, false);
@@ -181,7 +181,7 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device &device, const wstring &
 
 		for (auto m = 0ui8; m < numLinks; ++m)
 		{
-			auto &meshInfo = meshLinks->at(m);
+			auto& meshInfo = meshLinks->at(m);
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
 			N_RETURN(linkedMeshes->at(m).Create(device.get(), meshInfo.MeshName.c_str(),
 				textureCache), nullptr);
@@ -202,7 +202,7 @@ bool Character::createTransformedStates()
 	return true;
 }
 
-bool Character::createTransformedVBs(VertexBuffer &vertexBuffer, ResourceState state)
+bool Character::createTransformedVBs(VertexBuffer& vertexBuffer, ResourceState state)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
 	auto numVertices = 0u;
@@ -244,11 +244,11 @@ bool Character::createBuffers()
 
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
-	for (auto &cbLinkedMatrices : m_cbLinkedMatrices)
+	for (auto& cbLinkedMatrices : m_cbLinkedMatrices)
 		N_RETURN(cbLinkedMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount), false);
 
 	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
-	for (auto &cbLinkedMatrix : m_cbLinkedShadowMatrices)
+	for (auto& cbLinkedMatrix : m_cbLinkedShadowMatrices)
 		N_RETURN(cbLinkedMatrix.Create(m_device, sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
 			MAX_SHADOW_CASCADES * FrameCount), false);
 
@@ -353,7 +353,7 @@ bool Character::createPipelineLayouts()
 	return true;
 }
 
-bool Character::createPipelines(const InputLayout &inputLayout, const Format *rtvFormats,
+bool Character::createPipelines(const InputLayout& inputLayout, const Format* rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
 	// Skinning
@@ -404,7 +404,7 @@ bool Character::createDescriptorTables()
 }
 
 void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX world,
-	FXMMATRIX *pShadowView, FXMMATRIX *pShadows, uint8_t numShadows, bool isTemporal)
+	FXMMATRIX* pShadowView, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).BoneIndex);
@@ -430,7 +430,7 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 		for (auto i = 0ui8; i < numShadows; ++i)
 		{
 			const auto shadow = XMMatrixMultiply(model, pShadows[i]);
-			auto &cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh].Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
+			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh].Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
 			cbData = XMMatrixTranspose(shadow);
 		}
 	}
@@ -445,7 +445,7 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 #endif
 }
 
-void Character::skinning(const CommandList &commandList, bool reset)
+void Character::skinning(const CommandList& commandList, bool reset)
 {
 	if (reset)
 	{
@@ -467,14 +467,14 @@ void Character::skinning(const CommandList &commandList, bool reset)
 		// Setup descriptor tables
 		commandList.SetComputeDescriptorTable(INPUT, m_srvSkinningTables[m_currentFrame][m]);
 		commandList.SetComputeDescriptorTable(OUTPUT, m_uavSkinningTables[m_currentFrame][m]);
-		
+
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 		commandList.Dispatch(DIV_UP(numVertices, 64), 1, 1);
 	}
 }
 
-void Character::renderTransformed(const CommandList &commandList, PipelineLayoutIndex layout,
+void Character::renderTransformed(const CommandList& commandList, PipelineLayoutIndex layout,
 	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
 {
 	if (layout < GLOBAL_BASE_PASS)
@@ -495,7 +495,7 @@ void Character::renderTransformed(const CommandList &commandList, PipelineLayout
 	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	for (const auto &subsetMask : subsetMasks)
+	for (const auto& subsetMask : subsetMasks)
 	{
 		if (layout < GLOBAL_BASE_PASS && subsetMask != SUBSET_OPAQUE)
 			commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
@@ -561,7 +561,7 @@ void Character::setBoneMatrices(uint32_t mesh)
 }
 
 // Convert unit quaternion and translation to unit dual quaternion
-void Character::convertToDQ(XMFLOAT4 &dqTran, CXMVECTOR quat, const XMFLOAT3 &tran) const
+void Character::convertToDQ(XMFLOAT4& dqTran, CXMVECTOR quat, const XMFLOAT3& tran) const
 {
 	XMFLOAT4 dqRot;
 	XMStoreFloat4(&dqRot, quat);

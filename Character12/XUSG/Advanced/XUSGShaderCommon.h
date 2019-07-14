@@ -34,7 +34,7 @@ enum PixelShader : uint8_t
 	PS_DEPTH,
 	PS_ALPHA_TEST,
 	PS_ALPHA_TEST_STATIC,
-	
+
 	PS_SKYDOME,
 	PS_SS_REFLECT,
 	PS_WATER,

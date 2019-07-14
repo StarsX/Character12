@@ -72,26 +72,26 @@ namespace XUSG
 			NUM_CBV_TABLE = CBV_SHADOW_MATRIX + MAX_SHADOW_CASCADES
 		};
 
-		Model(const Device &device, const wchar_t *name);
+		Model(const Device& device, const wchar_t* name);
 		virtual ~Model();
 
-		bool Init(const InputLayout &inputLayout, const std::shared_ptr<SDKMesh> &mesh,
-			const std::shared_ptr<ShaderPool> &shaderPool,
-			const std::shared_ptr<Graphics::PipelineCache> &pipelineCache,
-			const std::shared_ptr<PipelineLayoutCache> &pipelineLayoutCache,
-			const std::shared_ptr<DescriptorTableCache> &descriptorTableCache);
+		bool Init(const InputLayout& inputLayout, const std::shared_ptr<SDKMesh>& mesh,
+			const std::shared_ptr<ShaderPool>& shaderPool,
+			const std::shared_ptr<Graphics::PipelineCache>& pipelineCache,
+			const std::shared_ptr<PipelineLayoutCache>& pipelineLayoutCache,
+			const std::shared_ptr<DescriptorTableCache>& descriptorTableCache);
 		void Update(uint8_t frameIndex);
-		void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world, DirectX::FXMMATRIX *pShadowView = nullptr,
-			DirectX::FXMMATRIX *pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
-		void SetPipelineLayout(const CommandList &commandList, PipelineLayoutIndex layout);
-		void SetPipeline(const CommandList &commandList, PipelineIndex pipeline);
-		void SetPipeline(const CommandList &commandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
-		void Render(const CommandList &commandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+		void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world, DirectX::FXMMATRIX* pShadowView = nullptr,
+			DirectX::FXMMATRIX* pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
+		void SetPipelineLayout(const CommandList& commandList, PipelineLayoutIndex layout);
+		void SetPipeline(const CommandList& commandList, PipelineIndex pipeline);
+		void SetPipeline(const CommandList& commandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
+		void Render(const CommandList& commandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
 			PipelineLayoutIndex layout = NUM_PIPELINE_LAYOUT, uint32_t numInstances = 1);
 
-		static InputLayout CreateInputLayout(Graphics::PipelineCache &pipelineCache);
-		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device &device, const std::wstring &meshFileName,
-			const TextureCache &textureCache, bool isStaticMesh);
+		static InputLayout CreateInputLayout(Graphics::PipelineCache& pipelineCache);
+		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device& device, const std::wstring& meshFileName,
+			const TextureCache& textureCache, bool isStaticMesh);
 
 		static constexpr uint32_t GetFrameCount() { return FrameCount; }
 
@@ -108,10 +108,10 @@ namespace XUSG
 		};
 
 		bool createConstantBuffers();
-		bool createPipelines(bool isStatic, const InputLayout &inputLayout, const Format *rtvFormats,
+		bool createPipelines(bool isStatic, const InputLayout& inputLayout, const Format* rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		bool createDescriptorTables();
-		void render(const CommandList &commandList, uint32_t mesh, PipelineLayoutIndex layout,
+		void render(const CommandList& commandList, uint32_t mesh, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlags, uint32_t numInstances);
 
 		Util::PipelineLayout initPipelineLayout(VertexShader vs, PixelShader ps);

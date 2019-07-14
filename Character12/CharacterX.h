@@ -91,5 +91,5 @@ private:
 	void PopulateCommandList();
 	void WaitForGpu();
 	void MoveToNextFrame();
-	double CalculateFrameStats(float *fTimeStep = nullptr);
+	double CalculateFrameStats(float* fTimeStep = nullptr);
 };

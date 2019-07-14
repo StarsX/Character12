@@ -93,7 +93,7 @@ void CharacterX::LoadPipeline()
 		nullptr,
 		nullptr,
 		&swapChain
-		));
+	));
 
 	// This sample does not support fullscreen transitions.
 	ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
@@ -119,7 +119,7 @@ void CharacterX::LoadPipeline()
 
 	// Create a DSV
 	N_RETURN(m_depth.Create(m_device, m_width, m_height, DXGI_FORMAT_D24_UNORM_S8_UINT,
-			D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE), ThrowIfFailed(E_FAIL));
+		D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE), ThrowIfFailed(E_FAIL));
 }
 
 // Load the sample assets.
@@ -159,7 +159,7 @@ void CharacterX::LoadAssets()
 
 	// Close the command list and execute it to begin the initial GPU setup.
 	ThrowIfFailed(m_commandList.Close());
-	ID3D12CommandList *const ppCommandLists[] = { m_commandList.GetCommandList().get() };
+	ID3D12CommandList* const ppCommandLists[] = { m_commandList.GetCommandList().get() };
 	m_commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
@@ -203,7 +203,7 @@ void CharacterX::OnUpdate()
 {
 	// Timer
 	static auto time = 0.0, pauseTime = 0.0;
-	
+
 	m_timer.Tick();
 	const auto totalTime = CalculateFrameStats();
 	pauseTime = m_pausing ? totalTime - time : pauseTime;
@@ -226,7 +226,7 @@ void CharacterX::OnRender()
 	PopulateCommandList();
 
 	// Execute the command list.
-	ID3D12CommandList *const ppCommandLists[] = { m_commandList.GetCommandList().get() };
+	ID3D12CommandList* const ppCommandLists[] = { m_commandList.GetCommandList().get() };
 	m_commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
 
 	// Present the frame.
@@ -343,7 +343,7 @@ void CharacterX::PopulateCommandList()
 	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	m_commandList.Barrier(numBarriers, barriers);
 	m_commandList.OMSetRenderTargets(1, m_rtvTables[m_frameIndex], &m_depth.GetDSV());
-	
+
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList.ClearRenderTargetView(*m_rtvTables[m_frameIndex], clearColor, 0, nullptr);
@@ -391,7 +391,7 @@ void CharacterX::MoveToNextFrame()
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;
 }
 
-double CharacterX::CalculateFrameStats(float *pTimeStep)
+double CharacterX::CalculateFrameStats(float* pTimeStep)
 {
 	static int frameCnt = 0;
 	static double elapsedTime = 0.0;
@@ -414,7 +414,7 @@ double CharacterX::CalculateFrameStats(float *pTimeStep)
 		SetCustomWindowText(windowText.str().c_str());
 	}
 
-	if (pTimeStep) *pTimeStep = static_cast<float>(totalTime - previousTime);
+	if (pTimeStep)* pTimeStep = static_cast<float>(totalTime - previousTime);
 	previousTime = totalTime;
 
 	return totalTime;

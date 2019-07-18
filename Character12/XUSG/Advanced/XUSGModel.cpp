@@ -440,7 +440,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
 
 #if TEMPORAL_AA
-	utilPipelineLayout.SetConstants(TEMPORAL_BIAS, 2, cbTempBias, 0, Shader::Stage::VS);
+	utilPipelineLayout.SetConstants(TEMPORAL_BIAS, SizeOfInUint32(XMFLOAT2), cbTempBias, 0, Shader::Stage::VS);
 #endif
 
 	if (ps != PS_NULL_INDEX)
@@ -463,7 +463,8 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 
 		const uint8_t shadowSlot = m_baseSlot + SHADOW_MAP_OFFSET;
 		if (ps == PS_DEPTH)
-			utilPipelineLayout.SetConstants(m_baseSlot + ALPHA_REF_OFFSET, 2, cbPerObject, 0, Shader::Stage::PS);
+			utilPipelineLayout.SetConstants(m_baseSlot + ALPHA_REF_OFFSET,
+				SizeOfInUint32(XMFLOAT2), cbPerObject, 0, Shader::Stage::PS);
 		else
 		{
 			utilPipelineLayout.SetRange(shadowSlot, DescriptorType::SRV, 1, txShadow);

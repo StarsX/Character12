@@ -65,7 +65,6 @@ private:
 
 	// App resources.
 	std::unique_ptr<XUSG::Character> m_character;
-	XUSG::RenderTargetTable	m_rtvTables[FrameCount];
 	XUSG::DepthStencil		m_depth;
 	XMFLOAT4X4	m_proj;
 	XMFLOAT4X4	m_view;

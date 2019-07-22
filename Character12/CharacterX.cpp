@@ -109,11 +109,6 @@ void CharacterX::LoadPipeline()
 	for (auto n = 0u; n < FrameCount; n++)
 	{
 		N_RETURN(m_renderTargets[n].CreateFromSwapChain(m_device, m_swapChain, n), ThrowIfFailed(E_FAIL));
-
-		Util::DescriptorTable rtvTable;
-		rtvTable.SetDescriptors(0, 1, &m_renderTargets[n].GetRTV());
-		m_rtvTables[n] = rtvTable.GetRtvTable(*m_descriptorTableCache);
-
 		ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
 	}
 
@@ -342,11 +337,11 @@ void CharacterX::PopulateCommandList()
 	// Indicate that the back buffer will be used as a render target.
 	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	m_commandList.Barrier(numBarriers, barriers);
-	m_commandList.OMSetRenderTargets(1, m_rtvTables[m_frameIndex], &m_depth.GetDSV());
+	m_commandList.OMSetRenderTargets(1, &m_renderTargets[m_frameIndex].GetRTV(), &m_depth.GetDSV());
 
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	m_commandList.ClearRenderTargetView(*m_rtvTables[m_frameIndex], clearColor, 0, nullptr);
+	m_commandList.ClearRenderTargetView(m_renderTargets[m_frameIndex].GetRTV(), clearColor, 0, nullptr);
 	m_commandList.ClearDepthStencilView(m_depth.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 	//m_commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 

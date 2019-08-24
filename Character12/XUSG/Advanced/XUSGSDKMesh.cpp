@@ -2,7 +2,6 @@
 // By Stars XU Tianchen
 //--------------------------------------------------------------------------------------
 
-#include "DXFrameworkHelper.h"
 #include "XUSGSDKMesh.h"
 #include "XUSGDDSLoader.h"
 
@@ -759,10 +758,9 @@ bool SDKMesh::createFromMemory(const Device& device, uint8_t* pData,
 	CommandList commandList;
 	if (device)
 	{
-		V_RETURN(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-			IID_PPV_ARGS(&commandAllocator)), cerr, false);
-		V_RETURN(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator.get(),
-			nullptr, IID_PPV_ARGS(&commandList.GetCommandList())), cerr, false);
+		N_RETURN(m_device->GetCommandAllocator(commandAllocator, CommandListType::DIRECT), false);
+		N_RETURN(m_device->GetCommandList(commandList.GetCommandList(), 0, CommandListType::DIRECT,
+			commandAllocator, nullptr), false);
 	}
 
 	F_RETURN(dataBytes < sizeof(SDKMeshHeader), cerr, E_FAIL, false);
@@ -1033,27 +1031,22 @@ bool SDKMesh::executeCommandList(CommandList& commandList)
 {
 	if (commandList.GetCommandList())
 	{
-		// Describe and create the command queue.
-		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-		com_ptr<ID3D12CommandQueue> commandQueue = nullptr;
-		V_RETURN(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)), cerr, false);
+		// Create the command queue.
+		CommandQueue commandQueue = nullptr;
+		N_RETURN(m_device->GetCommandQueue(commandQueue, CommandListType::DIRECT, CommandQueueFlags::NONE), false);
 
 		// Close the command list and execute it to begin the initial GPU setup.
 		V_RETURN(commandList.Close(), cerr, false);
-		ID3D12CommandList* const ppCommandLists[] = { commandList.GetCommandList().get() };
+		BaseCommandList* const ppCommandLists[] = { commandList.GetCommandList().get() };
 		commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
 
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
 		{
-			HANDLE fenceEvent;
-			com_ptr<ID3D12Fence> fence;
+			void* fenceEvent;
+			Fence fence;
 			uint64_t fenceValue = 0;
 
-			V_RETURN(m_device->CreateFence(fenceValue++, D3D12_FENCE_FLAG_NONE,
-				IID_PPV_ARGS(&fence)), cerr, false);
+			N_RETURN(m_device->GetFence(fence, fenceValue++, FenceFlag::NONE), false);
 
 			// Create an event handle to use for frame synchronization.
 			fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);

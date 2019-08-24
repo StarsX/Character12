@@ -166,11 +166,11 @@ InputLayout Model::CreateInputLayout(PipelineCache& pipelineCache)
 	const auto offset = 0xffffffff;
 	InputElementTable inputElementDescs =
 	{
-		{ "POSITION",	0, DXGI_FORMAT_R32G32B32_FLOAT,		0, 0,		D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "NORMAL",		0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD",	0, DXGI_FORMAT_R16G16_FLOAT,		0, offset,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TANGENT",	0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "BINORMAL",	0, DXGI_FORMAT_R16G16B16A16_FLOAT,	0, offset,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,		InputClassification::PER_VERTEX_DATA, 0 },
+		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, offset,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, offset,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, offset,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "BINORMAL",	0, Format::R16G16B16A16_FLOAT,	0, offset,	InputClassification::PER_VERTEX_DATA, 0 }
 	};
 
 	return pipelineCache.CreateInputLayout(inputElementDescs);
@@ -189,9 +189,9 @@ shared_ptr<SDKMesh> Model::LoadSDKMesh(const Device& device, const wstring& mesh
 bool Model::createConstantBuffers()
 {
 	N_RETURN(m_cbMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
-		D3D12_HEAP_TYPE_UPLOAD, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
+		MemoryType::UPLOAD, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 	N_RETURN(m_cbShadowMatrices.Create(m_device, sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
-		MAX_SHADOW_CASCADES * FrameCount, nullptr, D3D12_HEAP_TYPE_UPLOAD, m_name.empty() ? nullptr :
+		MAX_SHADOW_CASCADES * FrameCount, nullptr, MemoryType::UPLOAD, m_name.empty() ? nullptr :
 		(m_name + L".CBShadowMatrices").c_str()), false);
 
 	return true;
@@ -200,11 +200,11 @@ bool Model::createConstantBuffers()
 bool Model::createPipelines(bool isStatic, const InputLayout& inputLayout, const Format* rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
-	const auto defaultRtvFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+	const auto defaultRtvFormat = Format::B8G8R8A8_UNORM;
 	numRTVs = numRTVs > 0 ? numRTVs : 1;
 	rtvFormats = rtvFormats ? rtvFormats : &defaultRtvFormat;
-	dsvFormat = dsvFormat ? dsvFormat : DXGI_FORMAT_D24_UNORM_S8_UINT;
-	shadowFormat = shadowFormat ? shadowFormat : DXGI_FORMAT_D16_UNORM;
+	dsvFormat = dsvFormat != Format::UNKNOWN ? dsvFormat : Format::D24_UNORM_S8_UINT;
+	shadowFormat = shadowFormat != Format::UNKNOWN ? shadowFormat : Format::D16_UNORM;
 
 	Graphics::State state;
 
@@ -216,7 +216,7 @@ bool Model::createPipelines(bool isStatic, const InputLayout& inputLayout, const
 
 		// Get opaque pipelines
 		state.IASetInputLayout(inputLayout);
-		state.IASetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+		state.IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 		state.SetPipelineLayout(m_pipelineLayouts[BASE_PASS]);
 		state.SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsBasePass));
 		state.SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psBasePass));
@@ -435,8 +435,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	Util::PipelineLayout utilPipelineLayout;
 
 	// Constant buffers
-	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices,
-		0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	utilPipelineLayout.SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices, 0, DescriptorRangeFlag::DATA_STATIC);
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
 
 #if TEMPORAL_AA
@@ -449,16 +448,15 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		{
 			const uint8_t immutableSlot = m_baseSlot + IMMUTABLE_OFFSET;
 			utilPipelineLayout.SetRange(immutableSlot, DescriptorType::CBV, 1, cbImmutable,
-				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+				0, DescriptorRangeFlag::DATA_STATIC);
 			utilPipelineLayout.SetShaderStage(immutableSlot, Shader::Stage::PS);
 		}
 
 		// Textures (material and shadow)
 		const uint8_t materialSlot = m_baseSlot + MATERIAL_OFFSET;
-		utilPipelineLayout.SetRange(materialSlot, DescriptorType::SRV, 1, txDiffuse,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+		utilPipelineLayout.SetRange(materialSlot, DescriptorType::SRV, 1, txDiffuse, 0, DescriptorRangeFlag::DATA_STATIC);
 		if (ps != PS_DEPTH) utilPipelineLayout.SetRange(materialSlot, DescriptorType::SRV,
-			1, txNormal, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+			1, txNormal, 0, DescriptorRangeFlag::DATA_STATIC);
 		utilPipelineLayout.SetShaderStage(materialSlot, Shader::Stage::PS);
 
 		const uint8_t shadowSlot = m_baseSlot + SHADOW_MAP_OFFSET;
@@ -469,7 +467,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		{
 			utilPipelineLayout.SetRange(shadowSlot, DescriptorType::SRV, 1, txShadow);
 			if (cbShadow != UINT32_MAX) utilPipelineLayout.SetRange(shadowSlot, DescriptorType::CBV,
-				1, cbShadow, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+				1, cbShadow, 0, DescriptorRangeFlag::DATA_STATIC);
 			utilPipelineLayout.SetShaderStage(shadowSlot, Shader::Stage::PS);
 		}
 

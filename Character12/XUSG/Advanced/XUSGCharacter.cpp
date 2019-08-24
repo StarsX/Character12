@@ -124,12 +124,12 @@ void Character::Skinning(const CommandList& commandList, uint32_t& numBarriers,
 	ResourceBarrier* pBarriers, bool reset)
 {
 	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
-	m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS);
 	skinning(commandList, reset);
 
 	// Prepare VBV | SRV states for the vertex buffer
-	numBarriers = m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER |
-		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, numBarriers);
+	numBarriers = m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, ResourceState::VERTEX_AND_CONSTANT_BUFFER |
+		ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
 }
 
 void Character::RenderTransformed(const CommandList& commandList, PipelineLayoutIndex layout,
@@ -195,9 +195,9 @@ bool Character::createTransformedStates()
 {
 	for (auto i = 0u; i < FrameCount; ++i)
 		N_RETURN(createTransformedVBs(m_transformedVBs[i],
-			i + 1 < FrameCount ? D3D12_RESOURCE_STATE_COMMON :
-			D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER |
-			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE), false);
+			i + 1 < FrameCount ? ResourceState::COMMON :
+			ResourceState::VERTEX_AND_CONSTANT_BUFFER |
+			ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
 
 	return true;
 }
@@ -216,9 +216,10 @@ bool Character::createTransformedVBs(VertexBuffer& vertexBuffer, ResourceState s
 	}
 
 	N_RETURN(vertexBuffer.Create(m_device, numVertices, sizeof(Vertex),
-		D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_HEAP_TYPE_DEFAULT, state,
+		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT, state,
 		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
-		numMeshes, firstVertices.data(), m_name.empty() ? nullptr : (m_name + L".TransformedVB").c_str()), false);
+		numMeshes, firstVertices.data(), m_name.empty() ? nullptr :
+		(m_name + L".TransformedVB").c_str()), false);
 
 	return true;
 }
@@ -237,9 +238,9 @@ bool Character::createBuffers()
 
 	for (auto i = 0ui8; i < FrameCount; ++i)
 	{
-		N_RETURN(m_boneWorlds[i].Create(m_device, numElements, sizeof(XMFLOAT4X3), D3D12_RESOURCE_FLAG_NONE,
-			D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ, numMeshes, firstElements.data(), 1, nullptr,
-			m_name.empty() ? nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
+		N_RETURN(m_boneWorlds[i].Create(m_device, numElements, sizeof(XMFLOAT4X3), ResourceFlag::NONE,
+			MemoryType::UPLOAD, ResourceState::GENERAL_READ, numMeshes, firstElements.data(), 1,
+			nullptr, m_name.empty() ? nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
 
 	// Linked meshes
@@ -277,21 +278,18 @@ bool Character::createPipelineLayouts()
 		Util::PipelineLayout utilPipelineLayout;
 
 		// Input vertices and bone matrices
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld, 0, DescriptorRangeFlag::DATA_STATIC);
+		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices, 0, DescriptorRangeFlag::DESCRIPTORS_VOLATILE);
 		utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
 
 		// Output vertices
-		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices,
-			0, D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE |
-			D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices, 0,
+			DescriptorRangeFlag::DESCRIPTORS_VOLATILE | DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
 		X_RETURN(m_skinningPipelineLayout, utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str()), false);
+			PipelineLayoutFlag::NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str()), false);
 	}
 
 	// Base pass
@@ -322,13 +320,12 @@ bool Character::createPipelineLayouts()
 
 		if (cbPerFrame != UINT32_MAX)
 		{
-			utilPipelineLayout.SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame,
-				0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+			utilPipelineLayout.SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, 0, DescriptorRangeFlag::DATA_STATIC);
 			utilPipelineLayout.SetShaderStage(PER_FRAME, Shader::Stage::PS);
 		}
 
 		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str()), false);
 	}
 
@@ -337,7 +334,7 @@ bool Character::createPipelineLayouts()
 		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_NULL_INDEX);
 
 		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str()), false);
 	}
 
@@ -346,7 +343,7 @@ bool Character::createPipelineLayouts()
 		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
 
 		X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthAlphaPassLayout").c_str()), false);
 	}
 

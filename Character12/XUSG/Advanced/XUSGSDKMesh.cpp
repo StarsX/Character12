@@ -188,36 +188,36 @@ void SDKMesh::TransformMesh(CXMMATRIX world, double time)
 //--------------------------------------------------------------------------------------
 PrimitiveTopology SDKMesh::GetPrimitiveType(SDKMeshPrimitiveType primType)
 {
-	PrimitiveTopology retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	PrimitiveTopology retType = PrimitiveTopology::TRIANGLELIST;
 
 	switch (primType)
 	{
 	case PT_TRIANGLE_LIST:
-		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		retType = PrimitiveTopology::TRIANGLELIST;
 		break;
 	case PT_TRIANGLE_STRIP:
-		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+		retType = PrimitiveTopology::TRIANGLESTRIP;
 		break;
 	case PT_LINE_LIST:
-		retType = D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+		retType = PrimitiveTopology::LINELIST;
 		break;
 	case PT_LINE_STRIP:
-		retType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+		retType = PrimitiveTopology::LINESTRIP;
 		break;
 	case PT_POINT_LIST:
-		retType = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+		retType = PrimitiveTopology::POINTLIST;
 		break;
 	case PT_TRIANGLE_LIST_ADJ:
-		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST_ADJ;
+		retType = PrimitiveTopology::TRIANGLELIST_ADJ;
 		break;
 	case PT_TRIANGLE_STRIP_ADJ:
-		retType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ;
+		retType = PrimitiveTopology::TRIANGLESTRIP_ADJ;
 		break;
 	case PT_LINE_LIST_ADJ:
-		retType = D3D_PRIMITIVE_TOPOLOGY_LINELIST_ADJ;
+		retType = PrimitiveTopology::LINELIST_ADJ;
 		break;
 	case PT_LINE_STRIP_ADJ:
-		retType = D3D_PRIMITIVE_TOPOLOGY_LINESTRIP_ADJ;
+		retType = PrimitiveTopology::LINESTRIP_ADJ;
 		break;
 	};
 
@@ -229,12 +229,12 @@ Format SDKMesh::GetIBFormat(uint32_t mesh) const
 	switch (m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].IndexType)
 	{
 	case IT_16BIT:
-		return DXGI_FORMAT_R16_UINT;
+		return Format::R16_UINT;
 	case IT_32BIT:
-		return DXGI_FORMAT_R32_UINT;
+		return Format::R32_UINT;
 	};
 
-	return DXGI_FORMAT_R16_UINT;
+	return Format::R16_UINT;
 }
 
 SDKMeshIndexType SDKMesh::GetIndexType(uint32_t mesh) const
@@ -651,8 +651,8 @@ bool SDKMesh::createVertexBuffer(const CommandList& commandList, std::vector<Res
 	}
 
 	// Create a vertex Buffer
-	N_RETURN(m_vertexBuffer.Create(m_device, numVertices, stride, D3D12_RESOURCE_FLAG_NONE,
-		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST,
+	N_RETURN(m_vertexBuffer.Create(m_device, numVertices, stride, ResourceFlag::NONE,
+		MemoryType::DEFAULT, ResourceState::COPY_DEST,
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
 		1, nullptr, m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
@@ -672,7 +672,7 @@ bool SDKMesh::createVertexBuffer(const CommandList& commandList, std::vector<Res
 	uploaders.push_back(nullptr);
 
 	return m_vertexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		bufferData.size(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+		bufferData.size(), ResourceState::VERTEX_AND_CONSTANT_BUFFER);
 }
 
 bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Resource>& uploaders)
@@ -689,10 +689,10 @@ bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Reso
 
 	// Create a vertex Buffer
 	N_RETURN(m_indexBuffer.Create(m_device, byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
-		DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT, D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE,
-		D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COPY_DEST,
-		m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1, nullptr,
-		m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
+		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE,
+		MemoryType::DEFAULT, ResourceState::COPY_DEST, m_pMeshHeader->NumIndexBuffers,
+		offsets.data(), 1, nullptr, 1, nullptr, m_name.empty() ? nullptr :
+		(m_name + L".IndexBuffer").c_str()), false);
 
 	// Copy indices into one buffer
 	auto offset = 0u;
@@ -709,7 +709,7 @@ bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Reso
 	uploaders.push_back(nullptr);
 
 	return m_indexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		bufferData.size(), D3D12_RESOURCE_STATE_INDEX_BUFFER);
+		bufferData.size(), ResourceState::INDEX_BUFFER);
 }
 
 //--------------------------------------------------------------------------------------
@@ -849,7 +849,7 @@ bool SDKMesh::createFromMemory(const Device& device, uint8_t* pData,
 			pSubset = GetSubset(m, subset);	//&m_pSubsetArray[currentMesh->pSubsets[subset]];
 
 			primType = GetPrimitiveType(static_cast<SDKMeshPrimitiveType>(pSubset->PrimitiveType));
-			assert(primType == D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);	// only triangle lists are handled.
+			assert(primType == PrimitiveTopology::TRIANGLELIST);	// only triangle lists are handled.
 
 			const auto indexCount = static_cast<uint32_t>(pSubset->IndexCount);
 			const auto indexStart = static_cast<uint32_t>(pSubset->IndexStart);

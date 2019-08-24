@@ -40,7 +40,7 @@ namespace XUSG
 			const std::shared_ptr<std::vector<SDKMesh>>& linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
-			Format dsvFormat = Format(0), Format shadowFormat = Format(0));
+			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN);
 		void InitPosition(const DirectX::XMFLOAT4& posRot);
 		void Update(uint8_t frameIndex, double time);
 		void Update(uint8_t frameIndex, double time, DirectX::CXMMATRIX viewProj,
@@ -79,7 +79,7 @@ namespace XUSG
 		};
 
 		bool createTransformedStates();
-		bool createTransformedVBs(VertexBuffer& vertexBuffer, ResourceState state = ResourceState(0));
+		bool createTransformedVBs(VertexBuffer& vertexBuffer, ResourceState state = ResourceState::COMMON);
 		bool createBuffers();
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout& inputLayout, const Format* rtvFormats,

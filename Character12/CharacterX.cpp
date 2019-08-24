@@ -113,8 +113,8 @@ void CharacterX::LoadPipeline()
 	}
 
 	// Create a DSV
-	N_RETURN(m_depth.Create(m_device, m_width, m_height, DXGI_FORMAT_D24_UNORM_S8_UINT,
-		D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE), ThrowIfFailed(E_FAIL));
+	N_RETURN(m_depth.Create(m_device, m_width, m_height, Format::D24_UNORM_S8_UINT,
+		ResourceFlag::DENY_SHADER_RESOURCE), ThrowIfFailed(E_FAIL));
 }
 
 // Load the sample assets.
@@ -335,20 +335,20 @@ void CharacterX::PopulateCommandList()
 	m_commandList.RSSetScissorRects(1, &m_scissorRect);
 
 	// Indicate that the back buffer will be used as a render target.
-	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, ResourceState::RENDER_TARGET);
 	m_commandList.Barrier(numBarriers, barriers);
 	m_commandList.OMSetRenderTargets(1, &m_renderTargets[m_frameIndex].GetRTV(), &m_depth.GetDSV());
 
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList.ClearRenderTargetView(m_renderTargets[m_frameIndex].GetRTV(), clearColor, 0, nullptr);
-	m_commandList.ClearDepthStencilView(m_depth.GetDSV(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	m_commandList.ClearDepthStencilView(m_depth.GetDSV(), ClearFlag::DEPTH, 1.0f, 0, 0, nullptr);
 	//m_commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	m_character->RenderTransformed(m_commandList, Character::BASE_PASS, SUBSET_FULL, Character::CBV_MATRICES);
 
 	// Indicate that the back buffer will now be used to present.
-	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, D3D12_RESOURCE_STATE_PRESENT);
+	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, ResourceState::PRESENT);
 	m_commandList.Barrier(numBarriers, barriers);
 
 	ThrowIfFailed(m_commandList.Close());

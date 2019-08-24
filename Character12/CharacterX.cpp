@@ -156,8 +156,7 @@ void CharacterX::LoadAssets()
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
-		N_RETURN(m_device->GetFence(m_fence, m_fenceValues[m_frameIndex], FenceFlag::NONE), ThrowIfFailed(E_FAIL));
-		m_fenceValues[m_frameIndex]++;
+		N_RETURN(m_device->GetFence(m_fence, m_fenceValues[m_frameIndex]++, FenceFlag::NONE), ThrowIfFailed(E_FAIL));
 
 		// Create an event handle to use for frame synchronization.
 		m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);

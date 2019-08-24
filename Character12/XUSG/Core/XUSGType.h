@@ -17,6 +17,8 @@
 #define DIV_UP(x, n)			(((x) - 1) / (n) + 1)
 #define SizeOfInUint32(obj)		DIV_UP(sizeof(obj), sizeof(uint32_t))
 
+#define APPEND_ALIGNED_ELEMENT	D3D12_APPEND_ALIGNED_ELEMENT
+
 namespace XUSG
 {
 	template <typename T>

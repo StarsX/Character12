@@ -163,14 +163,13 @@ void Model::Render(const CommandList& commandList, SubsetFlags subsetFlags, uint
 InputLayout Model::CreateInputLayout(PipelineCache& pipelineCache)
 {
 	// Define vertex data layout for post-transformed objects
-	const auto offset = 0xffffffff;
 	InputElementTable inputElementDescs =
 	{
-		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,		InputClassification::PER_VERTEX_DATA, 0 },
-		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, offset,	InputClassification::PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, offset,	InputClassification::PER_VERTEX_DATA, 0 },
-		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, offset,	InputClassification::PER_VERTEX_DATA, 0 },
-		{ "BINORMAL",	0, Format::R16G16B16A16_FLOAT,	0, offset,	InputClassification::PER_VERTEX_DATA, 0 }
+		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,						InputClassification::PER_VERTEX_DATA, 0 },
+		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "BINORMAL",	0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 }
 	};
 
 	return pipelineCache.CreateInputLayout(inputElementDescs);

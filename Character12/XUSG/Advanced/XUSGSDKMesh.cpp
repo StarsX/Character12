@@ -995,27 +995,27 @@ void SDKMesh::classifyMaterialType()
 			auto subsetType = SUBSET_OPAQUE - 1;
 			if (pMaterial && pMaterial->pAlbedo && !IsErrorResource(pMaterial->Albedo64))
 			{
-				switch (pMaterial->pAlbedo->GetResource()->GetDesc().Format)
+				switch (pMaterial->pAlbedo->GetFormat())
 				{
-				case DXGI_FORMAT_BC2_UNORM:
-				case DXGI_FORMAT_BC2_UNORM_SRGB:
-				case DXGI_FORMAT_BC3_UNORM:
-				case DXGI_FORMAT_BC3_UNORM_SRGB:
-				case DXGI_FORMAT_BC4_UNORM:
-				case DXGI_FORMAT_BC5_UNORM:
+				case Format::BC2_UNORM:
+				case Format::BC2_UNORM_SRGB:
+				case Format::BC3_UNORM:
+				case Format::BC3_UNORM_SRGB:
+				case Format::BC4_UNORM:
+				case Format::BC5_UNORM:
 
-				case DXGI_FORMAT_B8G8R8A8_UNORM:
-				case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
-				case DXGI_FORMAT_B5G5R5A1_UNORM:
-				case DXGI_FORMAT_B4G4R4A4_UNORM:
+				case Format::B8G8R8A8_UNORM:
+				case Format::B8G8R8A8_UNORM_SRGB:
+				case Format::B5G5R5A1_UNORM:
+				case Format::B4G4R4A4_UNORM:
 
-				case DXGI_FORMAT_R8G8B8A8_UNORM:
-				case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-				case DXGI_FORMAT_R10G10B10A2_UNORM:
+				case Format::R8G8B8A8_UNORM:
+				case Format::R8G8B8A8_UNORM_SRGB:
+				case Format::R10G10B10A2_UNORM:
 
-				case DXGI_FORMAT_R16G16B16A16_FLOAT:
-				case DXGI_FORMAT_R16G16B16A16_UNORM:
-				case DXGI_FORMAT_R32G32B32A32_FLOAT:
+				case Format::R16G16B16A16_FLOAT:
+				case Format::R16G16B16A16_UNORM:
+				case Format::R32G32B32A32_FLOAT:
 					subsetType = SUBSET_ALPHA - 1;
 				}
 			}

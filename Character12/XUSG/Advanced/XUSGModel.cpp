@@ -313,13 +313,13 @@ bool Model::createDescriptorTables()
 	{
 		Util::DescriptorTable cbMatricesTable;
 		cbMatricesTable.SetDescriptors(0, 1, &m_cbMatrices.GetCBV(i));
-		m_cbvTables[i][CBV_MATRICES] = cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+		X_RETURN(m_cbvTables[i][CBV_MATRICES], cbMatricesTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
 
 		for (auto j = 0ui8; j < MAX_SHADOW_CASCADES; ++j)
 		{
 			Util::DescriptorTable cbShadowTable;
 			cbShadowTable.SetDescriptors(0, 1, &m_cbShadowMatrices.GetCBV(i * MAX_SHADOW_CASCADES + j));
-			m_cbvTables[i][CBV_SHADOW_MATRIX + j] = cbShadowTable.GetCbvSrvUavTable(*m_descriptorTableCache);
+			X_RETURN(m_cbvTables[i][CBV_SHADOW_MATRIX + j], cbShadowTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
 		}
 	}
 

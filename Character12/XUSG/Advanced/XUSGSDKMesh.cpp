@@ -565,7 +565,7 @@ void SDKMesh::loadMaterials(const CommandList& commandList, SDKMeshMaterial* pMa
 			else
 			{
 				shared_ptr<ResourceBase> texture;
-				uploaders.push_back(nullptr);
+				uploaders.emplace_back();
 
 				filePathW = converter.from_bytes(filePath);
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
@@ -592,7 +592,7 @@ void SDKMesh::loadMaterials(const CommandList& commandList, SDKMeshMaterial* pMa
 			else
 			{
 				shared_ptr<ResourceBase> texture;
-				uploaders.push_back(nullptr);
+				uploaders.emplace_back();
 
 				filePathW = converter.from_bytes(filePath);
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
@@ -619,7 +619,7 @@ void SDKMesh::loadMaterials(const CommandList& commandList, SDKMeshMaterial* pMa
 			else
 			{
 				shared_ptr<ResourceBase> texture;
-				uploaders.push_back(nullptr);
+				uploaders.emplace_back();
 
 				filePathW = converter.from_bytes(filePath);
 				if (!textureLoader.CreateTextureFromFile(m_device, commandList, filePathW.c_str(),
@@ -668,7 +668,7 @@ bool SDKMesh::createVertexBuffer(const CommandList& commandList, std::vector<Res
 	}
 
 	// Upload vertices
-	uploaders.push_back(nullptr);
+	uploaders.emplace_back();
 
 	return m_vertexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
 		bufferData.size(), ResourceState::VERTEX_AND_CONSTANT_BUFFER);
@@ -705,7 +705,7 @@ bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Reso
 	}
 
 	// Upload indices
-	uploaders.push_back(nullptr);
+	uploaders.emplace_back();
 
 	return m_indexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
 		bufferData.size(), ResourceState::INDEX_BUFFER);
@@ -1019,7 +1019,7 @@ void SDKMesh::classifyMaterialType()
 					subsetType = SUBSET_ALPHA - 1;
 				}
 			}
-			m_classifiedSubsets[subsetType][m].push_back(subsetIdx);
+			m_classifiedSubsets[subsetType][m].emplace_back(subsetIdx);
 		}
 
 		m_classifiedSubsets[SUBSET_OPAQUE - 1][m].shrink_to_fit();

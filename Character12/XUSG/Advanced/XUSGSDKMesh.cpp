@@ -651,10 +651,9 @@ bool SDKMesh::createVertexBuffer(const CommandList& commandList, std::vector<Res
 
 	// Create a vertex Buffer
 	N_RETURN(m_vertexBuffer.Create(m_device, numVertices, stride, ResourceFlag::NONE,
-		MemoryType::DEFAULT, ResourceState::COPY_DEST,
-		m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
-		m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
-		1, nullptr, m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
+		MemoryType::DEFAULT, m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
+		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr,
+		m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
 
 	// Copy vertices into one buffer
 	auto offset = 0u;
@@ -670,8 +669,9 @@ bool SDKMesh::createVertexBuffer(const CommandList& commandList, std::vector<Res
 	// Upload vertices
 	uploaders.emplace_back();
 
-	return m_vertexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		bufferData.size(), ResourceState::VERTEX_AND_CONSTANT_BUFFER);
+	return m_vertexBuffer.Upload(commandList, uploaders.back(),
+		ResourceState::VERTEX_AND_CONSTANT_BUFFER,
+		bufferData.data(), bufferData.size());
 }
 
 bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Resource>& uploaders)
@@ -689,9 +689,8 @@ bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Reso
 	// Create a vertex Buffer
 	N_RETURN(m_indexBuffer.Create(m_device, byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
 		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE,
-		MemoryType::DEFAULT, ResourceState::COPY_DEST, m_pMeshHeader->NumIndexBuffers,
-		offsets.data(), 1, nullptr, 1, nullptr, m_name.empty() ? nullptr :
-		(m_name + L".IndexBuffer").c_str()), false);
+		MemoryType::DEFAULT, m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1,
+		nullptr, m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
 
 	// Copy indices into one buffer
 	auto offset = 0u;
@@ -707,8 +706,8 @@ bool SDKMesh::createIndexBuffer(const CommandList& commandList, std::vector<Reso
 	// Upload indices
 	uploaders.emplace_back();
 
-	return m_indexBuffer.Upload(commandList, uploaders.back(), bufferData.data(),
-		bufferData.size(), ResourceState::INDEX_BUFFER);
+	return m_indexBuffer.Upload(commandList, uploaders.back(), ResourceState::INDEX_BUFFER,
+		bufferData.data(), bufferData.size());
 }
 
 //--------------------------------------------------------------------------------------

@@ -194,15 +194,12 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device& device, const wstring& 
 bool Character::createTransformedStates()
 {
 	for (auto i = 0u; i < FrameCount; ++i)
-		N_RETURN(createTransformedVBs(m_transformedVBs[i],
-			i + 1 < FrameCount ? ResourceState::COMMON :
-			ResourceState::VERTEX_AND_CONSTANT_BUFFER |
-			ResourceState::NON_PIXEL_SHADER_RESOURCE), false);
+		N_RETURN(createTransformedVBs(m_transformedVBs[i]), false);
 
 	return true;
 }
 
-bool Character::createTransformedVBs(VertexBuffer& vertexBuffer, ResourceState state)
+bool Character::createTransformedVBs(VertexBuffer& vertexBuffer)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
 	auto numVertices = 0u;
@@ -216,7 +213,7 @@ bool Character::createTransformedVBs(VertexBuffer& vertexBuffer, ResourceState s
 	}
 
 	N_RETURN(vertexBuffer.Create(m_device, numVertices, sizeof(Vertex),
-		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT, state,
+		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
 		numMeshes, firstVertices.data(), m_name.empty() ? nullptr :
 		(m_name + L".TransformedVB").c_str()), false);
@@ -239,8 +236,8 @@ bool Character::createBuffers()
 	for (auto i = 0ui8; i < FrameCount; ++i)
 	{
 		N_RETURN(m_boneWorlds[i].Create(m_device, numElements, sizeof(XMFLOAT4X3), ResourceFlag::NONE,
-			MemoryType::UPLOAD, ResourceState::GENERAL_READ, numMeshes, firstElements.data(), 1,
-			nullptr, m_name.empty() ? nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
+			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, m_name.empty() ?
+			nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
 
 	// Linked meshes

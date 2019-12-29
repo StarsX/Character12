@@ -79,7 +79,7 @@ namespace XUSG
 		};
 
 		bool createTransformedStates();
-		bool createTransformedVBs(VertexBuffer& vertexBuffer, ResourceState state = ResourceState::COMMON);
+		bool createTransformedVBs(VertexBuffer& vertexBuffer);
 		bool createBuffers();
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout& inputLayout, const Format* rtvFormats,

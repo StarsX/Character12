@@ -124,7 +124,7 @@ void Character::Skinning(const CommandList& commandList, uint32_t& numBarriers,
 	ResourceBarrier* pBarriers, bool reset)
 {
 	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
-	m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS);
+	m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS); // Implicit state promotion
 	skinning(commandList, reset);
 
 	// Prepare VBV | SRV states for the vertex buffer

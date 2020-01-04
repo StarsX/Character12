@@ -993,24 +993,29 @@ void SDKMesh::classifyMaterialType()
 			{
 				switch (pMaterial->pAlbedo->GetFormat())
 				{
+				case Format::BC2_TYPELESS:
 				case Format::BC2_UNORM:
 				case Format::BC2_UNORM_SRGB:
+				case Format::BC3_TYPELESS:
 				case Format::BC3_UNORM:
 				case Format::BC3_UNORM_SRGB:
-				case Format::BC4_UNORM:
-				case Format::BC5_UNORM:
 
+				case Format::B8G8R8A8_TYPELESS:
 				case Format::B8G8R8A8_UNORM:
 				case Format::B8G8R8A8_UNORM_SRGB:
-				case Format::B5G5R5A1_UNORM:
 				case Format::B4G4R4A4_UNORM:
 
+				case Format::R8G8B8A8_TYPELESS:
 				case Format::R8G8B8A8_UNORM:
 				case Format::R8G8B8A8_UNORM_SRGB:
+				case Format::R8G8B8A8_SNORM:
 				case Format::R10G10B10A2_UNORM:
 
+				case Format::R16G16B16A16_TYPELESS:
 				case Format::R16G16B16A16_FLOAT:
 				case Format::R16G16B16A16_UNORM:
+				case Format::R16G16B16A16_SNORM:
+				case Format::R32G32B32A32_TYPELESS:
 				case Format::R32G32B32A32_FLOAT:
 					subsetType = SUBSET_ALPHA - 1;
 				}

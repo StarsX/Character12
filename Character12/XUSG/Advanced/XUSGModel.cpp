@@ -12,7 +12,7 @@ using namespace XUSG::Graphics;
 Model::Model(const Device& device, const wchar_t* name) :
 	m_device(device),
 	m_currentFrame(0),
-	m_baseSlot(BASE_SLOT),
+	m_variableSlot(VARIABLE_SLOT),
 	m_mesh(nullptr),
 	m_shaderPool(nullptr),
 	m_pipelineCache(nullptr),
@@ -102,7 +102,7 @@ void Model::SetPipelineLayout(const CommandList& commandList, PipelineLayoutInde
 {
 	commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 	if (layout != DEPTH_PASS)
-		commandList.SetGraphicsDescriptorTable(m_baseSlot + SAMPLERS_OFFSET, m_samplerTable);
+		commandList.SetGraphicsDescriptorTable(m_variableSlot + SAMPLERS_OFFSET, m_samplerTable);
 }
 
 void Model::SetPipeline(const CommandList& commandList, PipelineIndex pipeline)
@@ -143,7 +143,7 @@ void Model::Render(const CommandList& commandList, SubsetFlags subsetFlags, uint
 		commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 		commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		commandList.SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
-		commandList.SetGraphicsDescriptorTable(m_baseSlot + SAMPLERS_OFFSET, m_samplerTable);
+		commandList.SetGraphicsDescriptorTable(m_variableSlot + SAMPLERS_OFFSET, m_samplerTable);
 	}
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -373,7 +373,7 @@ void Model::render(const CommandList& commandList, uint32_t mesh, PipelineLayout
 		// Set material
 		if (layout != DEPTH_PASS && layout != GLOBAL_DEPTH_PASS &&
 			m_mesh->GetMaterial(pSubset->MaterialID) && m_srvTables[pSubset->MaterialID])
-			commandList.SetGraphicsDescriptorTable(m_baseSlot + MATERIAL_OFFSET, m_srvTables[pSubset->MaterialID]);
+			commandList.SetGraphicsDescriptorTable(m_variableSlot + MATERIAL_OFFSET, m_srvTables[pSubset->MaterialID]);
 
 		// Draw
 		commandList.DrawIndexed(static_cast<uint32_t>(pSubset->IndexCount), numInstances,
@@ -438,29 +438,30 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 	utilPipelineLayout.SetShaderStage(MATRICES, Shader::Stage::VS);
 
 #if TEMPORAL_AA
-	utilPipelineLayout.SetConstants(TEMPORAL_BIAS, SizeOfInUint32(XMFLOAT2), cbTempBias, 0, Shader::Stage::VS);
+	utilPipelineLayout.SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias, 0, DescriptorRangeFlag::DATA_STATIC);
+	utilPipelineLayout.SetShaderStage(TEMPORAL_BIAS, Shader::Stage::VS);
 #endif
 
 	if (ps != PS_NULL_INDEX)
 	{
 		if (ps != PS_DEPTH && cbImmutable != UINT32_MAX)
 		{
-			const uint8_t immutableSlot = m_baseSlot + IMMUTABLE_OFFSET;
+			const uint8_t immutableSlot = m_variableSlot + IMMUTABLE_OFFSET;
 			utilPipelineLayout.SetRange(immutableSlot, DescriptorType::CBV, 1, cbImmutable,
 				0, DescriptorRangeFlag::DATA_STATIC);
 			utilPipelineLayout.SetShaderStage(immutableSlot, Shader::Stage::PS);
 		}
 
 		// Textures (material and shadow)
-		const uint8_t materialSlot = m_baseSlot + MATERIAL_OFFSET;
+		const uint8_t materialSlot = m_variableSlot + MATERIAL_OFFSET;
 		utilPipelineLayout.SetRange(materialSlot, DescriptorType::SRV, 1, txDiffuse, 0, DescriptorRangeFlag::DATA_STATIC);
 		if (ps != PS_DEPTH) utilPipelineLayout.SetRange(materialSlot, DescriptorType::SRV,
 			1, txNormal, 0, DescriptorRangeFlag::DATA_STATIC);
 		utilPipelineLayout.SetShaderStage(materialSlot, Shader::Stage::PS);
 
-		const uint8_t shadowSlot = m_baseSlot + SHADOW_MAP_OFFSET;
+		const uint8_t shadowSlot = m_variableSlot + SHADOW_MAP_OFFSET;
 		if (ps == PS_DEPTH)
-			utilPipelineLayout.SetConstants(m_baseSlot + ALPHA_REF_OFFSET,
+			utilPipelineLayout.SetConstants(m_variableSlot + ALPHA_REF_OFFSET,
 				SizeOfInUint32(XMFLOAT2), cbPerObject, 0, Shader::Stage::PS);
 		else
 		{
@@ -471,7 +472,7 @@ Util::PipelineLayout Model::initPipelineLayout(VertexShader vs, PixelShader ps)
 		}
 
 		// Samplers
-		const uint8_t samplerSlot = m_baseSlot + SAMPLERS_OFFSET;
+		const uint8_t samplerSlot = m_variableSlot + SAMPLERS_OFFSET;
 		utilPipelineLayout.SetRange(samplerSlot, DescriptorType::SAMPLER, 2, smpAnisoWrap);
 		if (ps != PS_DEPTH) utilPipelineLayout.SetRange(samplerSlot, DescriptorType::SAMPLER, 1, smpLinearCmp);
 		utilPipelineLayout.SetShaderStage(samplerSlot, Shader::Stage::PS);

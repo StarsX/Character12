@@ -52,7 +52,7 @@ namespace XUSG
 #if TEMPORAL_AA
 			TEMPORAL_BIAS,
 #endif
-			BASE_SLOT
+			VARIABLE_SLOT
 		};
 
 		enum DescriptorTableSlotOffset : uint8_t
@@ -124,7 +124,7 @@ namespace XUSG
 		uint8_t		m_currentFrame;
 		uint8_t		m_previousFrame;
 
-		uint8_t		m_baseSlot;
+		uint8_t		m_variableSlot;
 
 		std::shared_ptr<SDKMesh>					m_mesh;
 		std::shared_ptr<ShaderPool>					m_shaderPool;

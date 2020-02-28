@@ -13,6 +13,19 @@ namespace XUSG
 		public Model
 	{
 	public:
+		enum DescriptorTableSlot : uint8_t
+		{
+			SAMPLERS	= VARIABLE_SLOT,
+			MATERIAL,
+			SHADOW_MAP,
+#if TEMPORAL
+			HISTORY,
+#endif
+			PER_FRAME,
+			IMMUATABLE,
+			ALPHA_REF	= SHADOW_MAP
+		};
+
 		struct Vertex
 		{
 			DirectX::XMFLOAT3	Pos;
@@ -65,17 +78,10 @@ namespace XUSG
 			std::vector<SDKMesh>* pLinkedMeshes = nullptr);
 
 	protected:
-		enum InternalDescriptorTableSlot : uint8_t
+		enum SkinningDescriptorTableSlot : uint8_t
 		{
 			INPUT,
-			OUTPUT,
-			SAMPLERS = BASE_SLOT,
-			MATERIAL,
-			SHADOW_ALPHA_REF,
-#if TEMPORAL
-			HISTORY,
-#endif
-			PER_FRAME
+			OUTPUT
 		};
 
 		bool createTransformedStates();
@@ -124,13 +130,5 @@ namespace XUSG
 
 		std::vector<ConstantBuffer> m_cbLinkedMatrices;
 		std::vector<ConstantBuffer> m_cbLinkedShadowMatrices;
-
-	public:
-		enum DescriptorTableSlot : uint8_t
-		{
-			SHADOW_MAP	= SHADOW_ALPHA_REF,
-			ALPHA_REF	= SHADOW_ALPHA_REF,
-			IMMUATABLE	= PER_FRAME + 1
-		};
 	};
 }

@@ -952,17 +952,17 @@ void SDKMesh::createAsStaticMesh()
 
 			for (auto i = 0u; i < numVerts; ++i)
 			{
-				auto loc = stride * i;
-				auto& pos = reinterpret_cast<XMFLOAT3&>(verts[loc]);
+				auto offset = stride * i;
+				auto& pos = reinterpret_cast<XMFLOAT3&>(verts[offset]);
 
-				loc += sizeof(XMFLOAT3);
-				auto& norm = reinterpret_cast<XMHALF4&>(verts[loc]);
+				offset += sizeof(XMFLOAT3);
+				auto& norm = reinterpret_cast<XMHALF4&>(verts[offset]);
 
-				loc += sizeof(XMFLOAT3);
-				auto& tan = reinterpret_cast<XMHALF4&>(verts[loc]);
+				offset += sizeof(XMFLOAT3);
+				auto& tan = reinterpret_cast<XMHALF4&>(verts[offset]);
 
-				loc += sizeof(XMHALF4);
-				auto& biNorm = reinterpret_cast<XMHALF4&>(verts[loc]);
+				offset += sizeof(XMHALF4);
+				auto& biNorm = reinterpret_cast<XMHALF4&>(verts[offset]);
 
 				XMStoreFloat3(&pos, XMVector3TransformCoord(XMLoadFloat3(&pos), local));
 				XMStoreHalf4(&norm, XMVector3TransformNormal(XMLoadHalf4(&norm), localIT));

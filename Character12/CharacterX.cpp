@@ -221,7 +221,7 @@ void CharacterX::OnUpdate()
 	const auto viewProj = view * proj;
 
 	// Character
-	m_character->Update(m_frameIndex, time, viewProj, &XMMatrixIdentity(), nullptr, false);
+	m_character->Update(m_frameIndex, time, viewProj, &XMMatrixIdentity(), nullptr, nullptr, 0, false);
 }
 
 // Render the scene.

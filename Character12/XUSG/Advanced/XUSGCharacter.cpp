@@ -406,17 +406,15 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 
 	// Update constant buffers
 	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbLinkedMatrices[mesh].Map());
-	pCBData->WorldViewProj = XMMatrixTranspose(worldViewProj);
-	pCBData->World = XMMatrixTranspose(world);
-	pCBData->Normal = XMMatrixInverse(nullptr, world);
-	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose once
-	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose twice
+	XMStoreFloat4x4(&pCBData->WorldViewProj, XMMatrixTranspose(worldViewProj));
+	XMStoreFloat3x4(&pCBData->World, world); // XMStoreFloat3x4 includes transpose.
+	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
 
 	const auto model = XMMatrixMultiply(influenceMatrix, world);
 	if (pShadowView)
 	{
 		const auto shadow = XMMatrixMultiply(model, *pShadowView);
-		pCBData->Shadow = XMMatrixTranspose(shadow);
+		XMStoreFloat4x4(&pCBData->Shadow, XMMatrixTranspose(shadow));
 	}
 
 	if (pShadows)
@@ -434,7 +432,7 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 	{
 		XMStoreFloat4x4(&m_linkedWorldViewProjs[m_currentFrame][mesh], worldViewProj);
 		const auto worldViewProjPrev = XMLoadFloat4x4(&m_linkedWorldViewProjs[m_previousFrame][mesh]);
-		pCBData->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
+		XMStoreFloat4x4(&pCBData->WorldViewProjPrev, XMMatrixTranspose(worldViewProjPrev));
 	}
 #endif
 }

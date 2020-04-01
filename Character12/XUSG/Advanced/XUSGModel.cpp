@@ -66,16 +66,14 @@ void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX* pShadowV
 
 	// Update constant buffers
 	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices.Map(m_currentFrame));
-	pCBData->WorldViewProj = XMMatrixTranspose(worldViewProj);
-	pCBData->World = XMMatrixTranspose(world);
-	pCBData->Normal = XMMatrixInverse(nullptr, world);
-	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose once
-	//pCBData->Normal = XMMatrixTranspose(&, &pCBData->Normal);	// transpose twice
+	XMStoreFloat4x4(&pCBData->WorldViewProj, XMMatrixTranspose(worldViewProj));
+	XMStoreFloat3x4(&pCBData->World, world); // XMStoreFloat3x4 includes transpose.
+	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
 
 	if (pShadowView)
 	{
 		const auto shadow = XMMatrixMultiply(world, *pShadowView);
-		pCBData->Shadow = XMMatrixTranspose(shadow);
+		XMStoreFloat4x4(&pCBData->Shadow, XMMatrixTranspose(shadow));
 	}
 
 	if (pShadows)
@@ -93,7 +91,7 @@ void Model::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX* pShadowV
 	{
 		XMStoreFloat4x4(&m_worldViewProjs[m_currentFrame], worldViewProj);
 		const auto worldViewProjPrev = XMLoadFloat4x4(&m_worldViewProjs[m_previousFrame]);
-		pCBData->WorldViewProjPrev = XMMatrixTranspose(worldViewProjPrev);
+		XMStoreFloat4x4(&pCBData->WorldViewProjPrev, XMMatrixTranspose(worldViewProjPrev));
 	}
 #endif
 }

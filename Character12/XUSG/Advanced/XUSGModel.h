@@ -98,12 +98,12 @@ namespace XUSG
 	protected:
 		struct CBMatrices
 		{
-			DirectX::XMMATRIX WorldViewProj;
-			DirectX::XMMATRIX World;
-			DirectX::XMMATRIX Normal;
-			DirectX::XMMATRIX Shadow;
+			DirectX::XMFLOAT4X4 WorldViewProj;
+			DirectX::XMFLOAT3X4 World;
+			DirectX::XMFLOAT3X4 WorldIT;
+			DirectX::XMFLOAT4X4 Shadow;
 #if TEMPORAL
-			DirectX::XMMATRIX WorldViewProjPrev;
+			DirectX::XMFLOAT4X4 WorldViewProjPrev;
 #endif
 		};
 

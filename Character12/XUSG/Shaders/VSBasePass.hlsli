@@ -9,7 +9,7 @@
 // Constant buffers
 //--------------------------------------------------------------------------------------
 #if TEMPORAL_AA
-cbuffer cbTempBias	: register (b3)
+cbuffer cbTemporalBias	: register (b3)
 {
 	float2	g_projBias;
 };
@@ -73,7 +73,7 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 #endif
 
 #if defined(_POSWORLD_) || defined(_CLIP_)
-	pos = mul(pos, g_mWorld);
+	pos.xyz = mul(pos, g_world);
 #endif
 
 #ifdef _POSWORLD_
@@ -81,7 +81,7 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 #endif
 
 #ifdef _NORMAL_
-	output.Norm = min16float3(normalize(mul(input.Norm, (float3x3)g_normal)));
+	output.Norm = min16float3(normalize(mul(input.Norm, (float3x3)g_worldIT)));
 #endif
 
 #ifdef _TANGENTS_

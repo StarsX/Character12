@@ -8,156 +8,26 @@ using namespace std;
 using namespace DirectX;
 using namespace XUSG;
 
-Character::Character(const Device& device, const wchar_t* name) :
-	Model(device, name),
-	m_computePipelineCache(nullptr),
-	m_skinningPipelineLayout(nullptr),
-	m_skinningPipeline(nullptr),
-	m_srvSkinningTables(),
-	m_uavSkinningTables(),
-#if TEMPORAL
-	m_srvSkinnedTables(),
-	m_linkedWorldViewProjs(),
-#endif
-	m_linkedMeshes(nullptr),
-	m_meshLinks(nullptr),
-	m_cbLinkedMatrices(0),
-	m_cbLinkedShadowMatrices(0)
+//--------------------------------------------------------------------------------------
+// Create interfaces
+//--------------------------------------------------------------------------------------
+Character::uptr Character::MakeUnique(const Device& device, const wchar_t* name)
 {
+	return make_unique<Character_Impl>(device, name);
 }
 
-Character::~Character(void)
+Character::sptr Character::MakeShared(const Device& device, const wchar_t* name)
 {
+	return make_shared<Character_Impl>(device, name);
 }
 
-bool Character::Init(const InputLayout& inputLayout,
-	const shared_ptr<SDKMesh>& mesh,
-	const shared_ptr<ShaderPool>& shaderPool,
-	const shared_ptr<Graphics::PipelineCache>& graphicsPipelineCache,
-	const shared_ptr<Compute::PipelineCache>& computePipelineCache,
-	const shared_ptr<PipelineLayoutCache>& pipelineLayoutCache,
-	const shared_ptr<DescriptorTableCache>& descriptorTableCache,
-	const shared_ptr<vector<SDKMesh>>& linkedMeshes,
-	const shared_ptr<vector<MeshLink>>& meshLinks,
-	const Format* rtvFormats, uint32_t numRTVs,
-	Format dsvFormat, Format shadowFormat)
-{
-	m_computePipelineCache = computePipelineCache;
-
-	// Set the Linked Meshes
-	m_meshLinks = meshLinks;
-	m_linkedMeshes = linkedMeshes;
-
-	// Get SDKMesh
-	N_RETURN(Model::Init(inputLayout, mesh, shaderPool, graphicsPipelineCache,
-		pipelineLayoutCache, descriptorTableCache), false);
-
-	// Create buffers
-	N_RETURN(createBuffers(), false);
-
-	// Create VBs that will hold all of the skinned vertices that need to be transformed output
-	N_RETURN(createTransformedStates(), false);
-
-	// Create pipeline layout, pipelines, and descriptor tables
-	N_RETURN(createPipelineLayouts(), false);
-	N_RETURN(createPipelines(inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat), false);
-	N_RETURN(createDescriptorTables(), false);
-
-	return true;
-}
-
-void Character::InitPosition(const XMFLOAT4& posRot)
-{
-	m_vPosRot = posRot;
-}
-
-void Character::Update(uint8_t frameIndex, double time)
-{
-	Model::Update(frameIndex);
-	m_time = time;
-}
-
-void Character::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj, FXMMATRIX* pWorld,
-	FXMMATRIX* pShadowView, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
-{
-	Model::Update(frameIndex);
-
-	// Set the bone matrices
-	const auto numMeshes = m_mesh->GetNumMeshes();
-	m_mesh->TransformMesh(XMMatrixIdentity(), time);
-	setSkeletalMatrices(numMeshes);
-
-	SetMatrices(viewProj, pWorld, pShadowView, pShadows, numShadows, isTemporal);
-	m_time = -1.0;
-}
-
-void Character::SetMatrices(CXMMATRIX viewProj, FXMMATRIX* pWorld,
-	FXMMATRIX* pShadowView, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
-{
-	XMMATRIX world;
-	if (!pWorld)
-	{
-		const auto translation = XMMatrixTranslation(m_vPosRot.x, m_vPosRot.y, m_vPosRot.z);
-		const auto rotation = XMMatrixRotationY(m_vPosRot.w);
-		world = XMMatrixMultiply(rotation, translation);
-		XMStoreFloat4x4(&m_mWorld, world);
-	}
-	else world = *pWorld;
-
-	Model::SetMatrices(viewProj, world, pShadowView, pShadows, numShadows, isTemporal);
-
-	if (m_meshLinks)
-	{
-		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
-		for (auto m = 0ui8; m < numLinks; ++m)
-			setLinkedMatrices(m, viewProj, world, pShadowView, pShadows, numShadows, isTemporal);
-	}
-}
-
-void Character::SetSkinningPipeline(const CommandList& commandList)
-{
-	commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
-	commandList.SetPipelineState(m_skinningPipeline);
-}
-
-void Character::Skinning(const CommandList& commandList, uint32_t& numBarriers,
-	ResourceBarrier* pBarriers, bool reset)
-{
-	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
-	m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS); // Implicit state promotion
-	skinning(commandList, reset);
-
-	// Prepare VBV | SRV states for the vertex buffer
-	numBarriers = m_transformedVBs[m_currentFrame].SetBarrier(pBarriers, ResourceState::VERTEX_AND_CONSTANT_BUFFER |
-		ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
-}
-
-void Character::RenderTransformed(const CommandList& commandList, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
-{
-	renderTransformed(commandList, layout, subsetFlags, matrixTableIndex, numInstances);
-	if (m_meshLinks)
-	{
-		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
-		//for (auto m = 0ui8; m < numLinks; ++m)
-		//	renderLinked(m, matrixTableIndex, layout, numInstances);
-	}
-}
-
-const XMFLOAT4& Character::GetPosition() const
-{
-	return m_vPosRot;
-}
-
-FXMMATRIX Character::GetWorldMatrix() const
-{
-	return XMLoadFloat4x4(&m_mWorld);
-}
-
-shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device& device, const wstring& meshFileName,
+//--------------------------------------------------------------------------------------
+// Static interface function
+//--------------------------------------------------------------------------------------
+SDKMesh::sptr Character::LoadSDKMesh(const Device& device, const wstring& meshFileName,
 	const wstring& animFileName, const TextureCache& textureCache,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
-	vector<SDKMesh>* linkedMeshes)
+	vector<SDKMesh::sptr>* linkedMeshes)
 {
 	// Load the animated mesh
 	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache, false);
@@ -183,7 +53,8 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device& device, const wstring& 
 		{
 			auto& meshInfo = meshLinks->at(m);
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
-			N_RETURN(linkedMeshes->at(m).Create(device.get(), meshInfo.MeshName.c_str(),
+			linkedMeshes->at(m) = SDKMesh::MakeShared();
+			N_RETURN(linkedMeshes->at(m)->Create(device.get(), meshInfo.MeshName.c_str(),
 				textureCache), nullptr);
 		}
 	}
@@ -191,15 +62,167 @@ shared_ptr<SDKMesh> Character::LoadSDKMesh(const Device& device, const wstring& 
 	return mesh;
 }
 
-bool Character::createTransformedStates()
+//--------------------------------------------------------------------------------------
+// Character implementations
+//--------------------------------------------------------------------------------------
+Character_Impl::Character_Impl(const Device& device, const wchar_t* name) :
+	Model_Impl(device, name),
+	m_computePipelineCache(nullptr),
+	m_skinningPipelineLayout(nullptr),
+	m_skinningPipeline(nullptr),
+	m_srvSkinningTables(),
+	m_uavSkinningTables(),
+#if TEMPORAL
+	m_srvSkinnedTables(),
+	m_linkedWorldViewProjs(),
+#endif
+	m_linkedMeshes(nullptr),
+	m_meshLinks(nullptr),
+	m_cbLinkedMatrices(0),
+	m_cbLinkedShadowMatrices(0)
 {
-	for (auto i = 0u; i < FrameCount; ++i)
-		N_RETURN(createTransformedVBs(m_transformedVBs[i]), false);
+}
+
+Character_Impl::~Character_Impl(void)
+{
+}
+
+bool Character_Impl::Init(const InputLayout& inputLayout,
+	const shared_ptr<SDKMesh>& mesh,
+	const ShaderPool::sptr& shaderPool,
+	const Graphics::PipelineCache::sptr& graphicsPipelineCache,
+	const Compute::PipelineCache::sptr& computePipelineCache,
+	const PipelineLayoutCache::sptr& pipelineLayoutCache,
+	const DescriptorTableCache::sptr& descriptorTableCache,
+	const shared_ptr<vector<SDKMesh>>& linkedMeshes,
+	const shared_ptr<vector<MeshLink>>& meshLinks,
+	const Format* rtvFormats, uint32_t numRTVs,
+	Format dsvFormat, Format shadowFormat)
+{
+	m_computePipelineCache = computePipelineCache;
+
+	// Set the Linked Meshes
+	m_meshLinks = meshLinks;
+	m_linkedMeshes = linkedMeshes;
+
+	// Get SDKMesh
+	N_RETURN(Model_Impl::Init(inputLayout, mesh, shaderPool, graphicsPipelineCache,
+		pipelineLayoutCache, descriptorTableCache), false);
+
+	// Create buffers
+	N_RETURN(createBuffers(), false);
+
+	// Create VBs that will hold all of the skinned vertices that need to be transformed output
+	N_RETURN(createTransformedStates(), false);
+
+	// Create pipeline layout, pipelines, and descriptor tables
+	N_RETURN(createPipelineLayouts(), false);
+	N_RETURN(createPipelines(inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat), false);
+	N_RETURN(createDescriptorTables(), false);
 
 	return true;
 }
 
-bool Character::createTransformedVBs(VertexBuffer& vertexBuffer)
+void Character_Impl::InitPosition(const XMFLOAT4& posRot)
+{
+	m_vPosRot = posRot;
+}
+
+void Character_Impl::Update(uint8_t frameIndex, double time)
+{
+	Model_Impl::Update(frameIndex);
+	m_time = time;
+}
+
+void Character_Impl::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj,
+	FXMMATRIX* pWorld, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
+{
+	Model_Impl::Update(frameIndex);
+
+	// Set the bone matrices
+	const auto numMeshes = m_mesh->GetNumMeshes();
+	m_mesh->TransformMesh(XMMatrixIdentity(), time);
+	setSkeletalMatrices(numMeshes);
+
+	SetMatrices(viewProj, pWorld, pShadows, numShadows, isTemporal);
+	m_time = -1.0;
+}
+
+void Character_Impl::SetMatrices(CXMMATRIX viewProj, FXMMATRIX* pWorld,
+	FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
+{
+	XMMATRIX world;
+	if (!pWorld)
+	{
+		const auto translation = XMMatrixTranslation(m_vPosRot.x, m_vPosRot.y, m_vPosRot.z);
+		const auto rotation = XMMatrixRotationY(m_vPosRot.w);
+		world = XMMatrixMultiply(rotation, translation);
+		XMStoreFloat4x4(&m_mWorld, world);
+	}
+	else world = *pWorld;
+
+	Model_Impl::SetMatrices(viewProj, world, pShadows, numShadows, isTemporal);
+
+	if (m_meshLinks)
+	{
+		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
+		for (auto m = 0ui8; m < numLinks; ++m)
+			setLinkedMatrices(m, viewProj, world, pShadows, numShadows, isTemporal);
+	}
+}
+
+void Character_Impl::SetSkinningPipeline(const CommandList* pCommandList)
+{
+	pCommandList->SetComputePipelineLayout(m_skinningPipelineLayout);
+	pCommandList->SetPipelineState(m_skinningPipeline);
+}
+
+void Character_Impl::Skinning(const CommandList* pCommandList, uint32_t& numBarriers,
+	ResourceBarrier* pBarriers, bool reset)
+{
+	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
+	m_transformedVBs[m_currentFrame]->SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS); // Implicit state promotion
+	skinning(pCommandList, reset);
+
+	// Prepare VBV | SRV states for the vertex buffer
+	numBarriers = m_transformedVBs[m_currentFrame]->SetBarrier(pBarriers, ResourceState::VERTEX_AND_CONSTANT_BUFFER |
+		ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
+}
+
+void Character_Impl::RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
+	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
+{
+	renderTransformed(pCommandList, layout, subsetFlags, matrixTableIndex, numInstances);
+	if (m_meshLinks)
+	{
+		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
+		//for (auto m = 0ui8; m < numLinks; ++m)
+		//	renderLinked(m, matrixTableIndex, layout, numInstances);
+	}
+}
+
+const XMFLOAT4& Character_Impl::GetPosition() const
+{
+	return m_vPosRot;
+}
+
+FXMMATRIX Character_Impl::GetWorldMatrix() const
+{
+	return XMLoadFloat4x4(&m_mWorld);
+}
+
+bool Character_Impl::createTransformedStates()
+{
+	for (auto i = 0u; i < FrameCount; ++i)
+	{
+		m_transformedVBs[i] = VertexBuffer::MakeUnique();
+		N_RETURN(createTransformedVBs(*m_transformedVBs[i]), false);
+	}
+
+	return true;
+}
+
+bool Character_Impl::createTransformedVBs(VertexBuffer& vertexBuffer)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
 	auto numVertices = 0u;
@@ -221,7 +244,7 @@ bool Character::createTransformedVBs(VertexBuffer& vertexBuffer)
 	return true;
 }
 
-bool Character::createBuffers()
+bool Character_Impl::createBuffers()
 {
 	// Bone world matrices
 	auto numElements = 0u;
@@ -235,7 +258,8 @@ bool Character::createBuffers()
 
 	for (auto i = 0ui8; i < FrameCount; ++i)
 	{
-		N_RETURN(m_boneWorlds[i].Create(m_device, numElements, sizeof(XMFLOAT4X3), ResourceFlag::NONE,
+		m_boneWorlds[i] = StructuredBuffer::MakeUnique();
+		N_RETURN(m_boneWorlds[i]->Create(m_device, numElements, sizeof(XMFLOAT4X3), ResourceFlag::NONE,
 			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, m_name.empty() ?
 			nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
@@ -243,17 +267,23 @@ bool Character::createBuffers()
 	// Linked meshes
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
 	for (auto& cbLinkedMatrices : m_cbLinkedMatrices)
-		N_RETURN(cbLinkedMatrices.Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount), false);
+	{
+		cbLinkedMatrices = ConstantBuffer::MakeUnique();
+		N_RETURN(cbLinkedMatrices->Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount), false);
+	}
 
 	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
 	for (auto& cbLinkedMatrix : m_cbLinkedShadowMatrices)
-		N_RETURN(cbLinkedMatrix.Create(m_device, sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
+	{
+		cbLinkedMatrix = ConstantBuffer::MakeUnique();
+		N_RETURN(cbLinkedMatrix->Create(m_device, sizeof(XMFLOAT4X4[FrameCount][MAX_SHADOW_CASCADES]),
 			MAX_SHADOW_CASCADES * FrameCount), false);
+	}
 
 	return true;
 }
 
-bool Character::createPipelineLayouts()
+bool Character_Impl::createPipelineLayouts()
 {
 	// Skinning
 	{
@@ -272,20 +302,20 @@ bool Character::createPipelineLayouts()
 		}
 
 		// Pipeline layout utility
-		Util::PipelineLayout utilPipelineLayout;
+		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
 
 		// Input vertices and bone matrices
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld, 0, DescriptorRangeFlag::DATA_STATIC);
-		utilPipelineLayout.SetRange(INPUT, DescriptorType::SRV, 1, roVertices, 0, DescriptorRangeFlag::DESCRIPTORS_VOLATILE);
-		utilPipelineLayout.SetShaderStage(INPUT, Shader::Stage::CS);
+		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld, 0, DescriptorFlag::DATA_STATIC);
+		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roVertices, 0, DescriptorFlag::DESCRIPTORS_VOLATILE);
+		utilPipelineLayout->SetShaderStage(INPUT, Shader::Stage::CS);
 
 		// Output vertices
-		utilPipelineLayout.SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices, 0,
-			DescriptorRangeFlag::DESCRIPTORS_VOLATILE | DescriptorRangeFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-		utilPipelineLayout.SetShaderStage(OUTPUT, Shader::Stage::CS);
+		utilPipelineLayout->SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices, 0,
+			DescriptorFlag::DESCRIPTORS_VOLATILE | DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		utilPipelineLayout->SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
-		X_RETURN(m_skinningPipelineLayout, utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_skinningPipelineLayout, utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str()), false);
 	}
 
@@ -308,38 +338,38 @@ bool Character::createPipelineLayouts()
 			// Get constant buffer slot
 			cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame");
 
-		auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
+		const auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 
 #if TEMPORAL
-		utilPipelineLayout.SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
-		utilPipelineLayout.SetShaderStage(HISTORY, Shader::Stage::VS);
+		utilPipelineLayout->SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
+		utilPipelineLayout->SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
 
 		if (cbPerFrame != UINT32_MAX)
 		{
-			utilPipelineLayout.SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, 0, DescriptorRangeFlag::DATA_STATIC);
-			utilPipelineLayout.SetShaderStage(PER_FRAME, Shader::Stage::PS);
+			utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, 0, DescriptorFlag::DATA_STATIC);
+			utilPipelineLayout->SetShaderStage(PER_FRAME, Shader::Stage::PS);
 		}
 
-		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str()), false);
 	}
 
 	// Depth pass
 	{
-		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_NULL_INDEX);
+		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_NULL_INDEX);
 
-		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str()), false);
 	}
 
 	// Depth alpha pass
 	{
-		auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
+		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
 
-		X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout.GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthAlphaPassLayout").c_str()), false);
 	}
@@ -347,23 +377,23 @@ bool Character::createPipelineLayouts()
 	return true;
 }
 
-bool Character::createPipelines(const InputLayout& inputLayout, const Format* rtvFormats,
+bool Character_Impl::createPipelines(const InputLayout& inputLayout, const Format* rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
 	// Skinning
 	{
-		Compute::State state;
-		state.SetPipelineLayout(m_skinningPipelineLayout);
-		state.SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
-		X_RETURN(m_skinningPipeline, state.GetPipeline(*m_computePipelineCache,
+		const auto state = Compute::State::MakeUnique();
+		state->SetPipelineLayout(m_skinningPipelineLayout);
+		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
+		X_RETURN(m_skinningPipeline, state->GetPipeline(*m_computePipelineCache,
 			m_name.empty() ? nullptr : (m_name + L".SkinningPipe").c_str()), false);
 	}
 
 	// Rendering
-	return Model::createPipelines(false, inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
+	return Model_Impl::createPipelines(false, inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
 }
 
-bool Character::createDescriptorTables()
+bool Character_Impl::createDescriptorTables()
 {
 	const auto numMeshes = m_mesh->GetNumMeshes();
 
@@ -377,19 +407,25 @@ bool Character::createDescriptorTables()
 
 		for (auto m = 0u; m < numMeshes; ++m)
 		{
-			Util::DescriptorTable srvSkinningTable;
-			const Descriptor srvs[] = { m_boneWorlds[i].GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
-			srvSkinningTable.SetDescriptors(0, static_cast<uint32_t>(size(srvs)), srvs);
-			X_RETURN(m_srvSkinningTables[i][m], srvSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
+			{
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+				const Descriptor descriptors[] = { m_boneWorlds[i]->GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
+				descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+				X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+			}
 
-			Util::DescriptorTable uavSkinningTable;
-			uavSkinningTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetUAV(m));
-			X_RETURN(m_uavSkinningTables[i][m], uavSkinningTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
+			{
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetUAV(m));
+				X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+			}
 
 #if TEMPORAL
-			Util::DescriptorTable srvSkinnedTable;
-			srvSkinnedTable.SetDescriptors(0, 1, &m_transformedVBs[i].GetSRV(m));
-			X_RETURN(m_srvSkinnedTables[i][m], srvSkinnedTable.GetCbvSrvUavTable(*m_descriptorTableCache), false);
+			{
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetSRV(m));
+				X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+			}
 #endif
 		}
 	}
@@ -397,32 +433,27 @@ bool Character::createDescriptorTables()
 	return true;
 }
 
-void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX world,
-	FXMMATRIX* pShadowView, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
+void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX world,
+	FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).BoneIndex);
 	const auto worldViewProj = influenceMatrix * world * viewProj;
 
 	// Update constant buffers
-	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbLinkedMatrices[mesh].Map());
+	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbLinkedMatrices[mesh]->Map());
 	XMStoreFloat4x4(&pCBData->WorldViewProj, XMMatrixTranspose(worldViewProj));
 	XMStoreFloat3x4(&pCBData->World, world); // XMStoreFloat3x4 includes transpose.
 	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
 
 	const auto model = XMMatrixMultiply(influenceMatrix, world);
-	if (pShadowView)
-	{
-		const auto shadow = XMMatrixMultiply(model, *pShadowView);
-		XMStoreFloat4x4(&pCBData->Shadow, XMMatrixTranspose(shadow));
-	}
 
 	if (pShadows)
 	{
 		for (auto i = 0ui8; i < numShadows; ++i)
 		{
 			const auto shadow = XMMatrixMultiply(model, pShadows[i]);
-			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh].Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
+			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh]->Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
 			cbData = XMMatrixTranspose(shadow);
 		}
 	}
@@ -437,15 +468,15 @@ void Character::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX w
 #endif
 }
 
-void Character::skinning(const CommandList& commandList, bool reset)
+void Character_Impl::skinning(const CommandList* pCommandList, bool reset)
 {
 	if (reset)
 	{
 		const DescriptorPool descriptorPools[] =
 		{ m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL) };
-		commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-		commandList.SetComputePipelineLayout(m_skinningPipelineLayout);
-		commandList.SetPipelineState(m_skinningPipeline);
+		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		pCommandList->SetComputePipelineLayout(m_skinningPipelineLayout);
+		pCommandList->SetPipelineState(m_skinningPipeline);
 	}
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -457,16 +488,16 @@ void Character::skinning(const CommandList& commandList, bool reset)
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		// Setup descriptor tables
-		commandList.SetComputeDescriptorTable(INPUT, m_srvSkinningTables[m_currentFrame][m]);
-		commandList.SetComputeDescriptorTable(OUTPUT, m_uavSkinningTables[m_currentFrame][m]);
+		pCommandList->SetComputeDescriptorTable(INPUT, m_srvSkinningTables[m_currentFrame][m]);
+		pCommandList->SetComputeDescriptorTable(OUTPUT, m_uavSkinningTables[m_currentFrame][m]);
 
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
-		commandList.Dispatch(DIV_UP(numVertices, 64), 1, 1);
+		pCommandList->Dispatch(DIV_UP(numVertices, 64), 1, 1);
 	}
 }
 
-void Character::renderTransformed(const CommandList& commandList, PipelineLayoutIndex layout,
+void Character_Impl::renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
 	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
 {
 	if (layout < GLOBAL_BASE_PASS)
@@ -476,13 +507,13 @@ void Character::renderTransformed(const CommandList& commandList, PipelineLayout
 			m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
 			m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
 		};
-		commandList.SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
-		commandList.SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
-		commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
+		pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 	}
 
 	// Set matrices
-	commandList.SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
+	pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
 
 	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 
@@ -490,23 +521,23 @@ void Character::renderTransformed(const CommandList& commandList, PipelineLayout
 	for (const auto& subsetMask : subsetMasks)
 	{
 		if (layout < GLOBAL_BASE_PASS && subsetMask != SUBSET_OPAQUE)
-			commandList.SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+			pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 
 		if (subsetFlags & subsetMask)
 		{
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
 				// Set IA parameters
-				commandList.IASetVertexBuffers(0, 1, &m_transformedVBs[m_currentFrame].GetVBV(m));
+				pCommandList->IASetVertexBuffers(0, 1, &m_transformedVBs[m_currentFrame]->GetVBV(m));
 
 #if TEMPORAL
 				// Set historical motion states, if neccessary
 				if (layout == BASE_PASS || layout == GLOBAL_BASE_PASS)
-					commandList.SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
+					pCommandList->SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
 #endif
 
 				// Render mesh
-				render(commandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, numInstances);
+				render(pCommandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, numInstances);
 			}
 		}
 	}
@@ -516,7 +547,7 @@ void Character::renderTransformed(const CommandList& commandList, PipelineLayout
 }
 
 #if 0
-void Character::renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
+void Character_Impl::renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
 	PipelineLayoutIndex layout, uint32_t numInstances)
 {
 	// Set constant buffers
@@ -534,15 +565,15 @@ void Character::renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
 }
 #endif
 
-void Character::setSkeletalMatrices(uint32_t numMeshes)
+void Character_Impl::setSkeletalMatrices(uint32_t numMeshes)
 {
 	for (auto m = 0u; m < numMeshes; ++m) setBoneMatrices(m);
 	//m_boneWorlds[m_currentFrame].Unmap();
 }
 
-void Character::setBoneMatrices(uint32_t mesh)
+void Character_Impl::setBoneMatrices(uint32_t mesh)
 {
-	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds[m_currentFrame].Map(mesh));
+	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds[m_currentFrame]->Map(mesh));
 
 	const auto numBones = m_mesh->GetNumInfluences(mesh);
 	for (auto i = 0u; i < numBones; ++i)
@@ -553,7 +584,7 @@ void Character::setBoneMatrices(uint32_t mesh)
 }
 
 // Convert unit quaternion and translation to unit dual quaternion
-void Character::convertToDQ(XMFLOAT4& dqTran, CXMVECTOR quat, const XMFLOAT3& tran) const
+void Character_Impl::convertToDQ(XMFLOAT4& dqTran, CXMVECTOR quat, const XMFLOAT3& tran) const
 {
 	XMFLOAT4 dqRot;
 	XMStoreFloat4(&dqRot, quat);
@@ -563,7 +594,7 @@ void Character::convertToDQ(XMFLOAT4& dqTran, CXMVECTOR quat, const XMFLOAT3& tr
 	dqTran.w = -0.5f * (tran.x * dqRot.x + tran.y * dqRot.y + tran.z * dqRot.z);
 }
 
-FXMMATRIX Character::getDualQuat(uint32_t mesh, uint32_t influence) const
+FXMMATRIX Character_Impl::getDualQuat(uint32_t mesh, uint32_t influence) const
 {
 	const auto influenceMatrix = m_mesh->GetMeshInfluenceMatrix(mesh, influence);
 

@@ -34,12 +34,6 @@
     <Filter Include="XUSG\Advanced">
       <UniqueIdentifier>{0d65d36c-b060-43db-a244-4a0a69db16aa}</UniqueIdentifier>
     </Filter>
-    <Filter Include="XUSG\Core\Source Files">
-      <UniqueIdentifier>{efb85324-3977-43e4-8e7a-0853ebff814a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="XUSG\Core\Header Files">
-      <UniqueIdentifier>{df1558c4-4dc7-4190-9508-4034bfd79475}</UniqueIdentifier>
-    </Filter>
     <Filter Include="XUSG\Advanced\Header Files">
       <UniqueIdentifier>{987651c2-fb1e-4576-94fe-fabdc23d09d5}</UniqueIdentifier>
     </Filter>
@@ -48,9 +42,6 @@
     </Filter>
     <Filter Include="XUSG\Shaders">
       <UniqueIdentifier>{a7e87b53-c6f7-4e4f-be00-ed8d3e071330}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="XUSG\Core\Source Files\Inc">
-      <UniqueIdentifier>{99189be3-54e9-497f-9c45-4ddfea69de2e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -65,27 +56,6 @@
     </ClInclude>
     <ClInclude Include="Common\Win32Application.h">
       <Filter>Common\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGDescriptor.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGGraphicsState.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGInputLayout.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGPipelineLayout.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGResource.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGShader.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGType.h">
-      <Filter>XUSG\Core\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
@@ -114,23 +84,20 @@
     <ClInclude Include="Common\dds.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGComputeState.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSG.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGCommand.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSGReflector.h">
-      <Filter>XUSG\Core\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Common\dxcapi.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Common\StepTimer.h">
       <Filter>Common\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Advanced\XUSGAdvanced.h">
+      <Filter>XUSG\Advanced\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Core\XUSG.h">
+      <Filter>XUSG\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="XUSG\Core\XUSG_DX12.h">
+      <Filter>XUSG\Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -139,24 +106,6 @@
     </ClCompile>
     <ClCompile Include="Common\Win32Application.cpp">
       <Filter>Common\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGDescriptor.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGGraphicsState.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGInputLayout.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGPipelineLayout.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGResource.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGShader.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Main.cpp">
       <Filter>Source Files</Filter>
@@ -179,29 +128,8 @@
     <ClCompile Include="XUSG\Advanced\XUSGDDSLoader.cpp">
       <Filter>XUSG\Advanced\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGComputeState.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGCommand.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XUSG\Core\XUSGReflector.cpp">
-      <Filter>XUSG\Core\Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="XUSG\Core\XUSGBlend.inl">
-      <Filter>XUSG\Core\Source Files\Inc</Filter>
-    </None>
-    <None Include="XUSG\Core\XUSGDepthStencil.inl">
-      <Filter>XUSG\Core\Source Files\Inc</Filter>
-    </None>
-    <None Include="XUSG\Core\XUSGRasterizer.inl">
-      <Filter>XUSG\Core\Source Files\Inc</Filter>
-    </None>
-    <None Include="XUSG\Core\XUSGSampler.inl">
-      <Filter>XUSG\Core\Source Files\Inc</Filter>
-    </None>
     <None Include="XUSG\Shaders\CSSkinning.hlsli">
       <Filter>XUSG\Shaders</Filter>
     </None>

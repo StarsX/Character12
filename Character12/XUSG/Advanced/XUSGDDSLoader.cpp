@@ -10,12 +10,14 @@ using namespace DirectX;
 using namespace XUSG;
 using namespace XUSG::DDS;
 
+#if defined(WIN32) || (_WIN32)
 struct handle_closer
 {
 	void operator()(HANDLE h) { if (h) CloseHandle(h); }
 };
 typedef public unique_ptr<void, handle_closer> ScopedHandle;
 inline HANDLE safe_handle(HANDLE h) { return (h == INVALID_HANDLE_VALUE) ? 0 : h; }
+#endif
 
 static bool LoadTextureDataFromFile(const wchar_t* fileName,
 	unique_ptr<uint8_t[]>& ddsData, DDS_HEADER** header,
@@ -183,6 +185,140 @@ static void GetSurfaceInfo(uint32_t width, uint32_t height, Format fmt,
 }
 
 #define ISBITMASK(r,g,b,a) (ddpf.RBitMask == r && ddpf.GBitMask == g && ddpf.BBitMask == b && ddpf.ABitMask == a)
+#define FROM_DXGI_FORMAT(fmt) case DXGI_FORMAT_##fmt: return Format::fmt
+
+static Format GetFormat(DXGI_FORMAT format)
+{
+	switch (format)
+	{
+		FROM_DXGI_FORMAT(R32G32B32A32_TYPELESS);
+		FROM_DXGI_FORMAT(R32G32B32A32_FLOAT);
+		FROM_DXGI_FORMAT(R32G32B32A32_UINT);
+		FROM_DXGI_FORMAT(R32G32B32A32_SINT);
+		FROM_DXGI_FORMAT(R32G32B32_TYPELESS);
+		FROM_DXGI_FORMAT(R32G32B32_FLOAT);
+		FROM_DXGI_FORMAT(R32G32B32_UINT);
+		FROM_DXGI_FORMAT(R32G32B32_SINT);
+		FROM_DXGI_FORMAT(R16G16B16A16_TYPELESS);
+		FROM_DXGI_FORMAT(R16G16B16A16_FLOAT);
+		FROM_DXGI_FORMAT(R16G16B16A16_UNORM);
+		FROM_DXGI_FORMAT(R16G16B16A16_UINT);
+		FROM_DXGI_FORMAT(R16G16B16A16_SNORM);
+		FROM_DXGI_FORMAT(R16G16B16A16_SINT);
+		FROM_DXGI_FORMAT(R32G32_TYPELESS);
+		FROM_DXGI_FORMAT(R32G32_FLOAT);
+		FROM_DXGI_FORMAT(R32G32_UINT);
+		FROM_DXGI_FORMAT(R32G32_SINT);
+		FROM_DXGI_FORMAT(R32G8X24_TYPELESS);
+		FROM_DXGI_FORMAT(D32_FLOAT_S8X24_UINT);
+		FROM_DXGI_FORMAT(R32_FLOAT_X8X24_TYPELESS);
+		FROM_DXGI_FORMAT(X32_TYPELESS_G8X24_UINT);
+		FROM_DXGI_FORMAT(R10G10B10A2_TYPELESS);
+		FROM_DXGI_FORMAT(R10G10B10A2_UNORM);
+		FROM_DXGI_FORMAT(R10G10B10A2_UINT);
+		FROM_DXGI_FORMAT(R11G11B10_FLOAT);
+		FROM_DXGI_FORMAT(R8G8B8A8_TYPELESS);
+		FROM_DXGI_FORMAT(R8G8B8A8_UNORM);
+		FROM_DXGI_FORMAT(R8G8B8A8_UNORM_SRGB);
+		FROM_DXGI_FORMAT(R8G8B8A8_UINT);
+		FROM_DXGI_FORMAT(R8G8B8A8_SNORM);
+		FROM_DXGI_FORMAT(R8G8B8A8_SINT);
+		FROM_DXGI_FORMAT(R16G16_TYPELESS);
+		FROM_DXGI_FORMAT(R16G16_FLOAT);
+		FROM_DXGI_FORMAT(R16G16_UNORM);
+		FROM_DXGI_FORMAT(R16G16_UINT);
+		FROM_DXGI_FORMAT(R16G16_SNORM);
+		FROM_DXGI_FORMAT(R16G16_SINT);
+		FROM_DXGI_FORMAT(R32_TYPELESS);
+		FROM_DXGI_FORMAT(D32_FLOAT);
+		FROM_DXGI_FORMAT(R32_FLOAT);
+		FROM_DXGI_FORMAT(R32_UINT);
+		FROM_DXGI_FORMAT(R32_SINT);
+		FROM_DXGI_FORMAT(R24G8_TYPELESS);
+		FROM_DXGI_FORMAT(D24_UNORM_S8_UINT);
+		FROM_DXGI_FORMAT(R24_UNORM_X8_TYPELESS);
+		FROM_DXGI_FORMAT(X24_TYPELESS_G8_UINT);
+		FROM_DXGI_FORMAT(R8G8_TYPELESS);
+		FROM_DXGI_FORMAT(R8G8_UNORM);
+		FROM_DXGI_FORMAT(R8G8_UINT);
+		FROM_DXGI_FORMAT(R8G8_SNORM);
+		FROM_DXGI_FORMAT(R8G8_SINT);
+		FROM_DXGI_FORMAT(R16_TYPELESS);
+		FROM_DXGI_FORMAT(R16_FLOAT);
+		FROM_DXGI_FORMAT(D16_UNORM);
+		FROM_DXGI_FORMAT(R16_UNORM);
+		FROM_DXGI_FORMAT(R16_UINT);
+		FROM_DXGI_FORMAT(R16_SNORM);
+		FROM_DXGI_FORMAT(R16_SINT);
+		FROM_DXGI_FORMAT(R8_TYPELESS);
+		FROM_DXGI_FORMAT(R8_UNORM);
+		FROM_DXGI_FORMAT(R8_UINT);
+		FROM_DXGI_FORMAT(R8_SNORM);
+		FROM_DXGI_FORMAT(R8_SINT);
+		FROM_DXGI_FORMAT(A8_UNORM);
+		FROM_DXGI_FORMAT(R1_UNORM);
+		FROM_DXGI_FORMAT(R9G9B9E5_SHAREDEXP);
+		FROM_DXGI_FORMAT(R8G8_B8G8_UNORM);
+		FROM_DXGI_FORMAT(G8R8_G8B8_UNORM);
+		FROM_DXGI_FORMAT(BC1_TYPELESS);
+		FROM_DXGI_FORMAT(BC1_UNORM);
+		FROM_DXGI_FORMAT(BC1_UNORM_SRGB);
+		FROM_DXGI_FORMAT(BC2_TYPELESS);
+		FROM_DXGI_FORMAT(BC2_UNORM);
+		FROM_DXGI_FORMAT(BC2_UNORM_SRGB);
+		FROM_DXGI_FORMAT(BC3_TYPELESS);
+		FROM_DXGI_FORMAT(BC3_UNORM);
+		FROM_DXGI_FORMAT(BC3_UNORM_SRGB);
+		FROM_DXGI_FORMAT(BC4_TYPELESS);
+		FROM_DXGI_FORMAT(BC4_UNORM);
+		FROM_DXGI_FORMAT(BC4_SNORM);
+		FROM_DXGI_FORMAT(BC5_TYPELESS);
+		FROM_DXGI_FORMAT(BC5_UNORM);
+		FROM_DXGI_FORMAT(BC5_SNORM);
+		FROM_DXGI_FORMAT(B5G6R5_UNORM);
+		FROM_DXGI_FORMAT(B5G5R5A1_UNORM);
+		FROM_DXGI_FORMAT(B8G8R8A8_UNORM);
+		FROM_DXGI_FORMAT(B8G8R8X8_UNORM);
+	case DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+		return Format::RGB10_XR_BIAS_A2_UNORM;
+		FROM_DXGI_FORMAT(B8G8R8A8_TYPELESS);
+		FROM_DXGI_FORMAT(B8G8R8A8_UNORM_SRGB);
+		FROM_DXGI_FORMAT(B8G8R8X8_TYPELESS);
+		FROM_DXGI_FORMAT(B8G8R8X8_UNORM_SRGB);
+		FROM_DXGI_FORMAT(BC6H_TYPELESS);
+		FROM_DXGI_FORMAT(BC6H_UF16);
+		FROM_DXGI_FORMAT(BC6H_SF16);
+		FROM_DXGI_FORMAT(BC7_TYPELESS);
+		FROM_DXGI_FORMAT(BC7_UNORM);
+		FROM_DXGI_FORMAT(BC7_UNORM_SRGB);
+		FROM_DXGI_FORMAT(AYUV);
+		FROM_DXGI_FORMAT(Y410);
+		FROM_DXGI_FORMAT(Y416);
+		FROM_DXGI_FORMAT(NV12);
+		FROM_DXGI_FORMAT(P010);
+		FROM_DXGI_FORMAT(P016);
+	case DXGI_FORMAT_420_OPAQUE:
+		return Format::OPAQUE_420;
+		FROM_DXGI_FORMAT(YUY2);
+		FROM_DXGI_FORMAT(Y210);
+		FROM_DXGI_FORMAT(Y216);
+		FROM_DXGI_FORMAT(NV11);
+		FROM_DXGI_FORMAT(AI44);
+		FROM_DXGI_FORMAT(IA44);
+		FROM_DXGI_FORMAT(P8);
+		FROM_DXGI_FORMAT(A8P8);
+		FROM_DXGI_FORMAT(B4G4R4A4_UNORM);
+
+		FROM_DXGI_FORMAT(P208);
+		FROM_DXGI_FORMAT(V208);
+		FROM_DXGI_FORMAT(V408);
+
+		FROM_DXGI_FORMAT(FORCE_UINT);
+
+	default:
+		return Format::UNKNOWN;
+	}
+}
 
 static Format GetFormat(const DDS_PIXELFORMAT& ddpf)
 {
@@ -403,7 +539,7 @@ static bool FillInitData(uint32_t width, uint32_t height, uint32_t depth,
 	return index > 0;
 }
 
-static bool CreateTexture(const Device& device, const CommandList& commandList,
+static bool CreateTexture(const Device& device, CommandList* pCommandList,
 	const DDS_HEADER* header, const uint8_t* bitData, size_t bitSize, size_t maxsize,
 	bool forceSRGB, shared_ptr<ResourceBase>& texture, Resource& uploader,
 	ResourceState state, const wchar_t* name)
@@ -412,7 +548,7 @@ static bool CreateTexture(const Device& device, const CommandList& commandList,
 	auto height = header->height;
 	auto depth = header->depth;
 
-	ResourceDimension resDim = ResourceDimension::UNKNOWN;
+	auto resDim = ResourceDimension::UNKNOWN;
 	auto arraySize = 1u;
 	auto format = Format::UNKNOWN;
 	bool isCubeMap = false;
@@ -427,7 +563,8 @@ static bool CreateTexture(const Device& device, const CommandList& commandList,
 		arraySize = d3d10ext->arraySize;
 		F_RETURN(arraySize == 0, cerr, ERROR_INVALID_DATA, false);
 
-		switch (static_cast<Format>(d3d10ext->dxgiFormat))
+		format = GetFormat(d3d10ext->dxgiFormat);
+		switch (format)
 		{
 		case Format::AI44:
 		case Format::IA44:
@@ -435,38 +572,37 @@ static bool CreateTexture(const Device& device, const CommandList& commandList,
 		case Format::A8P8:
 			V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 		default:
-			F_RETURN(Loader::BitsPerPixel(static_cast<Format>(d3d10ext->dxgiFormat)) == 0, cerr, ERROR_NOT_SUPPORTED, false);
+			F_RETURN(Loader::BitsPerPixel(format) == 0, cerr, ERROR_NOT_SUPPORTED, false);
 		}
 
-		format = static_cast<Format>(d3d10ext->dxgiFormat);
-
-		switch (static_cast<ResourceDimension>(d3d10ext->resourceDimension))
+		switch (d3d10ext->resourceDimension)
 		{
-		case ResourceDimension::TEXTURE1D:
+		case DDS_DIMENSION_TEXTURE1D:
 			// D3DX writes 1D textures with a fixed Height of 1
 			F_RETURN((header->flags & DDS_HEIGHT) && height != 1, cerr, ERROR_INVALID_DATA, false);
+			resDim = ResourceDimension::TEXTURE1D;
 			height = depth = 1;
 			break;
 
-		case ResourceDimension::TEXTURE2D:
+		case DDS_DIMENSION_TEXTURE2D:
 			if (d3d10ext->miscFlag & DDS_RESOURCE_MISC_TEXTURECUBE)
 			{
 				arraySize *= 6;
 				isCubeMap = true;
 			}
+			resDim = ResourceDimension::TEXTURE2D;
 			depth = 1;
 			break;
 
-		case ResourceDimension::TEXTURE3D:
+		case DDS_DIMENSION_TEXTURE3D:
 			F_RETURN(!(header->flags & DDS_HEADER_FLAGS_VOLUME), cerr, ERROR_INVALID_DATA, false);
 			F_RETURN(arraySize > 1, cerr, ERROR_INVALID_DATA, false);
+			resDim = ResourceDimension::TEXTURE3D;
 			break;
 
 		default:
 			V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
 		}
-
-		resDim = static_cast<ResourceDimension>(d3d10ext->resourceDimension);
 	}
 	else
 	{
@@ -497,39 +633,39 @@ static bool CreateTexture(const Device& device, const CommandList& commandList,
 	}
 
 	// Bound sizes (for security purposes we don't trust DDS file metadata larger than the D3D 11.x hardware requirements)
-	F_RETURN(mipCount > REQ_MIP_LEVELS, cerr, ERROR_NOT_SUPPORTED, false);
+	F_RETURN(mipCount > GetDX12Requirement(REQ_MIP_LEVELS), cerr, ERROR_NOT_SUPPORTED, false);
 
 	switch (resDim)
 	{
 	case ResourceDimension::TEXTURE1D:
-		F_RETURN(arraySize > REQ_TEXTURE1D_ARRAY_AXIS_DIMENSION ||
-			width > REQ_TEXTURE1D_U_DIMENSION, cerr, ERROR_NOT_SUPPORTED, false);
-		texture = make_shared<Texture2D>();
+		F_RETURN(arraySize > GetDX12Requirement(REQ_TEXTURE1D_ARRAY_AXIS_DIMENSION) ||
+			width > GetDX12Requirement(REQ_TEXTURE1D_U_DIMENSION), cerr, ERROR_NOT_SUPPORTED, false);
+		texture = Texture2D::MakeUnique();
 		break;
 
 	case ResourceDimension::TEXTURE2D:
 		if (isCubeMap)
 		{
 			// This is the right bound because we set arraySize to (NumCubes * 6) above
-			F_RETURN(arraySize > REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
-				width > REQ_TEXTURECUBE_DIMENSION ||
-				height > REQ_TEXTURECUBE_DIMENSION,
+			F_RETURN(arraySize > GetDX12Requirement(REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION) ||
+				width > GetDX12Requirement(REQ_TEXTURECUBE_DIMENSION) ||
+				height > GetDX12Requirement(REQ_TEXTURECUBE_DIMENSION),
 				cerr, ERROR_NOT_SUPPORTED, false);
 		}
-		else F_RETURN(arraySize > REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION ||
-			width > REQ_TEXTURE2D_U_OR_V_DIMENSION ||
-			height > REQ_TEXTURE2D_U_OR_V_DIMENSION,
+		else F_RETURN(arraySize > GetDX12Requirement(REQ_TEXTURE2D_ARRAY_AXIS_DIMENSION) ||
+			width > GetDX12Requirement(REQ_TEXTURE2D_U_OR_V_DIMENSION) ||
+			height > GetDX12Requirement(REQ_TEXTURE2D_U_OR_V_DIMENSION),
 			cerr, ERROR_NOT_SUPPORTED, false);
-		texture = make_shared<Texture2D>();
+		texture = Texture2D::MakeUnique();
 		break;
 
 	case ResourceDimension::TEXTURE3D:
 		F_RETURN(arraySize > 1 ||
-			width > REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
-			height > REQ_TEXTURE3D_U_V_OR_W_DIMENSION ||
-			depth > REQ_TEXTURE3D_U_V_OR_W_DIMENSION,
+			width > GetDX12Requirement(REQ_TEXTURE3D_U_V_OR_W_DIMENSION) ||
+			height > GetDX12Requirement(REQ_TEXTURE3D_U_V_OR_W_DIMENSION) ||
+			depth > GetDX12Requirement(REQ_TEXTURE3D_U_V_OR_W_DIMENSION),
 			cerr, ERROR_NOT_SUPPORTED, false);
-		texture = make_shared<Texture3D>();
+		texture = Texture3D::MakeUnique();
 		break;
 
 	default:
@@ -553,20 +689,20 @@ static bool CreateTexture(const Device& device, const CommandList& commandList,
 			bool success;
 			const auto texture2D = dynamic_pointer_cast<Texture2D, ResourceBase>(texture);
 			const auto texture3D = dynamic_pointer_cast<Texture3D, ResourceBase>(texture);
-			if (texture2D)
-			{
-				const auto fmt = forceSRGB ? MakeSRGB(format) : format;
-				success = texture2D->Create(device, twidth, theight, fmt, arraySize, ResourceFlag::NONE,
-					mipCount - skipMip, 1, MemoryType::DEFAULT, isCubeMap, name);
-				if (success) success = texture2D->Upload(commandList, uploader, initData.get(),
-					subresourceCount, state);
-			}
-			else if (texture3D)
+			if (texture3D) // Texture3D can be a Texture2D, so it goes first.
 			{
 				const auto fmt = forceSRGB ? MakeSRGB(format) : format;
 				success = texture3D->Create(device, twidth, theight, tdepth, fmt, ResourceFlag::NONE,
 					mipCount - skipMip, MemoryType::DEFAULT, name);
-				if (success) success = texture3D->Upload(commandList, uploader, initData.get(),
+				if (success) success = texture3D->Upload(pCommandList, uploader, initData.get(),
+					subresourceCount, state);
+			}
+			else if (texture2D)
+			{
+				const auto fmt = forceSRGB ? MakeSRGB(format) : format;
+				success = texture2D->Create(device, twidth, theight, fmt, arraySize, ResourceFlag::NONE,
+					mipCount - skipMip, 1, MemoryType::DEFAULT, isCubeMap, name);
+				if (success) success = texture2D->Upload(pCommandList, uploader, initData.get(),
 					subresourceCount, state);
 			}
 			else V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
@@ -581,22 +717,22 @@ static bool CreateTexture(const Device& device, const CommandList& commandList,
 				if (FillInitData(width, height, depth, mipCount, arraySize, format, maxsize, bitSize, bitData,
 					twidth, theight, tdepth, skipMip, initData.get()))
 				{
-					if (texture2D)
+					if (texture3D) // Texture3D can be a Texture2D, so it goes first.
 					{
 						const auto fmt = forceSRGB ? MakeSRGB(format) : format;
-						texture = make_shared<Texture2D>();
-						success = texture2D->Create(device, width, height, fmt, arraySize, ResourceFlag::NONE,
-							mipCount, 1, MemoryType::DEFAULT, isCubeMap, name);
-						if (success) success = texture2D->Upload(commandList, uploader, initData.get(),
-							subresourceCount, state);
-					}
-					else if (texture3D)
-					{
-						const auto fmt = forceSRGB ? MakeSRGB(format) : format;
-						texture = make_shared<Texture3D>();
+						texture = Texture3D::MakeUnique();
 						success = texture3D->Create(device, width, height, depth, fmt, ResourceFlag::NONE,
 							mipCount, MemoryType::DEFAULT, name);
-						if (success) success = texture3D->Upload(commandList, uploader, initData.get(),
+						if (success) success = texture3D->Upload(pCommandList, uploader, initData.get(),
+							subresourceCount, state);
+					}
+					else if (texture2D)
+					{
+						const auto fmt = forceSRGB ? MakeSRGB(format) : format;
+						texture = Texture2D::MakeUnique();
+						success = texture2D->Create(device, width, height, fmt, arraySize, ResourceFlag::NONE,
+							mipCount, 1, MemoryType::DEFAULT, isCubeMap, name);
+						if (success) success = texture2D->Upload(pCommandList, uploader, initData.get(),
 							subresourceCount, state);
 					}
 					else V_RETURN(ERROR_NOT_SUPPORTED, cerr, false);
@@ -646,10 +782,10 @@ Loader::~Loader()
 {
 }
 
-bool Loader::CreateTextureFromMemory(const Device& device, const CommandList& commandList,
+bool Loader::CreateTextureFromMemory(const Device& device, CommandList* pCommandList,
 	const uint8_t* ddsData, size_t ddsDataSize, size_t maxsize, bool forceSRGB,
-	std::shared_ptr<ResourceBase>& texture, Resource& uploader,
-	AlphaMode* alphaMode, ResourceState state)
+	ResourceBase::sptr& texture, Resource& uploader, AlphaMode* alphaMode,
+	ResourceState state)
 {
 	if (alphaMode)* alphaMode = ALPHA_MODE_UNKNOWN;
 	F_RETURN(!device || !ddsData, cerr, E_INVALIDARG, false);
@@ -675,7 +811,7 @@ bool Loader::CreateTextureFromMemory(const Device& device, const CommandList& co
 	// Must be long enough for all headers and magic value
 	C_RETURN(ddsDataSize < offset, false);
 
-	N_RETURN(CreateTexture(device, commandList, header, ddsData + offset, ddsDataSize - offset,
+	N_RETURN(CreateTexture(device, pCommandList, header, ddsData + offset, ddsDataSize - offset,
 		maxsize, forceSRGB, texture, uploader, state, L"DDSTextureLoader"), false);
 
 	if (alphaMode)* alphaMode = GetAlphaMode(header);
@@ -683,8 +819,8 @@ bool Loader::CreateTextureFromMemory(const Device& device, const CommandList& co
 	return true;
 }
 
-bool Loader::CreateTextureFromFile(const Device& device, const CommandList& commandList,
-	const wchar_t* fileName, size_t maxsize, bool forceSRGB, shared_ptr<ResourceBase>& texture,
+bool Loader::CreateTextureFromFile(const Device& device, CommandList* pCommandList,
+	const wchar_t* fileName, size_t maxsize, bool forceSRGB, ResourceBase::sptr& texture,
 	Resource& uploader, AlphaMode* alphaMode, ResourceState state)
 {
 	if (alphaMode)* alphaMode = ALPHA_MODE_UNKNOWN;
@@ -697,7 +833,7 @@ bool Loader::CreateTextureFromFile(const Device& device, const CommandList& comm
 	unique_ptr<uint8_t[]> ddsData;
 	N_RETURN(LoadTextureDataFromFile(fileName, ddsData, &header, &bitData, &bitSize), false);
 
-	N_RETURN(CreateTexture(device, commandList, header, bitData, bitSize,
+	N_RETURN(CreateTexture(device, pCommandList, header, bitData, bitSize,
 		maxsize, forceSRGB, texture, uploader, state, fileName), false);
 
 	if (alphaMode)* alphaMode = GetAlphaMode(header);

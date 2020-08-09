@@ -84,7 +84,7 @@ void CharacterX::LoadPipeline()
 	ThrowIfFailed(hr);
 
 	// Create the command queue.
-	N_RETURN(m_device->GetCommandQueue(m_commandQueue, CommandListType::DIRECT, CommandQueueFlags::NONE), ThrowIfFailed(E_FAIL));
+	N_RETURN(m_device->GetCommandQueue(m_commandQueue, CommandListType::DIRECT, CommandQueueFlag::NONE), ThrowIfFailed(E_FAIL));
 
 	// Describe and create the swap chain.
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -112,29 +112,30 @@ void CharacterX::LoadPipeline()
 	ThrowIfFailed(swapChain.As(&m_swapChain));
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_descriptorTableCache = make_shared<DescriptorTableCache>();
-	m_descriptorTableCache->SetDevice(m_device);
+	m_descriptorTableCache = DescriptorTableCache::MakeShared(m_device, L"DescriptorTableCache");
 
 	// Create frame resources.
 	// Create a RTV and a command allocator for each frame.
 	for (auto n = 0u; n < FrameCount; n++)
 	{
-		N_RETURN(m_renderTargets[n].CreateFromSwapChain(m_device, m_swapChain, n), ThrowIfFailed(E_FAIL));
+		m_renderTargets[n] = RenderTarget::MakeUnique();
+		N_RETURN(m_renderTargets[n]->CreateFromSwapChain(m_device, m_swapChain, n), ThrowIfFailed(E_FAIL));
 		N_RETURN(m_device->GetCommandAllocator(m_commandAllocators[n], CommandListType::DIRECT), ThrowIfFailed(E_FAIL));
 	}
 
 	// Create a DSV
-	N_RETURN(m_depth.Create(m_device, m_width, m_height, Format::D24_UNORM_S8_UINT,
+	m_depth = DepthStencil::MakeUnique();
+	N_RETURN(m_depth->Create(m_device, m_width, m_height, Format::D24_UNORM_S8_UINT,
 		ResourceFlag::DENY_SHADER_RESOURCE), ThrowIfFailed(E_FAIL));
 }
 
 // Load the sample assets.
 void CharacterX::LoadAssets()
 {
-	m_shaderPool = make_shared<ShaderPool>();
-	m_graphicsPipelineCache = make_shared<Graphics::PipelineCache>(m_device);
-	m_computePipelineCache = make_shared<Compute::PipelineCache>(m_device);
-	m_pipelineLayoutCache = make_shared<PipelineLayoutCache>(m_device);
+	m_shaderPool = ShaderPool::MakeShared();
+	m_graphicsPipelineCache = Graphics::PipelineCache::MakeShared(m_device);
+	m_computePipelineCache = Compute::PipelineCache::MakeShared(m_device);
+	m_pipelineLayoutCache = PipelineLayoutCache::MakeShared(m_device);
 
 	// Create the shaders.
 	{
@@ -145,17 +146,19 @@ void CharacterX::LoadAssets()
 	}
 
 	// Create the command list.
-	N_RETURN(m_device->GetCommandList(m_commandList.GetCommandList(), 0, CommandListType::DIRECT,
+	m_commandList = CommandList::MakeUnique();
+	const auto pCommandList = m_commandList.get();
+	N_RETURN(m_device->GetCommandList(pCommandList, 0, CommandListType::DIRECT,
 		m_commandAllocators[m_frameIndex], nullptr), ThrowIfFailed(E_FAIL));
 
 	// Load character asset
 	{
 		m_inputLayout = Character::CreateInputLayout(*m_graphicsPipelineCache);
-		const auto textureCache = make_shared<TextureCache::element_type>(0);
+		const auto textureCache = make_shared<TextureCache::element_type>();
 		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
 			L"Media/Bright/Stars.sdkmesh_anim", textureCache);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
-		m_character = make_unique<Character>(m_device, L"Stars");
+		m_character = Character::MakeUnique(m_device, L"Stars");
 		if (!m_character) ThrowIfFailed(E_FAIL);
 		if (!m_character->Init(m_inputLayout, characterMesh, m_shaderPool,
 			m_graphicsPipelineCache, m_computePipelineCache,
@@ -164,9 +167,8 @@ void CharacterX::LoadAssets()
 	}
 
 	// Close the command list and execute it to begin the initial GPU setup.
-	ThrowIfFailed(m_commandList.Close());
-	BaseCommandList* const ppCommandLists[] = { m_commandList.GetCommandList().get() };
-	m_commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
+	ThrowIfFailed(pCommandList->Close());
+	m_commandQueue->SubmitCommandList(pCommandList);
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
 	{
@@ -221,7 +223,7 @@ void CharacterX::OnUpdate()
 	const auto viewProj = view * proj;
 
 	// Character
-	m_character->Update(m_frameIndex, time, viewProj, &XMMatrixIdentity(), nullptr, nullptr, 0, false);
+	m_character->Update(m_frameIndex, time, viewProj, &XMMatrixIdentity(), nullptr, 0, false);
 }
 
 // Render the scene.
@@ -231,8 +233,7 @@ void CharacterX::OnRender()
 	PopulateCommandList();
 
 	// Execute the command list.
-	BaseCommandList* const ppCommandLists[] = { m_commandList.GetCommandList().get() };
-	m_commandQueue->ExecuteCommandLists(static_cast<uint32_t>(size(ppCommandLists)), ppCommandLists);
+	m_commandQueue->SubmitCommandList(m_commandList.get());
 
 	// Present the frame.
 	ThrowIfFailed(m_swapChain->Present(0, 0));
@@ -332,36 +333,37 @@ void CharacterX::PopulateCommandList()
 	// However, when ExecuteCommandList() is called on a particular command 
 	// list, that command list can then be reset at any time and must be before 
 	// re-recording.
-	ThrowIfFailed(m_commandList.Reset(m_commandAllocators[m_frameIndex], nullptr));
+	const auto pCommandList = m_commandList.get();
+	ThrowIfFailed(pCommandList->Reset(m_commandAllocators[m_frameIndex], nullptr));
 
 	// Skinning
 	auto numBarriers = 0u;
 	ResourceBarrier barriers[1];
-	m_character->Skinning(m_commandList, numBarriers, barriers, true);
-	m_commandList.Barrier(numBarriers, barriers);
+	m_character->Skinning(pCommandList, numBarriers, barriers, true);
+	pCommandList->Barrier(numBarriers, barriers);
 
 	// Set necessary state.
-	m_commandList.RSSetViewports(1, &m_viewport);
-	m_commandList.RSSetScissorRects(1, &m_scissorRect);
+	pCommandList->RSSetViewports(1, &m_viewport);
+	pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
 	// Indicate that the back buffer will be used as a render target.
-	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, ResourceState::RENDER_TARGET);
-	m_commandList.Barrier(numBarriers, barriers);
-	m_commandList.OMSetRenderTargets(1, &m_renderTargets[m_frameIndex].GetRTV(), &m_depth.GetDSV());
+	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::RENDER_TARGET);
+	pCommandList->Barrier(numBarriers, barriers);
+	pCommandList->OMSetRenderTargets(1, &m_renderTargets[m_frameIndex]->GetRTV(), &m_depth->GetDSV());
 
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	m_commandList.ClearRenderTargetView(m_renderTargets[m_frameIndex].GetRTV(), clearColor, 0, nullptr);
-	m_commandList.ClearDepthStencilView(m_depth.GetDSV(), ClearFlag::DEPTH, 1.0f, 0, 0, nullptr);
+	pCommandList->ClearRenderTargetView(m_renderTargets[m_frameIndex]->GetRTV(), clearColor, 0, nullptr);
+	pCommandList->ClearDepthStencilView(m_depth->GetDSV(), ClearFlag::DEPTH, 1.0f, 0, 0, nullptr);
 	//m_commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	m_character->RenderTransformed(m_commandList, Character::BASE_PASS, SUBSET_FULL, Character::CBV_MATRICES);
+	m_character->RenderTransformed(pCommandList, Character::BASE_PASS, SUBSET_FULL, Character::CBV_MATRICES);
 
 	// Indicate that the back buffer will now be used to present.
-	numBarriers = m_renderTargets[m_frameIndex].SetBarrier(barriers, ResourceState::PRESENT);
-	m_commandList.Barrier(numBarriers, barriers);
+	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::PRESENT);
+	pCommandList->Barrier(numBarriers, barriers);
 
-	ThrowIfFailed(m_commandList.Close());
+	ThrowIfFailed(pCommandList->Close());
 }
 
 // Wait for pending GPU work to complete.

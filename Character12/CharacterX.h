@@ -14,7 +14,7 @@
 #include "DXFramework.h"
 #include "StepTimer.h"
 #include "Core/XUSG.h"
-#include "Advanced/XUSGCharacter.h"
+#include "Advanced/XUSGAdvanced.h"
 
 using namespace DirectX;
 
@@ -45,28 +45,28 @@ public:
 private:
 	static const uint32_t FrameCount = XUSG::Model::GetFrameCount();
 
-	std::shared_ptr<XUSG::ShaderPool>				m_shaderPool;
-	std::shared_ptr<XUSG::Graphics::PipelineCache>	m_graphicsPipelineCache;
-	std::shared_ptr<XUSG::Compute::PipelineCache>	m_computePipelineCache;
-	std::shared_ptr<XUSG::PipelineLayoutCache>		m_pipelineLayoutCache;
-	std::shared_ptr<XUSG::DescriptorTableCache>		m_descriptorTableCache;
-
+	XUSG::ShaderPool::sptr				m_shaderPool;
+	XUSG::Graphics::PipelineCache::sptr	m_graphicsPipelineCache;
+	XUSG::Compute::PipelineCache::sptr	m_computePipelineCache;
+	XUSG::PipelineLayoutCache::sptr		m_pipelineLayoutCache;
+	XUSG::DescriptorTableCache::sptr	m_descriptorTableCache;
+	
 	// Pipeline objects.
-	XUSG::InputLayout		m_inputLayout;
-	XUSG::Viewport			m_viewport;
-	XUSG::RectRange			m_scissorRect;
+	XUSG::InputLayout			m_inputLayout;
+	XUSG::Viewport				m_viewport;
+	XUSG::RectRange				m_scissorRect;
 
-	XUSG::SwapChain			m_swapChain;
-	XUSG::CommandAllocator	m_commandAllocators[FrameCount];
-	XUSG::CommandQueue		m_commandQueue;
+	XUSG::SwapChain				m_swapChain;
+	XUSG::CommandAllocator		m_commandAllocators[FrameCount];
+	XUSG::CommandQueue			m_commandQueue;
 
-	XUSG::Device			m_device;
-	XUSG::RenderTarget		m_renderTargets[FrameCount];
-	XUSG::CommandList		m_commandList;
+	XUSG::Device				m_device;
+	XUSG::RenderTarget::uptr	m_renderTargets[FrameCount];
+	XUSG::CommandList::uptr		m_commandList;
 
 	// App resources.
-	std::unique_ptr<XUSG::Character> m_character;
-	XUSG::DepthStencil		m_depth;
+	XUSG::Character::uptr		m_character;
+	XUSG::DepthStencil::uptr	m_depth;
 	XMFLOAT4X4	m_proj;
 	XMFLOAT4X4	m_view;
 	XMFLOAT3	m_focusPt;

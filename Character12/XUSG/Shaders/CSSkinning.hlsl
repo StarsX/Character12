@@ -13,7 +13,7 @@ struct CS_Input
 	uint	Weights;	// Bone weights
 	uint	Bones;		// Bone indices
 	uint2	Norm;		// Normal
-	uint	Tex;		// Texture coordinate
+	uint	UV;			// Texture coordinate
 	uint2	Tan;		// Normalized Tangent vector
 	uint2	BiNorm;		// Normalized BiNormal vector
 };
@@ -22,7 +22,7 @@ struct CS_Output
 {
 	float3	Pos;		// Position
 	uint2	Norm;		// Normal
-	uint	Tex;		// Texture coordinate
+	uint	UV;			// Texture coordinate
 	uint2	Tan;		// Normalized Tangent vector
 	uint2	BiNorm;		// Normalized BiNormal vector
 };
@@ -81,7 +81,7 @@ VS_Input LoadVertex(uint i)
 	vertex.Norm = DecodeRGB16f(vertexIn.Norm);
 	vertex.Tan = DecodeRGB16f(vertexIn.Tan);
 	vertex.BiNorm = DecodeRGB16f(vertexIn.BiNorm);
-	vertex.Tex = vertexIn.Tex;
+	vertex.UV = vertexIn.UV;
 	
 	return vertex;
 }
@@ -94,7 +94,7 @@ void StoreVertex(SkinnedInfo skinned, uint i)
 	CS_Output output;
 	output.Pos = skinned.Pos;
 	output.Norm = EncodeRGB16f(skinned.Norm);
-	output.Tex = skinned.Tex;
+	output.UV = skinned.UV;
 	output.Tan = EncodeRGB16f(skinned.Tan);
 	output.BiNorm = EncodeRGB16f(skinned.BiNorm);
 

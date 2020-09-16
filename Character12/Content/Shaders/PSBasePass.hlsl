@@ -15,7 +15,7 @@ SamplerState g_sampler;
 
 float4 main(PS_Input input) : SV_TARGET
 {
-	const float4 albedo = g_albedo.Sample(g_sampler, input.Tex);
+	const float4 albedo = g_albedo.Sample(g_sampler, input.UV);
 #ifdef _ALPHA_TEST_
 	clip(albedo.w - 0.667);
 #endif

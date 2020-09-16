@@ -11,7 +11,7 @@ struct VS_Input
 	float4	Weights	: WEIGHTS;		// Bone weights
 	uint4	Bones	: BONES;		// Bone indices
 	float3	Norm	: NORMAL;		// Normal
-	uint	Tex		: TEXCOORD;		// Texture coordinate
+	uint	UV		: TEXCOORD;		// Texture coordinate
 	float3	Tan		: TANGENT;		// Normalized Tangent vector
 	float3	BiNorm	: BINORMAL;		// Normalized BiNormal vector
 };
@@ -29,7 +29,7 @@ struct SkinnedInfo
 {
 	float3	Pos;
 	float3	Norm;
-	uint	Tex;
+	uint	UV;
 	float3	Tan;
 	float3	BiNorm;
 };
@@ -96,7 +96,7 @@ SkinnedInfo SkinVert(VS_Input input)
 	output.Norm = RotateWithDQ(normal, dual);
 	output.Tan = RotateWithDQ(tangent, dual);
 	output.BiNorm = RotateWithDQ(binorm, dual);
-	output.Tex = input.Tex;
+	output.UV = input.UV;
 
 	return output;
 }

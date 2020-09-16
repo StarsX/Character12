@@ -657,7 +657,7 @@ namespace XUSG
 			std::vector<Resource>& uploaders, Format rtvFormat, Format dsvFormat,
 			bool useIBL = false) = 0;
 		virtual bool ChangeWindowSize(CommandList* pCommandList, std::vector<Resource>& uploaders,
-			RenderTarget& renderTarget, DepthStencil& depth) = 0;
+			RenderTarget& rtColor, DepthStencil& depth, RenderTarget& rtMasks) = 0;
 		virtual bool CreateResources(CommandList* pCommandList, std::vector<Resource>& uploaders) = 0;
 		virtual void Update(uint8_t frameIndex, double time, float timeStep) = 0;
 		virtual void Update(uint8_t frameIndex, double time, float timeStep,
@@ -667,13 +667,14 @@ namespace XUSG
 		virtual void SetViewProjMatrix(DirectX::CXMMATRIX view, DirectX::CXMMATRIX proj) = 0;
 		virtual void SetEyePoint(DirectX::CXMVECTOR eyePt) = 0;
 		virtual void SetFocusAndDistance(DirectX::CXMVECTOR focus_dist) = 0;
-		virtual void SetRenderTarget(RenderTarget& renderTarget, DepthStencil& depth, bool createFB = true) = 0;
+		virtual void SetRenderTarget(RenderTarget& rtColor, DepthStencil& depth,
+			RenderTarget& rtMasks, bool createFB = true) = 0;
 		virtual void SetViewport(const Viewport& viewport, const RectRange& scissorRect) = 0;
 
 		virtual DirectX::FXMVECTOR GetFocusAndDistance() const = 0;
 		virtual const DescriptorTable& GetCBVTable(uint8_t i) const = 0;
 		virtual const RenderTarget::sptr GetGBuffer(const uint8_t i) const = 0;
-		virtual const RenderTarget::sptr GetShadowMask() const = 0;
+		//virtual const RenderTarget::sptr GetMasks() const = 0;
 		
 		using uptr = std::unique_ptr<Scene>;
 		using sptr = std::shared_ptr<Scene>;
@@ -690,11 +691,11 @@ namespace XUSG
 	public:
 		enum PipelineIndex : uint8_t
 		{
-			RESAMPLE_LUM,
+			ANTIALIAS,
 			POST_EFFECTS,
+			RESAMPLE_LUM,
 			LUM_ADAPT,
 			TONE_MAP,
-			ANTIALIAS,
 			UNSHARP,
 
 			NUM_PIPELINE
@@ -715,22 +716,22 @@ namespace XUSG
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
 			Format hdrFormat, Format ldrFormat) = 0;
-		virtual bool ChangeWindowSize(const RenderTarget& refRT, const Descriptor& srvBaseColor) = 0;
+		virtual bool ChangeWindowSize(const RenderTarget& refRT) = 0;
 
 		virtual void Update(const DescriptorTable& cbvImmutable, const DescriptorTable& cbvPerFrameTable,
 			float timeStep) = 0;
 		virtual void Render(const CommandList* pCommandList, RenderTarget& dst, Texture2D& src,
-			const Descriptor& rtv, const DescriptorTable& srvTable, bool clearRT = false) = 0;
+			const DescriptorTable& srvTable, bool clearRT = false) = 0;
 		virtual void ScreenRender(const CommandList* pCommandList, PipelineIndex pipelineIndex,
 			const DescriptorTable& srvTable, bool hasPerFrameCB, bool hasSampler, bool reset = false) = 0;
 		virtual void LumAdaption(const CommandList* pCommandList, const DescriptorTable& uavSrvTable, bool reset = false) = 0;
-		virtual void Antialias(const CommandList* pCommandList, const Descriptor* pRTVs, const DescriptorTable& srvTable,
-			uint8_t numRTVs = 1, bool reset = false) = 0;
+		virtual void Antialias(const CommandList* pCommandList, RenderTarget** ppDsts, Texture2D** ppSrcs,
+			const DescriptorTable& srvTable, uint8_t numRTVs, uint8_t numSRVs, bool reset = false) = 0;
 		virtual void Unsharp(const CommandList* pCommandList, const Descriptor* pRTVs, const DescriptorTable& srvTable,
 			uint8_t numRTVs = 1, bool reset = false) = 0;
 
 		virtual DescriptorTable CreateTemporalAASRVTable(const Descriptor& srvCurrent, const Descriptor& srvPrevious,
-			const Descriptor& srvVelocity, const Descriptor& pSRVMask) = 0;
+			const Descriptor& srvVelocity, const Descriptor& srvMasks, const Descriptor& srvMeta) = 0;
 
 		using uptr = std::unique_ptr<Postprocess>;
 		using sptr = std::shared_ptr<Postprocess>;

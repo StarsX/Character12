@@ -21,15 +21,11 @@ struct IOStruct
 	float3	WSPos		: POSWORLD;		// World space Pos
 #endif
 
-#ifdef _SHADOW_MAP_
-	float4	LSPos		: POSLIGHT;		// Light space Pos
-#endif
-
 #ifdef _NORMAL_
 	min16float3	Norm	: NORMAL;		// Normal
 #endif
 
-	float2	Tex			: TEXCOORD;		// Texture coordinate
+	float2	UV			: TEXCOORD;		// Texture coordinate
 
 #ifdef _POSSCREEN_
 	float4	SSPos		: POSSCREEN;	// Screen space Pos

@@ -43,7 +43,6 @@ enum PixelShader : uint8_t
 	PS_POST_PROC,
 	PS_TONE_MAP,
 	PS_TEMPORAL_AA,
-	PS_UNSHARP,
 	PS_FXAA,
 
 	PS_NULL_INDEX

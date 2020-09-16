@@ -23,7 +23,7 @@ struct Vertex
 {
 	float3	Pos;		// Position
 	uint2	Norm;		// Normal
-	uint	Tex;		// Texture coordinate
+	uint	UV;			// Texture coordinate
 	uint2	Tan;		// Normalized Tangent vector
 	uint2	BiNorm;		// Normalized BiNormal vector
 };
@@ -68,10 +68,6 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 	output.Pos.xy += g_projBias * output.Pos.w;
 #endif
 
-#ifdef _SHADOW_MAP_
-	output.LSPos = mul(pos, g_shadow);
-#endif
-
 #if defined(_POSWORLD_) || defined(_CLIP_)
 	pos.xyz = mul(pos, g_world);
 #endif
@@ -89,7 +85,7 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 	output.BiNorm = min16float3(normalize(mul(input.BiNorm, (float3x3)g_world)));
 #endif
 
-	output.Tex = input.Tex;
+	output.UV = input.UV;
 
 #ifdef  _CLIP_
 	output.Clip = dot(pos, g_clipPlane);

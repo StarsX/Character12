@@ -54,7 +54,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device& device, const wstring& meshFi
 			auto& meshInfo = meshLinks->at(m);
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
 			linkedMeshes->at(m) = SDKMesh::MakeShared();
-			N_RETURN(linkedMeshes->at(m)->Create(device.get(), meshInfo.MeshName.c_str(),
+			N_RETURN(linkedMeshes->at(m)->Create(device, meshInfo.MeshName.c_str(),
 				textureCache), nullptr);
 		}
 	}

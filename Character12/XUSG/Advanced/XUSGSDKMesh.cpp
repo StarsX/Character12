@@ -558,7 +558,6 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 	wstring filePathW;
 	DDS::Loader textureLoader;
 	DDS::AlphaMode alphaMode;
-	wstring_convert<codecvt_utf8<wchar_t>> converter;
 
 	for (auto m = 0u; m < numMaterials; ++m)
 	{
@@ -585,7 +584,7 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 				shared_ptr<ResourceBase> texture;
 				uploaders.emplace_back();
 
-				filePathW = converter.from_bytes(filePath);
+				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, pCommandList, filePathW.c_str(),
 					8192, true, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
@@ -612,7 +611,7 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 				shared_ptr<ResourceBase> texture;
 				uploaders.emplace_back();
 
-				filePathW = converter.from_bytes(filePath);
+				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, pCommandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back(), &alphaMode))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
@@ -639,7 +638,7 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 				shared_ptr<ResourceBase> texture;
 				uploaders.emplace_back();
 
-				filePathW = converter.from_bytes(filePath);
+				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device, pCommandList, filePathW.c_str(),
 					8192, false, texture, uploaders.back()))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
@@ -733,7 +732,6 @@ bool SDKMesh_Impl::createFromFile(const Device& device, const wchar_t* fileName,
 {
 	// Find the path for the file
 	m_filePathW = fileName;
-	//V_RETURN(DXUTFindDXSDKMediaFileCch(m_filePathW, sizeof(m_strPathW) / sizeof(WCHAR), fileName));
 
 	// Open the file
 	ifstream fileStream(m_filePathW, ios::in | ios::binary);
@@ -743,7 +741,8 @@ bool SDKMesh_Impl::createFromFile(const Device& device, const wchar_t* fileName,
 	const auto found = m_filePathW.find_last_of(L"/\\");
 	m_name = m_filePathW.substr(found + 1);
 	m_filePathW = m_filePathW.substr(0, found + 1);
-	m_filePath = wstring_convert<codecvt_utf8<wchar_t>>().to_bytes(m_filePathW);
+	m_filePath.resize(m_filePathW.size());
+	for (size_t i = 0; i < m_filePath.size(); ++i) m_filePath[i] = static_cast<char>(m_filePathW[i]);
 
 	// Get the file size
 	F_RETURN(!fileStream.seekg(0, fileStream.end), fileStream.close(); cerr, E_FAIL, false);

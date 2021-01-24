@@ -134,14 +134,14 @@ namespace XUSG
 
 		IndexType			GetIndexType(uint32_t mesh) const;
 
-		Descriptor			GetVertexBufferSRV(uint32_t mesh, uint32_t i) const;
-		VertexBufferView	GetVertexBufferView(uint32_t mesh, uint32_t i) const;
-		IndexBufferView		GetIndexBufferView(uint32_t mesh) const;
-		IndexBufferView		GetAdjIndexBufferView(uint32_t mesh) const;
+		const Descriptor&		GetVertexBufferSRV(uint32_t mesh, uint32_t i) const;
+		const VertexBufferView&	GetVertexBufferView(uint32_t mesh, uint32_t i) const;
+		const IndexBufferView&	GetIndexBufferView(uint32_t mesh) const;
+		const IndexBufferView&	GetAdjIndexBufferView(uint32_t mesh) const;
 
-		Descriptor			GetVertexBufferSRVAt(uint32_t vb) const;
-		VertexBufferView	GetVertexBufferViewAt(uint32_t vb) const;
-		IndexBufferView		GetIndexBufferViewAt(uint32_t ib) const;
+		const Descriptor&		GetVertexBufferSRVAt(uint32_t vb) const;
+		const VertexBufferView&	GetVertexBufferViewAt(uint32_t vb) const;
+		const IndexBufferView&	GetIndexBufferViewAt(uint32_t ib) const;
 
 		// Helpers (general)
 		const char*			GetMeshPathA() const;

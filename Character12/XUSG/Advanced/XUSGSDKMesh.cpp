@@ -259,37 +259,37 @@ SDKMesh::IndexType SDKMesh_Impl::GetIndexType(uint32_t mesh) const
 	return static_cast<IndexType>(m_pIndexBufferArray[m_pMeshArray[mesh].IndexBuffer].IndexType);
 }
 
-Descriptor SDKMesh_Impl::GetVertexBufferSRV(uint32_t mesh, uint32_t i) const
+const Descriptor& SDKMesh_Impl::GetVertexBufferSRV(uint32_t mesh, uint32_t i) const
 {
 	return m_vertexBuffer->GetSRV(m_pMeshArray[mesh].VertexBuffers[i]);
 }
 
-VertexBufferView SDKMesh_Impl::GetVertexBufferView(uint32_t mesh, uint32_t i) const
+const VertexBufferView& SDKMesh_Impl::GetVertexBufferView(uint32_t mesh, uint32_t i) const
 {
 	return m_vertexBuffer->GetVBV(m_pMeshArray[mesh].VertexBuffers[i]);
 }
 
-IndexBufferView SDKMesh_Impl::GetIndexBufferView(uint32_t mesh) const
+const IndexBufferView& SDKMesh_Impl::GetIndexBufferView(uint32_t mesh) const
 {
 	return m_indexBuffer->GetIBV(m_pMeshArray[mesh].IndexBuffer);
 }
 
-IndexBufferView SDKMesh_Impl::GetAdjIndexBufferView(uint32_t mesh) const
+const IndexBufferView& SDKMesh_Impl::GetAdjIndexBufferView(uint32_t mesh) const
 {
 	return m_adjIndexBuffer->GetIBV(m_pMeshArray[mesh].IndexBuffer);
 }
 
-Descriptor SDKMesh_Impl::GetVertexBufferSRVAt(uint32_t vb) const
+const Descriptor& SDKMesh_Impl::GetVertexBufferSRVAt(uint32_t vb) const
 {
 	return m_vertexBuffer->GetSRV(vb);
 }
 
-VertexBufferView SDKMesh_Impl::GetVertexBufferViewAt(uint32_t vb) const
+const VertexBufferView& SDKMesh_Impl::GetVertexBufferViewAt(uint32_t vb) const
 {
 	return m_vertexBuffer->GetVBV(vb);
 }
 
-IndexBufferView SDKMesh_Impl::GetIndexBufferViewAt(uint32_t ib) const
+const IndexBufferView& SDKMesh_Impl::GetIndexBufferViewAt(uint32_t ib) const
 {
 	return m_indexBuffer->GetIBV(ib);
 }

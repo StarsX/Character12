@@ -218,9 +218,10 @@ void CharacterX::OnUpdate()
 	const auto view = XMLoadFloat4x4(&m_view);
 	const auto proj = XMLoadFloat4x4(&m_proj);
 	const auto viewProj = view * proj;
+	const auto world = XMMatrixIdentity();
 
 	// Character
-	m_character->Update(m_frameIndex, time, viewProj, &XMMatrixIdentity(), nullptr, 0, false);
+	m_character->Update(m_frameIndex, time, viewProj, &world, nullptr, 0, false);
 }
 
 // Render the scene.

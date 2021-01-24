@@ -233,14 +233,14 @@ namespace XUSG
 
 		virtual IndexType			GetIndexType(uint32_t mesh) const = 0;
 
-		virtual Descriptor			GetVertexBufferSRV(uint32_t mesh, uint32_t i) const = 0;
-		virtual VertexBufferView	GetVertexBufferView(uint32_t mesh, uint32_t i) const = 0;
-		virtual IndexBufferView		GetIndexBufferView(uint32_t mesh) const = 0;
-		virtual IndexBufferView		GetAdjIndexBufferView(uint32_t mesh) const = 0;
+		virtual const Descriptor&		GetVertexBufferSRV(uint32_t mesh, uint32_t i) const = 0;
+		virtual const VertexBufferView&	GetVertexBufferView(uint32_t mesh, uint32_t i) const = 0;
+		virtual const IndexBufferView&	GetIndexBufferView(uint32_t mesh) const = 0;
+		virtual const IndexBufferView&	GetAdjIndexBufferView(uint32_t mesh) const = 0;
 
-		virtual Descriptor			GetVertexBufferSRVAt(uint32_t vb) const = 0;
-		virtual VertexBufferView	GetVertexBufferViewAt(uint32_t vb) const = 0;
-		virtual IndexBufferView		GetIndexBufferViewAt(uint32_t ib) const = 0;
+		virtual const Descriptor&		GetVertexBufferSRVAt(uint32_t vb) const = 0;
+		virtual const VertexBufferView&	GetVertexBufferViewAt(uint32_t vb) const = 0;
+		virtual const IndexBufferView&	GetIndexBufferViewAt(uint32_t ib) const = 0;
 
 		// Helpers (general)
 		virtual const char*			GetMeshPathA() const = 0;

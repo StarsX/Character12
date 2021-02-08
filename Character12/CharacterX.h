@@ -52,7 +52,7 @@ private:
 	XUSG::DescriptorTableCache::sptr	m_descriptorTableCache;
 	
 	// Pipeline objects.
-	XUSG::InputLayout			m_inputLayout;
+	const XUSG::InputLayout*	m_pInputLayout;
 	XUSG::Viewport				m_viewport;
 	XUSG::RectRange				m_scissorRect;
 

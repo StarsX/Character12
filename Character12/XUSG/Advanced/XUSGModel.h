@@ -15,7 +15,7 @@ namespace XUSG
 		Model_Impl(const Device& device, const wchar_t* name);
 		virtual ~Model_Impl();
 
-		bool Init(const InputLayout& inputLayout,
+		bool Init(const InputLayout* pInputLayout,
 			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
@@ -41,7 +41,7 @@ namespace XUSG
 		};
 
 		bool createConstantBuffers();
-		bool createPipelines(bool isStatic, const InputLayout& inputLayout, const Format* rtvFormats,
+		bool createPipelines(bool isStatic, const InputLayout* pInputLayout, const Format* rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		bool createDescriptorTables();
 		void render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,

@@ -17,7 +17,7 @@ namespace XUSG
 		Character_Impl(const Device& device, const wchar_t* name = nullptr);
 		virtual ~Character_Impl();
 
-		bool Init(const InputLayout& inputLayout,
+		bool Init(const InputLayout* pInputLayout,
 			const SDKMesh::sptr& mesh,
 			const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
@@ -63,7 +63,7 @@ namespace XUSG
 		bool createTransformedVBs(VertexBuffer& vertexBuffer);
 		bool createBuffers();
 		bool createPipelineLayouts();
-		bool createPipelines(const InputLayout& inputLayout, const Format* rtvFormats,
+		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		bool createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX viewProj,

@@ -30,10 +30,10 @@ Model* Model::AsModel()
 //--------------------------------------------------------------------------------------
 // Static interface functions
 //--------------------------------------------------------------------------------------
-InputLayout Model::CreateInputLayout(PipelineCache& pipelineCache)
+const InputLayout* Model::CreateInputLayout(PipelineCache& pipelineCache)
 {
 	// Define vertex data layout for post-transformed objects
-	InputElementTable inputElementDescs =
+	const InputElement inputElements[] =
 	{
 		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,						InputClassification::PER_VERTEX_DATA, 0 },
 		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
@@ -42,7 +42,7 @@ InputLayout Model::CreateInputLayout(PipelineCache& pipelineCache)
 		{ "BINORMAL",	0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 }
 	};
 
-	return pipelineCache.CreateInputLayout(inputElementDescs);
+	return pipelineCache.CreateInputLayout(inputElements, static_cast<uint32_t>(size(inputElements)));
 }
 
 SDKMesh::sptr Model::LoadSDKMesh(const Device& device, const wstring& meshFileName,
@@ -80,7 +80,7 @@ Model_Impl::~Model_Impl()
 {
 }
 
-bool Model_Impl::Init(const InputLayout& inputLayout, const SDKMesh::sptr& mesh,
+bool Model_Impl::Init(const InputLayout* pInputLayout, const SDKMesh::sptr& mesh,
 	const ShaderPool::sptr& shaderPool, const PipelineCache::sptr& pipelineCache,
 	const PipelineLayoutCache::sptr& pipelineLayoutCache,
 	const DescriptorTableCache::sptr& descriptorTableCache)
@@ -214,7 +214,7 @@ bool Model_Impl::createConstantBuffers()
 	return true;
 }
 
-bool Model_Impl::createPipelines(bool isStatic, const InputLayout& inputLayout, const Format* rtvFormats,
+bool Model_Impl::createPipelines(bool isStatic, const InputLayout* pInputLayout, const Format* rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
 	const auto defaultRtvFormat = Format::B8G8R8A8_UNORM;
@@ -232,7 +232,7 @@ bool Model_Impl::createPipelines(bool isStatic, const InputLayout& inputLayout, 
 		const auto psAlphaTest = isStatic ? PS_ALPHA_TEST_STATIC : PS_ALPHA_TEST;
 
 		// Get opaque pipelines
-		state->IASetInputLayout(inputLayout);
+		state->IASetInputLayout(pInputLayout);
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 		state->SetPipelineLayout(m_pipelineLayouts[BASE_PASS]);
 		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsBasePass));

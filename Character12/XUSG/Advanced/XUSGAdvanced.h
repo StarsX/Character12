@@ -354,7 +354,7 @@ namespace XUSG
 		//Model(const Device& device, const wchar_t* name);
 		virtual ~Model() {};
 
-		virtual bool Init(const InputLayout& inputLayout, const SDKMesh::sptr& mesh,
+		virtual bool Init(const InputLayout* pInputLayout, const SDKMesh::sptr& mesh,
 			const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
@@ -370,7 +370,7 @@ namespace XUSG
 
 		Model* AsModel();
 
-		static InputLayout CreateInputLayout(Graphics::PipelineCache& pipelineCache);
+		static const InputLayout* CreateInputLayout(Graphics::PipelineCache& pipelineCache);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device& device, const std::wstring& meshFileName,
 			const TextureCache& textureCache, bool isStaticMesh);
 
@@ -415,7 +415,7 @@ namespace XUSG
 		//Character(const Device& device, const wchar_t* name = nullptr);
 		virtual ~Character() {};
 
-		virtual bool Init(const InputLayout& inputLayout,
+		virtual bool Init(const InputLayout* pInputLayout,
 			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
 			const Compute::PipelineCache::sptr& computePipelineCache,
@@ -475,7 +475,7 @@ namespace XUSG
 		//StaticModel(const Device& device, const wchar_t* name = nullptr);
 		virtual ~StaticModel() {};
 
-		virtual bool Init(const InputLayout& inputLayout, const SDKMesh::sptr& mesh,
+		virtual bool Init(const InputLayout* pInputLayout, const SDKMesh::sptr& mesh,
 			const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,

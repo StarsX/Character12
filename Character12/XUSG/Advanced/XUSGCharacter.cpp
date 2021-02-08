@@ -87,7 +87,7 @@ Character_Impl::~Character_Impl(void)
 {
 }
 
-bool Character_Impl::Init(const InputLayout& inputLayout,
+bool Character_Impl::Init(const InputLayout* pInputLayout,
 	const shared_ptr<SDKMesh>& mesh,
 	const ShaderPool::sptr& shaderPool,
 	const Graphics::PipelineCache::sptr& graphicsPipelineCache,
@@ -106,7 +106,7 @@ bool Character_Impl::Init(const InputLayout& inputLayout,
 	m_linkedMeshes = linkedMeshes;
 
 	// Get SDKMesh
-	N_RETURN(Model_Impl::Init(inputLayout, mesh, shaderPool, graphicsPipelineCache,
+	N_RETURN(Model_Impl::Init(pInputLayout, mesh, shaderPool, graphicsPipelineCache,
 		pipelineLayoutCache, descriptorTableCache), false);
 
 	// Create buffers
@@ -117,7 +117,7 @@ bool Character_Impl::Init(const InputLayout& inputLayout,
 
 	// Create pipeline layout, pipelines, and descriptor tables
 	N_RETURN(createPipelineLayouts(), false);
-	N_RETURN(createPipelines(inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat), false);
+	N_RETURN(createPipelines(pInputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat), false);
 	N_RETURN(createDescriptorTables(), false);
 
 	return true;
@@ -377,7 +377,7 @@ bool Character_Impl::createPipelineLayouts()
 	return true;
 }
 
-bool Character_Impl::createPipelines(const InputLayout& inputLayout, const Format* rtvFormats,
+bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
 	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
 {
 	// Skinning
@@ -390,7 +390,7 @@ bool Character_Impl::createPipelines(const InputLayout& inputLayout, const Forma
 	}
 
 	// Rendering
-	return Model_Impl::createPipelines(false, inputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
+	return Model_Impl::createPipelines(false, pInputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
 }
 
 bool Character_Impl::createDescriptorTables()

@@ -138,6 +138,14 @@ void Model_Impl::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX* pSh
 #endif
 }
 
+#if TEMPORAL_AA
+void Model_Impl::SetTemporalBias(const XMFLOAT2& temporalBias)
+{
+	const auto pCBData = reinterpret_cast<XMFLOAT2*>(m_cbTemporalBias->Map(m_currentFrame));
+	*pCBData = temporalBias;
+}
+#endif
+
 void Model_Impl::SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout)
 {
 	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
@@ -184,6 +192,9 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
 		pCommandList->SetGraphicsDescriptorTable(m_variableSlot + SAMPLERS_OFFSET, m_samplerTable);
+#if TEMPORAL_AA
+		pCommandList->SetGraphicsDescriptorTable(TEMPORAL_BIAS, m_cbvTables[m_currentFrame][CBV_LOCAL_TEMPORAL_BIAS]);
+#endif
 	}
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
@@ -210,6 +221,12 @@ bool Model_Impl::createConstantBuffers()
 	N_RETURN(m_cbShadowMatrices->Create(m_device, sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
 		MAX_SHADOW_CASCADES * FrameCount, nullptr, MemoryType::UPLOAD, m_name.empty() ? nullptr :
 		(m_name + L".CBShadowMatrices").c_str()), false);
+
+#if TEMPORAL_AA
+	m_cbTemporalBias = ConstantBuffer::MakeUnique();
+	N_RETURN(m_cbTemporalBias->Create(m_device, sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
+		MemoryType::UPLOAD, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
+#endif
 
 	return true;
 }
@@ -329,9 +346,11 @@ bool Model_Impl::createDescriptorTables()
 {
 	for (auto i = 0ui8; i < FrameCount; ++i)
 	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-		descriptorTable->SetDescriptors(0, 1, &m_cbMatrices->GetCBV(i));
-		X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		{
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+			descriptorTable->SetDescriptors(0, 1, &m_cbMatrices->GetCBV(i));
+			X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		}
 
 		for (auto j = 0ui8; j < MAX_SHADOW_CASCADES; ++j)
 		{
@@ -339,6 +358,14 @@ bool Model_Impl::createDescriptorTables()
 			descriptorTable->SetDescriptors(0, 1, &m_cbShadowMatrices->GetCBV(i * MAX_SHADOW_CASCADES + j));
 			X_RETURN(m_cbvTables[i][CBV_SHADOW_MATRIX + j], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 		}
+
+#if TEMPORAL_AA
+		{
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+			descriptorTable->SetDescriptors(0, 1, &m_cbTemporalBias->GetCBV(i));
+			X_RETURN(m_cbvTables[i][CBV_LOCAL_TEMPORAL_BIAS], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+		}
+#endif
 	}
 
 	const auto descriptorTable = Util::DescriptorTable::MakeUnique();

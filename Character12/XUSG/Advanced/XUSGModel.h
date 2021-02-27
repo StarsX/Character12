@@ -23,6 +23,9 @@ namespace XUSG
 		void Update(uint8_t frameIndex);
 		void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world,
 			DirectX::FXMMATRIX* pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
+#if TEMPORAL_AA
+		void SetTemporalBias(const DirectX::XMFLOAT2& temporalBias);
+#endif
 		void SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout);
 		void SetPipeline(const CommandList* pCommandList, PipelineIndex pipeline);
 		void SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
@@ -69,6 +72,9 @@ namespace XUSG
 
 		ConstantBuffer::uptr	m_cbMatrices;
 		ConstantBuffer::uptr	m_cbShadowMatrices;
+#if TEMPORAL_AA
+		ConstantBuffer::uptr	m_cbTemporalBias;
+#endif
 
 		PipelineLayout			m_pipelineLayouts[NUM_PIPELINE_LAYOUT];
 		Pipeline				m_pipelines[NUM_PIPELINE];

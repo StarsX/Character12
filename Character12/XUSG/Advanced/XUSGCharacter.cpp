@@ -306,12 +306,11 @@ bool Character_Impl::createPipelineLayouts()
 
 		// Input vertices and bone matrices
 		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld, 0, DescriptorFlag::DATA_STATIC);
-		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roVertices, 0, DescriptorFlag::DESCRIPTORS_VOLATILE);
+		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roVertices, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		utilPipelineLayout->SetShaderStage(INPUT, Shader::Stage::CS);
 
 		// Output vertices
-		utilPipelineLayout->SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices, 0,
-			DescriptorFlag::DESCRIPTORS_VOLATILE | DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		utilPipelineLayout->SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
 		utilPipelineLayout->SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
@@ -510,6 +509,9 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+#if TEMPORAL_AA
+		pCommandList->SetGraphicsDescriptorTable(TEMPORAL_BIAS, m_cbvTables[m_currentFrame][CBV_LOCAL_TEMPORAL_BIAS]);
+#endif
 	}
 
 	// Set matrices

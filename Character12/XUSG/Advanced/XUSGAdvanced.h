@@ -346,6 +346,9 @@ namespace XUSG
 		enum CBVTableIndex : uint8_t
 		{
 			CBV_MATRICES,
+#if TEMPORAL_AA
+			CBV_LOCAL_TEMPORAL_BIAS,
+#endif
 			CBV_SHADOW_MATRIX,
 
 			NUM_CBV_TABLE = CBV_SHADOW_MATRIX + MAX_SHADOW_CASCADES
@@ -362,6 +365,9 @@ namespace XUSG
 		virtual void Update(uint8_t frameIndex) = 0;
 		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world,
 			DirectX::FXMMATRIX* pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true) = 0;
+#if TEMPORAL_AA
+		virtual void SetTemporalBias(const DirectX::XMFLOAT2& temporalBias) = 0;
+#endif
 		virtual void SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout) = 0;
 		virtual void SetPipeline(const CommandList* pCommandList, PipelineIndex pipeline) = 0;
 		virtual void SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout) = 0;

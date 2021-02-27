@@ -306,11 +306,12 @@ bool Character_Impl::createPipelineLayouts()
 
 		// Input vertices and bone matrices
 		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld, 0, DescriptorFlag::DATA_STATIC);
-		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roVertices, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roVertices, 0, DescriptorFlag::DESCRIPTORS_VOLATILE);
 		utilPipelineLayout->SetShaderStage(INPUT, Shader::Stage::CS);
 
 		// Output vertices
-		utilPipelineLayout->SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices, 0, DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
+		utilPipelineLayout->SetRange(OUTPUT, DescriptorType::UAV, 1, rwVertices, 0,
+			DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE | DescriptorFlag::DESCRIPTORS_VOLATILE);
 		utilPipelineLayout->SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout

@@ -105,8 +105,8 @@ void StoreVertex(SkinnedInfo skinned, uint i)
 // Compute shader used for skinning the mesh for stream out
 //--------------------------------------------------------------------------------------
 [numthreads(64, 1, 1)]
-void main(uint3 DTid : SV_DispatchThreadID)
+void main(uint DTid : SV_DispatchThreadID)
 {
-	VS_Input vertex = LoadVertex(DTid.x);
-	StoreVertex(SkinVert(vertex), DTid.x);
+	VS_Input vertex = LoadVertex(DTid);
+	StoreVertex(SkinVert(vertex), DTid);
 }

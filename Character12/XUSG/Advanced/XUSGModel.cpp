@@ -38,8 +38,10 @@ const InputLayout* Model::CreateInputLayout(PipelineCache& pipelineCache)
 		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,						InputClassification::PER_VERTEX_DATA, 0 },
 		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
 		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
+#if HAS_TANGENTS
 		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
 		{ "BINORMAL",	0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 }
+#endif
 	};
 
 	return pipelineCache.CreateInputLayout(inputElements, static_cast<uint32_t>(size(inputElements)));

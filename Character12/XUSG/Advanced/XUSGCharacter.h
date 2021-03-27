@@ -56,7 +56,9 @@ namespace XUSG
 		{
 			DirectX::XMFLOAT3	Pos;
 			DirectX::XMUINT3	NormTex;
+#if HAS_TANGENTS
 			DirectX::XMUINT4	TanBiNrm;
+#endif
 		};
 
 		bool createTransformedStates();

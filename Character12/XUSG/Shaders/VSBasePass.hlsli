@@ -2,8 +2,8 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#include "VHBasePass.hlsli"
 #include "SHCommon.hlsli"
+#include "VHBasePass.hlsli"
 
 //--------------------------------------------------------------------------------------
 // Constant buffers
@@ -21,18 +21,20 @@ cbuffer cbTemporalBias	: register (b3)
 //--------------------------------------------------------------------------------------
 struct Vertex
 {
-	float3	Pos;		// Position
-	uint2	Norm;		// Normal
-	uint	UV;			// Texture coordinate
-	uint2	Tan;		// Normalized Tangent vector
-	uint2	BiNorm;		// Normalized BiNormal vector
+	float3	Pos;	// Position
+	uint2	Norm;	// Normal
+	uint	UV;		// Texture coordinate
+#ifdef _TANGENTS_
+	uint2	Tan;	// Normalized Tangent vector
+	uint2	BiNorm;	// Normalized BiNormal vector
+#endif
 };
 
 //--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
 // Buffer for the historical moition state
-StructuredBuffer<Vertex>	g_roVertices;
+StructuredBuffer<Vertex> g_roVertices;
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -51,7 +53,7 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 	float4 hPos = pos;
 	VegetationWave(hPos, 1.0);
 #else
-#define hPos	pos
+#define hPos pos
 #endif
 	output.TSPos = mul(hPos, g_previousWVP);
 #endif

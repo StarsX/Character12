@@ -10,8 +10,10 @@ struct VS_Input
 	float3		Pos		: POSITION;		// Position
 	float3		Norm	: NORMAL;		// Normal
 	min16float2	UV		: TEXCOORD;		// Texture coordinate
+#ifdef _TANGENTS_
 	float3		Tan		: TANGENT;		// Normalized Tangent vector
 	float3		BiNorm	: BINORMAL;		// Normalized BiNormal vector
+#endif
 };
 
 //--------------------------------------------------------------------------------------

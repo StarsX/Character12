@@ -969,25 +969,49 @@ void SDKMesh_Impl::createAsStaticMesh()
 			const auto verts = m_vertices[vb];
 			const auto stride = GetVertexStride(m, 0);
 			const auto localIT = XMMatrixTranspose(XMMatrixInverse(nullptr, local));
+			const auto& pDecl = m_pVertexBufferArray[vb].Decl;
 
 			for (auto i = 0u; i < numVerts; ++i)
 			{
+				auto element = 0ui8;
 				auto offset = stride * i;
-				auto& pos = reinterpret_cast<XMFLOAT3&>(verts[offset]);
+				if (pDecl[element].Usage == 0)
+				{
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					auto& pos = reinterpret_cast<XMFLOAT3&>(verts[offset]);
+					XMStoreFloat3(&pos, XMVector3TransformCoord(XMLoadFloat3(&pos), local));
+					offset += sizeof(XMFLOAT3);
+				}
 
-				offset += sizeof(XMFLOAT3);
-				auto& norm = reinterpret_cast<XMHALF4&>(verts[offset]);
+				if (pDecl[++element].Usage == 3)
+				{
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					auto& norm = reinterpret_cast<XMHALF4&>(verts[offset]);
+					XMStoreHalf4(&norm, XMVector3TransformNormal(XMLoadHalf4(&norm), localIT));
+					offset += sizeof(XMHALF4);
+				}
 
-				offset += sizeof(XMFLOAT3);
-				auto& tan = reinterpret_cast<XMHALF4&>(verts[offset]);
+				if (pDecl[++element].Usage == 5)
+				{
+					// UV is unchanged
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					offset += sizeof(XMHALF2);
+				}
 
-				offset += sizeof(XMHALF4);
-				auto& biNorm = reinterpret_cast<XMHALF4&>(verts[offset]);
+				if (pDecl[++element].Usage == 6)
+				{
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					auto& tan = reinterpret_cast<XMHALF4&>(verts[offset]);
+					XMStoreHalf4(&tan, XMVector3TransformNormal(XMLoadHalf4(&tan), local));
+					offset += sizeof(XMHALF4);
+				}
 
-				XMStoreFloat3(&pos, XMVector3TransformCoord(XMLoadFloat3(&pos), local));
-				XMStoreHalf4(&norm, XMVector3TransformNormal(XMLoadHalf4(&norm), localIT));
-				XMStoreHalf4(&tan, XMVector3TransformNormal(XMLoadHalf4(&tan), local));
-				XMStoreHalf4(&biNorm, XMVector3TransformNormal(XMLoadHalf4(&biNorm), local));
+				if (pDecl[++element].Usage == 7)
+				{
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					auto& biNorm = reinterpret_cast<XMHALF4&>(verts[offset]);
+					XMStoreHalf4(&biNorm, XMVector3TransformNormal(XMLoadHalf4(&biNorm), local));
+				}
 			}
 		}
 	}

@@ -380,7 +380,7 @@ namespace XUSG
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device& device, const std::wstring& meshFileName,
 			const TextureCache& textureCache, bool isStaticMesh);
 
-		static constexpr uint32_t GetFrameCount() { return FrameCount; }
+		static constexpr uint8_t GetFrameCount() { return FrameCount; }
 
 		using uptr = std::unique_ptr<Model>;
 		using sptr = std::shared_ptr<Model>;
@@ -389,7 +389,7 @@ namespace XUSG
 		static sptr MakeShared(const Device& device, const wchar_t* name);
 
 	protected:
-		static const uint32_t FrameCount = FRAME_COUNT;
+		static const uint8_t FrameCount = FRAME_COUNT;
 	};
 
 	//--------------------------------------------------------------------------------------

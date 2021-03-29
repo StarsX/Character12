@@ -973,7 +973,7 @@ void SDKMesh_Impl::createAsStaticMesh()
 
 			for (auto i = 0u; i < numVerts; ++i)
 			{
-				auto element = 0ui8;
+				uint8_t element = 0;
 				auto offset = stride * i;
 				if (pDecl[element].Usage == 0)
 				{

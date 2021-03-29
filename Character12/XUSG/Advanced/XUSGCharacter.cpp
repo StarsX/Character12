@@ -39,7 +39,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device& device, const wstring& meshFi
 	for (auto i = 0u; i < numFrames; ++i)
 	{
 		auto szName = mesh->GetFrame(i)->Name;
-		for (auto j = 0ui8; szName[j] != '\0'; ++j)
+		for (uint8_t j = 0; szName[j] != '\0'; ++j)
 			if (szName[j] == ' ') szName[j] = '_';
 	}
 
@@ -49,7 +49,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device& device, const wstring& meshFi
 		const auto numLinks = static_cast<uint8_t>(meshLinks->size());
 		linkedMeshes->resize(numLinks);
 
-		for (auto m = 0ui8; m < numLinks; ++m)
+		for (uint8_t m = 0; m < numLinks; ++m)
 		{
 			auto& meshInfo = meshLinks->at(m);
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
@@ -166,7 +166,7 @@ void Character_Impl::SetMatrices(CXMMATRIX viewProj, FXMMATRIX* pWorld,
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
-		for (auto m = 0ui8; m < numLinks; ++m)
+		for (uint8_t m = 0; m < numLinks; ++m)
 			setLinkedMatrices(m, viewProj, world, pShadows, numShadows, isTemporal);
 	}
 }
@@ -196,7 +196,7 @@ void Character_Impl::RenderTransformed(const CommandList* pCommandList, Pipeline
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
-		//for (auto m = 0ui8; m < numLinks; ++m)
+		//for (uint8_t m = 0; m < numLinks; ++m)
 		//	renderLinked(m, matrixTableIndex, layout, numInstances);
 	}
 }
@@ -256,7 +256,7 @@ bool Character_Impl::createBuffers()
 		numElements += m_mesh->GetNumInfluences(m);
 	}
 
-	for (auto i = 0ui8; i < FrameCount; ++i)
+	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_boneWorlds[i] = StructuredBuffer::MakeUnique();
 		N_RETURN(m_boneWorlds[i]->Create(m_device, numElements, sizeof(XMFLOAT4X3), ResourceFlag::NONE,
@@ -397,7 +397,7 @@ bool Character_Impl::createDescriptorTables()
 {
 	const auto numMeshes = m_mesh->GetNumMeshes();
 
-	for (auto i = 0ui8; i < FrameCount; ++i)
+	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_srvSkinningTables[i].resize(numMeshes);
 		m_uavSkinningTables[i].resize(numMeshes);
@@ -450,7 +450,7 @@ void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMAT
 
 	if (pShadows)
 	{
-		for (auto i = 0ui8; i < numShadows; ++i)
+		for (uint8_t i = 0; i < numShadows; ++i)
 		{
 			const auto shadow = XMMatrixMultiply(model, pShadows[i]);
 			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh]->Map(m_currentFrame * MAX_SHADOW_CASCADES + i));

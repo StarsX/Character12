@@ -122,7 +122,7 @@ void Model_Impl::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX* pSh
 
 	if (pShadows)
 	{
-		for (auto i = 0ui8; i < numShadows; ++i)
+		for (uint8_t i = 0; i < numShadows; ++i)
 		{
 			const auto shadow = XMMatrixMultiply(world, pShadows[i]);
 			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrices->Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
@@ -346,7 +346,7 @@ bool Model_Impl::createPipelines(bool isStatic, const InputLayout* pInputLayout,
 
 bool Model_Impl::createDescriptorTables()
 {
-	for (auto i = 0ui8; i < FrameCount; ++i)
+	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		{
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
@@ -354,7 +354,7 @@ bool Model_Impl::createDescriptorTables()
 			X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
 		}
 
-		for (auto j = 0ui8; j < MAX_SHADOW_CASCADES; ++j)
+		for (uint8_t j = 0; j < MAX_SHADOW_CASCADES; ++j)
 		{
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 			descriptorTable->SetDescriptors(0, 1, &m_cbShadowMatrices->GetCBV(i * MAX_SHADOW_CASCADES + j));

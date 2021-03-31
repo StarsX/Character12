@@ -43,7 +43,7 @@ public:
 	virtual void OnMouseLeave();
 
 private:
-	static const uint32_t FrameCount = XUSG::Model::GetFrameCount();
+	static const auto FrameCount = XUSG::Model::GetFrameCount();
 
 	XUSG::ShaderPool::sptr				m_shaderPool;
 	XUSG::Graphics::PipelineCache::sptr	m_graphicsPipelineCache;

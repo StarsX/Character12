@@ -213,7 +213,7 @@ FXMMATRIX Character_Impl::GetWorldMatrix() const
 
 bool Character_Impl::createTransformedStates()
 {
-	for (auto i = 0u; i < FrameCount; ++i)
+	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_transformedVBs[i] = VertexBuffer::MakeUnique();
 		N_RETURN(createTransformedVBs(*m_transformedVBs[i]), false);

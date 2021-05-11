@@ -18,11 +18,16 @@ struct VS_Input
 #endif
 };
 
+struct QuatTRS
+{
+	row_major float3x4 M;
+};
+
 //--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
-// Structured buffer for bone matrices
-StructuredBuffer<float3x4>	g_roDualQuat;
+// Structured buffer for bone transforms
+StructuredBuffer<QuatTRS>	g_roTRSQuats;
 
 //--------------------------------------------------------------------------------------
 // Helper struct for passing back skinned vertex information
@@ -47,7 +52,7 @@ float3 TranslateWithDQ(float3 vec, float2x4 dual)
 	disp += dual[0].w * dual[1].xyz;
 	disp -= dual[1].w * dual[0].xyz;
 
-	return disp * 2.0f + vec;
+	return disp * 2.0 + vec;
 }
 
 //--------------------------------------------------------------------------------------
@@ -57,7 +62,7 @@ float3 RotateWithDQ(float3 vec, float2x4 dual)
 {
 	float3 disp = cross(dual[0].xyz, cross(dual[0].xyz, vec) + dual[0].w * vec);
 
-	return disp * 2.0f + vec;
+	return disp * 2.0 + vec;
 }
 
 //--------------------------------------------------------------------------------------
@@ -67,34 +72,35 @@ SkinnedInfo SkinVert(VS_Input input)
 {
 	SkinnedInfo output;
 	
-	const float3x4 m[] =
+	const float3x4 q[] =
 	{
-		g_roDualQuat[input.Bones.x],
-		g_roDualQuat[input.Bones.y],
-		g_roDualQuat[input.Bones.z],
-		g_roDualQuat[input.Bones.w]
+		g_roTRSQuats[input.Bones.x].M,
+		g_roTRSQuats[input.Bones.y].M,
+		g_roTRSQuats[input.Bones.z].M,
+		g_roTRSQuats[input.Bones.w].M
 	};
 
 	float weight = input.Weights[0];
-	float4 scale = weight * m[0][2];
-	float2x4 dual = weight * (float2x4)m[0];
+	float3 scale = weight * q[0][2].xyz;
+	float2x4 dual = weight * (float2x4)q[0];
 
 	[unroll]
 	for (uint i = 1; i < 4; ++i)
 	{
 		weight = input.Weights[i];
-		scale += weight * m[i][2];
-		dual += (dot(m[0][0], m[i][0]) < 0.0 ? -weight : weight) * (float2x4)m[i];
+		scale += weight * q[i][2].xyz;
+		weight *= sign(dot(q[0][0], q[i][0]));
+		dual += weight * (float2x4)q[i];
 	}
 
 	// fast dqs 
 	dual /= length(dual[0]);
-	float3 normal = input.Norm / scale.xyz;
+	float3 normal = input.Norm / scale;
 #ifdef _TANGENTS_
-	float3 tangent = input.Tan * scale.xyz;
-	float3 binorm = input.BiNorm * scale.xyz;
+	float3 tangent = input.Tan * scale;
+	float3 binorm = input.BiNorm * scale;
 #endif
-	float3 pos = input.Pos * scale.xyz;
+	float3 pos = input.Pos * scale;
 	pos = RotateWithDQ(pos, dual);
 	pos = TranslateWithDQ(pos, dual);
 

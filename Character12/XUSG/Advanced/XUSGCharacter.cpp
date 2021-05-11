@@ -259,7 +259,7 @@ bool Character_Impl::createBuffers()
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_boneWorlds[i] = StructuredBuffer::MakeUnique();
-		N_RETURN(m_boneWorlds[i]->Create(m_device, numElements, sizeof(XMFLOAT4X3), ResourceFlag::NONE,
+		N_RETURN(m_boneWorlds[i]->Create(m_device, numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
 			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, m_name.empty() ?
 			nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
@@ -576,13 +576,13 @@ void Character_Impl::setSkeletalMatrices(uint32_t numMeshes)
 
 void Character_Impl::setBoneMatrices(uint32_t mesh)
 {
-	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT4X3*>(m_boneWorlds[m_currentFrame]->Map(mesh));
+	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT3X4*>(m_boneWorlds[m_currentFrame]->Map(mesh));
 
 	const auto numBones = m_mesh->GetNumInfluences(mesh);
 	for (auto i = 0u; i < numBones; ++i)
 	{
 		const auto qMat = getDualQuat(mesh, i);
-		XMStoreFloat4x3(&pDataBoneWorld[i], XMMatrixTranspose(qMat));
+		XMStoreFloat3x4(&pDataBoneWorld[i], XMMatrixTranspose(qMat));
 	}
 }
 

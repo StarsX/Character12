@@ -23,7 +23,7 @@ cbuffer cbMatrices : register (b0)
 {
 	float4x4 g_worldViewProj;
 	float4x3 g_world;
-	float4x3 g_worldIT;
+	float3x3 g_worldIT;
 #if TEMPORAL
 	float4x4 g_previousWVP;
 #endif

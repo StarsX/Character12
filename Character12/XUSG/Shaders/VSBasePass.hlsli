@@ -79,7 +79,7 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 #endif
 
 #ifdef _NORMAL_
-	output.Norm = min16float3(normalize(mul(input.Norm, (float3x3)g_worldIT)));
+	output.Norm = min16float3(normalize(mul(input.Norm, g_worldIT)));
 #endif
 
 #ifdef _TANGENTS_

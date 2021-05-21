@@ -4,6 +4,7 @@
 
 #include "XUSGSDKMesh.h"
 #include "XUSGDDSLoader.h"
+#include "Core/XUSG_DX12.h"
 
 using namespace std;
 using namespace DirectX;
@@ -101,13 +102,13 @@ SDKMesh_Impl::~SDKMesh_Impl()
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh_Impl::Create(const Device& device, const wchar_t* fileName,
+bool SDKMesh_Impl::Create(const Device::sptr& device, const wchar_t* fileName,
 	const TextureCache& textureCache, bool isStaticMesh)
 {
 	return createFromFile(device, fileName, textureCache, isStaticMesh);
 }
 
-bool SDKMesh_Impl::Create(const Device& device, uint8_t* pData,
+bool SDKMesh_Impl::Create(const Device::sptr& device, uint8_t* pData,
 	const TextureCache& textureCache, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
@@ -552,7 +553,7 @@ bool SDKMesh_Impl::GetAnimationProperties(uint32_t* pNumKeys, float* pFrameTime)
 
 //--------------------------------------------------------------------------------------
 void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials,
-	uint32_t numMaterials, vector<Resource>& uploaders)
+	uint32_t numMaterials, vector<Resource::uptr>& uploaders)
 {
 	string filePath;
 	wstring filePathW;
@@ -581,12 +582,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<ResourceBase> texture;
-				uploaders.emplace_back();
+				shared_ptr<ShaderResource> texture;
+				uploaders.emplace_back(Resource::MakeUnique());
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
-				if (!textureLoader.CreateTextureFromFile(m_device, pCommandList, filePathW.c_str(),
-					8192, true, texture, uploaders.back(), &alphaMode))
+				if (!textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, filePathW.c_str(),
+					8192, true, texture, uploaders.back().get(), &alphaMode))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -608,12 +609,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<ResourceBase> texture;
-				uploaders.emplace_back();
+				shared_ptr<ShaderResource> texture;
+				uploaders.emplace_back(Resource::MakeUnique());
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
-				if (!textureLoader.CreateTextureFromFile(m_device, pCommandList, filePathW.c_str(),
-					8192, false, texture, uploaders.back(), &alphaMode))
+				if (!textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, filePathW.c_str(),
+					8192, false, texture, uploaders.back().get(), &alphaMode))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -635,12 +636,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<ResourceBase> texture;
-				uploaders.emplace_back();
+				shared_ptr<ShaderResource> texture;
+				uploaders.emplace_back(Resource::MakeUnique());
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
-				if (!textureLoader.CreateTextureFromFile(m_device, pCommandList, filePathW.c_str(),
-					8192, false, texture, uploaders.back()))
+				if (!textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, filePathW.c_str(),
+					8192, false, texture, uploaders.back().get()))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -653,7 +654,7 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 	}
 }
 
-bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Resource>& uploaders)
+bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders)
 {
 	// Vertex buffer info
 	auto numVertices = 0u;
@@ -668,7 +669,7 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 
 	// Create a vertex Buffer
 	m_vertexBuffer = VertexBuffer::MakeShared();
-	N_RETURN(m_vertexBuffer->Create(m_device, numVertices, stride, ResourceFlag::NONE,
+	N_RETURN(m_vertexBuffer->Create(m_device.get(), numVertices, stride, ResourceFlag::NONE,
 		MemoryType::DEFAULT, m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr,
 		m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
@@ -685,12 +686,12 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 	}
 
 	// Upload vertices
-	uploaders.emplace_back();
+	uploaders.emplace_back(Resource::MakeUnique());
 
-	return m_vertexBuffer->Upload(pCommandList, uploaders.back(), bufferData.data(), bufferData.size());
+	return m_vertexBuffer->Upload(pCommandList, uploaders.back().get(), bufferData.data(), bufferData.size());
 }
 
-bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Resource>& uploaders)
+bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders)
 {
 	// Index buffer info
 	size_t byteWidth = 0;
@@ -704,7 +705,7 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 
 	// Create a index Buffer
 	m_indexBuffer = IndexBuffer::MakeShared();
-	N_RETURN(m_indexBuffer->Create(m_device, byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
+	N_RETURN(m_indexBuffer->Create(m_device.get(), byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
 		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE,
 		MemoryType::DEFAULT, m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1,
 		nullptr, m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
@@ -721,13 +722,13 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 	}
 
 	// Upload indices
-	uploaders.emplace_back();
+	uploaders.emplace_back(Resource::MakeUnique());
 
-	return m_indexBuffer->Upload(pCommandList, uploaders.back(), bufferData.data(), bufferData.size());
+	return m_indexBuffer->Upload(pCommandList, uploaders.back().get(), bufferData.data(), bufferData.size());
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh_Impl::createFromFile(const Device& device, const wchar_t* fileName,
+bool SDKMesh_Impl::createFromFile(const Device::sptr& device, const wchar_t* fileName,
 	const TextureCache& textureCache, bool isStaticMesh)
 {
 	// Find the path for the file
@@ -761,7 +762,7 @@ bool SDKMesh_Impl::createFromFile(const Device& device, const wchar_t* fileName,
 	return createFromMemory(device, m_pStaticMeshData, textureCache, cBytes, isStaticMesh, false);
 }
 
-bool SDKMesh_Impl::createFromMemory(const Device& device, uint8_t* pData,
+bool SDKMesh_Impl::createFromMemory(const Device::sptr& device, uint8_t* pData,
 	const TextureCache& textureCache, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
@@ -769,14 +770,14 @@ bool SDKMesh_Impl::createFromMemory(const Device& device, uint8_t* pData,
 	XMFLOAT3 upper;
 
 	m_device = device;
-	CommandAllocator commandAllocator = nullptr;
+	const auto commandAllocator = CommandAllocator::MakeUnique();
 	const auto commandList = CommandList::MakeUnique();
 	const auto pCommandList = commandList.get();
 	if (device)
 	{
-		N_RETURN(m_device->GetCommandAllocator(commandAllocator, CommandListType::DIRECT), false);
-		N_RETURN(m_device->GetCommandList(pCommandList, 0, CommandListType::DIRECT,
-			commandAllocator, nullptr), false);
+		N_RETURN(commandAllocator->Create(m_device.get(), CommandListType::DIRECT, (m_name + L".CommandAllocator").c_str()), false);
+		N_RETURN(pCommandList->Create(m_device.get(), 0, CommandListType::DIRECT, commandAllocator.get(),
+			nullptr, (m_name + L".CommandList").c_str()), false);
 	}
 
 	F_RETURN(dataBytes < sizeof(Header), cerr, E_FAIL, false);
@@ -828,7 +829,7 @@ bool SDKMesh_Impl::createFromMemory(const Device& device, uint8_t* pData,
 		m_indices[i] = reinterpret_cast<uint8_t*>(pData + m_pIndexBufferArray[i].DataOffset);
 
 	// Uploader buffers
-	vector<Resource> uploaders;
+	vector<Resource::uptr> uploaders;
 
 	// Load Materials
 	m_textureCache = textureCache;
@@ -1077,20 +1078,20 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 	if (pCommandList)
 	{
 		// Create the command queue.
-		CommandQueue commandQueue = nullptr;
-		N_RETURN(m_device->GetCommandQueue(commandQueue, CommandListType::DIRECT, CommandQueueFlag::NONE), false);
+		CommandQueue::uptr commandQueue = CommandQueue::MakeUnique();
+		N_RETURN(commandQueue->Create(m_device.get(), CommandListType::DIRECT, CommandQueueFlag::NONE,
+			0, 0, (m_name + L".CommandQueue").c_str()), false);
 
 		// Close the command list and execute it to begin the initial GPU setup.
 		V_RETURN(pCommandList->Close(), cerr, false);
-		commandQueue->SubmitCommandList(pCommandList);
+		commandQueue->ExecuteCommandList(pCommandList);
 
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
 		{
 			void* fenceEvent;
-			Fence fence;
+			const auto fence = Fence::MakeUnique();
 			uint64_t fenceValue = 0;
-
-			N_RETURN(m_device->GetFence(fence, fenceValue++, FenceFlag::NONE), false);
+			N_RETURN(fence->Create(m_device.get(), fenceValue++, FenceFlag::NONE, (m_name + L".Fence").c_str()), false);
 
 			// Create an event handle to use for frame synchronization.
 			fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -1104,7 +1105,7 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 
 			// Wait until the fence has been processed, and increment the fence value for the current frame.
 			V_RETURN(fence->SetEventOnCompletion(fenceValue++, fenceEvent), cerr, false);
-			WaitForSingleObjectEx(fenceEvent, INFINITE, FALSE);
+			WaitForSingleObject(fenceEvent, INFINITE);
 		}
 	}
 

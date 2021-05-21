@@ -118,9 +118,9 @@ namespace XUSG
 		SDKMesh_Impl();
 		virtual ~SDKMesh_Impl();
 
-		bool Create(const Device& device, const wchar_t* fileName,
+		bool Create(const Device::sptr& device, const wchar_t* fileName,
 			const TextureCache& textureCache, bool isStaticMesh = false);
-		bool Create(const Device& device, uint8_t* pData, const TextureCache& textureCache,
+		bool Create(const Device::sptr& device, uint8_t* pData, const TextureCache& textureCache,
 			size_t dataBytes, bool isStaticMesh = false, bool copyStatic = false);
 		bool LoadAnimation(const wchar_t* fileName);
 		void Destroy();
@@ -132,7 +132,7 @@ namespace XUSG
 		// Helpers (Graphics API specific)
 		Format GetIBFormat(uint32_t mesh) const;
 
-		IndexType			GetIndexType(uint32_t mesh) const;
+		IndexType GetIndexType(uint32_t mesh) const;
 
 		const Descriptor&		GetVertexBufferSRV(uint32_t mesh, uint32_t i) const;
 		const VertexBufferView&	GetVertexBufferView(uint32_t mesh, uint32_t i) const;
@@ -188,14 +188,14 @@ namespace XUSG
 
 	protected:
 		void loadMaterials(CommandList* pCommandList, Material* pMaterials,
-			uint32_t NumMaterials, std::vector<Resource>& uploaders);
+			uint32_t NumMaterials, std::vector<Resource::uptr>& uploaders);
 
-		bool createVertexBuffer(CommandList* pCommandList, std::vector<Resource>& uploaders);
-		bool createIndexBuffer(CommandList* pCommandList, std::vector<Resource>& uploaders);
+		bool createVertexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders);
+		bool createIndexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders);
 
-		virtual bool createFromFile(const Device& device, const wchar_t* fileName,
+		virtual bool createFromFile(const Device::sptr& device, const wchar_t* fileName,
 			const TextureCache& textureCache, bool isStaticMesh);
-		virtual bool createFromMemory(const Device& device, uint8_t* pData, const TextureCache& textureCache,
+		virtual bool createFromMemory(const Device::sptr& device, uint8_t* pData, const TextureCache& textureCache,
 			size_t dataBytes, bool isStaticMesh, bool copyStatic);
 
 		void createAsStaticMesh();
@@ -249,7 +249,7 @@ namespace XUSG
 		std::vector<DirectX::XMFLOAT4X4> m_worldPoseFrameMatrices;
 
 	private:
-		Device m_device;
+		Device::sptr m_device;
 		uint32_t m_numOutstandingResources;
 		bool m_isLoading;
 	};

@@ -14,7 +14,7 @@ namespace XUSG
 		public virtual Model_Impl
 	{
 	public:
-		Character_Impl(const Device& device, const wchar_t* name = nullptr);
+		Character_Impl(const Device::sptr& device, const wchar_t* name = nullptr);
 		virtual ~Character_Impl();
 
 		bool Init(const InputLayout* pInputLayout,
@@ -62,7 +62,7 @@ namespace XUSG
 		};
 
 		bool createTransformedStates();
-		bool createTransformedVBs(VertexBuffer& vertexBuffer);
+		bool createTransformedVBs(VertexBuffer* pVertexBuffer);
 		bool createBuffers();
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,

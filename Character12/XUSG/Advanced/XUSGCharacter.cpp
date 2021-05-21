@@ -11,12 +11,12 @@ using namespace XUSG;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-Character::uptr Character::MakeUnique(const Device& device, const wchar_t* name)
+Character::uptr Character::MakeUnique(const Device::sptr& device, const wchar_t* name)
 {
 	return make_unique<Character_Impl>(device, name);
 }
 
-Character::sptr Character::MakeShared(const Device& device, const wchar_t* name)
+Character::sptr Character::MakeShared(const Device::sptr& device, const wchar_t* name)
 {
 	return make_shared<Character_Impl>(device, name);
 }
@@ -24,7 +24,7 @@ Character::sptr Character::MakeShared(const Device& device, const wchar_t* name)
 //--------------------------------------------------------------------------------------
 // Static interface function
 //--------------------------------------------------------------------------------------
-SDKMesh::sptr Character::LoadSDKMesh(const Device& device, const wstring& meshFileName,
+SDKMesh::sptr Character::LoadSDKMesh(const Device::sptr& device, const wstring& meshFileName,
 	const wstring& animFileName, const TextureCache& textureCache,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
 	vector<SDKMesh::sptr>* linkedMeshes)
@@ -65,7 +65,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device& device, const wstring& meshFi
 //--------------------------------------------------------------------------------------
 // Character implementations
 //--------------------------------------------------------------------------------------
-Character_Impl::Character_Impl(const Device& device, const wchar_t* name) :
+Character_Impl::Character_Impl(const Device::sptr& device, const wchar_t* name) :
 	Model_Impl(device, name),
 	m_computePipelineCache(nullptr),
 	m_skinningPipelineLayout(nullptr),
@@ -216,13 +216,13 @@ bool Character_Impl::createTransformedStates()
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_transformedVBs[i] = VertexBuffer::MakeUnique();
-		N_RETURN(createTransformedVBs(*m_transformedVBs[i]), false);
+		N_RETURN(createTransformedVBs(m_transformedVBs[i].get()), false);
 	}
 
 	return true;
 }
 
-bool Character_Impl::createTransformedVBs(VertexBuffer& vertexBuffer)
+bool Character_Impl::createTransformedVBs(VertexBuffer* pVertexBuffer)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
 	auto numVertices = 0u;
@@ -235,7 +235,7 @@ bool Character_Impl::createTransformedVBs(VertexBuffer& vertexBuffer)
 		numVertices += static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 	}
 
-	N_RETURN(vertexBuffer.Create(m_device, numVertices, sizeof(Vertex),
+	N_RETURN(pVertexBuffer->Create(m_device.get(), numVertices, sizeof(Vertex),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
 		numMeshes, firstVertices.data(), m_name.empty() ? nullptr :
@@ -259,7 +259,7 @@ bool Character_Impl::createBuffers()
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_boneWorlds[i] = StructuredBuffer::MakeUnique();
-		N_RETURN(m_boneWorlds[i]->Create(m_device, numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
+		N_RETURN(m_boneWorlds[i]->Create(m_device.get(), numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
 			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, m_name.empty() ?
 			nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
@@ -269,14 +269,14 @@ bool Character_Impl::createBuffers()
 	for (auto& cbLinkedMatrices : m_cbLinkedMatrices)
 	{
 		cbLinkedMatrices = ConstantBuffer::MakeUnique();
-		N_RETURN(cbLinkedMatrices->Create(m_device, sizeof(CBMatrices[FrameCount]), FrameCount), false);
+		N_RETURN(cbLinkedMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount), false);
 	}
 
 	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
 	for (auto& cbLinkedMatrix : m_cbLinkedShadowMatrices)
 	{
 		cbLinkedMatrix = ConstantBuffer::MakeUnique();
-		N_RETURN(cbLinkedMatrix->Create(m_device, sizeof(XMFLOAT4X4[FrameCount][MAX_SHADOW_CASCADES]),
+		N_RETURN(cbLinkedMatrix->Create(m_device.get(), sizeof(XMFLOAT4X4[FrameCount][MAX_SHADOW_CASCADES]),
 			MAX_SHADOW_CASCADES * FrameCount), false);
 	}
 
@@ -315,7 +315,7 @@ bool Character_Impl::createPipelineLayouts()
 		utilPipelineLayout->SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
-		X_RETURN(m_skinningPipelineLayout, utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_skinningPipelineLayout, utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str()), false);
 	}
 
@@ -351,7 +351,7 @@ bool Character_Impl::createPipelineLayouts()
 			utilPipelineLayout->SetShaderStage(PER_FRAME, Shader::Stage::PS);
 		}
 
-		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str()), false);
 	}
@@ -360,7 +360,7 @@ bool Character_Impl::createPipelineLayouts()
 	{
 		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_NULL_INDEX);
 
-		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str()), false);
 	}
@@ -369,7 +369,7 @@ bool Character_Impl::createPipelineLayouts()
 	{
 		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
 
-		X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout->GetPipelineLayout(*m_pipelineLayoutCache,
+		X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthAlphaPassLayout").c_str()), false);
 	}
@@ -385,7 +385,7 @@ bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Form
 		const auto state = Compute::State::MakeUnique();
 		state->SetPipelineLayout(m_skinningPipelineLayout);
 		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
-		X_RETURN(m_skinningPipeline, state->GetPipeline(*m_computePipelineCache,
+		X_RETURN(m_skinningPipeline, state->GetPipeline(m_computePipelineCache.get(),
 			m_name.empty() ? nullptr : (m_name + L".SkinningPipe").c_str()), false);
 	}
 
@@ -411,20 +411,20 @@ bool Character_Impl::createDescriptorTables()
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 				const Descriptor descriptors[] = { m_boneWorlds[i]->GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
 				descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-				X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+				X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 
 			{
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetUAV(m));
-				X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+				X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 
 #if TEMPORAL
 			{
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetSRV(m));
-				X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(*m_descriptorTableCache), false);
+				X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 #endif
 		}

@@ -12,7 +12,7 @@ namespace XUSG
 		public virtual Model
 	{
 	public:
-		Model_Impl(const Device& device, const wchar_t* name);
+		Model_Impl(const Device::sptr& device, const wchar_t* name);
 		virtual ~Model_Impl();
 
 		bool Init(const InputLayout* pInputLayout,
@@ -52,7 +52,7 @@ namespace XUSG
 
 		Util::PipelineLayout::sptr initPipelineLayout(VertexShader vs, PixelShader ps);
 
-		Device		m_device;
+		Device::sptr m_device;
 		std::wstring m_name;
 
 		uint8_t		m_currentFrame;
@@ -62,7 +62,7 @@ namespace XUSG
 
 		SDKMesh::sptr					m_mesh;
 		ShaderPool::sptr				m_shaderPool;
-		Graphics::PipelineCache::sptr	m_pipelineCache;
+		Graphics::PipelineCache::sptr	m_graphicsPipelineCache;
 		PipelineLayoutCache::sptr		m_pipelineLayoutCache;
 		DescriptorTableCache::sptr		m_descriptorTableCache;
 

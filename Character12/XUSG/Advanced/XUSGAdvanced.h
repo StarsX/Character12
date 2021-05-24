@@ -647,7 +647,7 @@ namespace XUSG
 			const std::wstring& skyTexture, std::vector<Resource::uptr>& uploaders,
 			bool renderWater, Format rtvFormat = Format::R11G11B10_FLOAT,
 			Format dsvFormat = Format::D24_UNORM_S8_UINT) = 0;
-		virtual bool CreateResources(ShaderResource* pSceneColor, const DepthStencil* pDepth) = 0;
+		virtual bool CreateResources(const ShaderResource::sptr& sceneColor, const DepthStencil* pDepth) = 0;
 
 		virtual void Update(uint8_t frameIndex, DirectX::FXMMATRIX* pViewProj, DirectX::FXMMATRIX* pWorld = nullptr) = 0;
 		virtual void SetGlobalCBVTables(DescriptorTable cbvImmutable, DescriptorTable cbvPerFrameTable) = 0;
@@ -711,8 +711,11 @@ namespace XUSG
 			const DescriptorTableCache::sptr& descriptorTableCache,
 			std::vector<Resource::uptr>& uploaders, Format rtvFormat, Format dsvFormat,
 			bool useIBL = false) = 0;
-		virtual bool ChangeWindowSize(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders,
-			RenderTarget* pRTColor, DepthStencil* pDepth, RenderTarget* pRTMasks) = 0;
+		virtual bool ChangeWindowSize(CommandList* pCommandList,
+			std::vector<Resource::uptr>& uploaders,
+			const RenderTarget::sptr& sceneColor,
+			const DepthStencil::sptr& sceneDepth,
+			const RenderTarget::sptr& sceneMasks) = 0;
 		virtual bool CreateResources(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders) = 0;
 		virtual void Update(uint8_t frameIndex, double time, float timeStep) = 0;
 		virtual void Update(uint8_t frameIndex, double time, float timeStep,
@@ -722,15 +725,14 @@ namespace XUSG
 		virtual void SetViewProjMatrix(DirectX::CXMMATRIX view, DirectX::CXMMATRIX proj) = 0;
 		virtual void SetEyePoint(DirectX::CXMVECTOR eyePt) = 0;
 		virtual void SetFocusAndDistance(DirectX::CXMVECTOR focus_dist) = 0;
-		virtual void SetRenderTarget(RenderTarget* pRTColor, DepthStencil* pDepth,
-			RenderTarget* pRTMasks, bool createFB = true) = 0;
+		virtual void SetRenderTarget(const RenderTarget::sptr& sceneColor, const DepthStencil::sptr& sceneDepth,
+			const RenderTarget::sptr& sceneMasks, bool createFramebuffer = true) = 0;
 		virtual void SetViewport(const Viewport& viewport, const RectRange& scissorRect) = 0;
 
 		virtual DirectX::FXMVECTOR GetFocusAndDistance() const = 0;
 		virtual const DescriptorTable& GetCBVTable(uint8_t i) const = 0;
-		virtual const RenderTarget::sptr GetGBuffer(const uint8_t i) const = 0;
-		//virtual const RenderTarget::sptr GetMasks() const = 0;
-		
+		virtual const RenderTarget* GetGBuffer(uint8_t i) const = 0;
+
 		using uptr = std::unique_ptr<Scene>;
 		using sptr = std::shared_ptr<Scene>;
 
@@ -771,11 +773,11 @@ namespace XUSG
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
 			Format hdrFormat, Format ldrFormat) = 0;
-		virtual bool ChangeWindowSize(const RenderTarget& refRT) = 0;
+		virtual bool ChangeWindowSize(const Texture2D* pReference) = 0;
 
 		virtual void Update(const DescriptorTable& cbvImmutable, const DescriptorTable& cbvPerFrameTable,
 			float timeStep) = 0;
-		virtual void Render(const CommandList* pCommandList, RenderTarget& dst, Texture2D& src,
+		virtual void Render(const CommandList* pCommandList, RenderTarget* pDst, Texture2D* pSrc,
 			const DescriptorTable& srvTable, bool clearRT = false) = 0;
 		virtual void ScreenRender(const CommandList* pCommandList, PipelineIndex pipelineIndex,
 			const DescriptorTable& srvTable, bool hasPerFrameCB, bool hasSampler, bool reset = false) = 0;

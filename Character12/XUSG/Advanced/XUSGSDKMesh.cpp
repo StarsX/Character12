@@ -1083,7 +1083,7 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 			0, 0, (m_name + L".CommandQueue").c_str()), false);
 
 		// Close the command list and execute it to begin the initial GPU setup.
-		V_RETURN(pCommandList->Close(), cerr, false);
+		N_RETURN(pCommandList->Close(), false);
 		commandQueue->ExecuteCommandList(pCommandList);
 
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
@@ -1101,10 +1101,10 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 			// list in our main loop but for now, we just want to wait for setup to 
 			// complete before continuing.
 			// Schedule a Signal command in the queue.
-			V_RETURN(commandQueue->Signal(fence.get(), fenceValue), cerr, false);
+			N_RETURN(commandQueue->Signal(fence.get(), fenceValue), false);
 
 			// Wait until the fence has been processed, and increment the fence value for the current frame.
-			V_RETURN(fence->SetEventOnCompletion(fenceValue++, fenceEvent), cerr, false);
+			N_RETURN(fence->SetEventOnCompletion(fenceValue++, fenceEvent), false);
 			WaitForSingleObject(fenceEvent, INFINITE);
 		}
 	}

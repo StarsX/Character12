@@ -69,13 +69,7 @@
     <ClInclude Include="XUSG\Advanced\XUSGModel.h">
       <Filter>XUSG\Advanced\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="XUSG\Advanced\XUSGShaderCommon.h">
-      <Filter>XUSG\Advanced\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="XUSG\Advanced\XUSGCharacter.h">
-      <Filter>XUSG\Advanced\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Advanced\XUSGSharedConst.h">
       <Filter>XUSG\Advanced\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h">
@@ -94,9 +88,6 @@
       <Filter>XUSG\Advanced\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="XUSG\Core\XUSG.h">
-      <Filter>XUSG\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="XUSG\Core\XUSG_DX12.h">
       <Filter>XUSG\Core</Filter>
     </ClInclude>
     <ClInclude Include="Common\d3d12.h">

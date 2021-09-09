@@ -19,22 +19,8 @@
 #define FRAME_COUNT		3
 #endif
 
-#ifndef TAA_SHOW_DIFF
-#define TAA_CLIP_DIFF	1
-#define TAA_FRAME_DIFF	2
-#define TAA_MOTION		3
-#define TAA_SHOW_DIFF	0
-#endif
-
-#ifndef TEMPORAL_SSAA
-#define TEMPORAL_SSAA	1
-#endif  
-#ifndef TEMPORAL_MSAA
-#define TEMPORAL_MSAA	2
-#endif
-
 #ifndef TEMPORAL_AA
-#define TEMPORAL_AA		TEMPORAL_SSAA
+#define TEMPORAL_AA		1
 #endif
 
 #ifndef TEMPORAL
@@ -56,8 +42,6 @@ static const float g_zFar = 1000.0f;
 #if HLSL_VERSION <= 0
 
 #include "Core/XUSG.h"
-
-#define MAX_SHADOW_CASCADES	8
 
 namespace XUSG
 {
@@ -101,7 +85,6 @@ namespace XUSG
 		SUBSET_OPAQUE = 0x1,
 		SUBSET_ALPHA = 0x2,
 		SUBSET_ALPHA_TEST = 0x4,
-		SUBSET_REFLECTED = 0x8,
 		SUBSET_FULL = SUBSET_OPAQUE | SUBSET_ALPHA | SUBSET_ALPHA_TEST,
 
 		NUM_SUBSET_TYPE = 2
@@ -352,9 +335,6 @@ namespace XUSG
 			BASE_PASS,
 			DEPTH_PASS,
 			DEPTH_ALPHA_PASS,
-			GLOBAL_BASE_PASS,
-			GLOBAL_DEPTH_PASS,
-			GLOBAL_DEPTH_ALPHA_PASS,
 
 			NUM_PIPELINE_LAYOUT
 		};
@@ -378,6 +358,7 @@ namespace XUSG
 		enum DescriptorTableSlot : uint8_t
 		{
 			MATRICES,
+			PER_FRAME,
 #if TEMPORAL_AA
 			TEMPORAL_BIAS,
 #endif
@@ -388,8 +369,8 @@ namespace XUSG
 		{
 			SAMPLERS_OFFSET,
 			MATERIAL_OFFSET,
-			IMMUTABLE_OFFSET,
-			ALPHA_REF_OFFSET = IMMUTABLE_OFFSET
+			ALPHA_REF_OFFSET,
+			IMMUTABLE_OFFSET = ALPHA_REF_OFFSET
 		};
 
 		enum CBVTableIndex : uint8_t
@@ -398,9 +379,8 @@ namespace XUSG
 #if TEMPORAL_AA
 			CBV_LOCAL_TEMPORAL_BIAS,
 #endif
-			CBV_SHADOW_MATRIX,
 
-			NUM_CBV_TABLE = CBV_SHADOW_MATRIX + MAX_SHADOW_CASCADES
+			NUM_CBV_TABLE
 		};
 
 		//Model(const Device::sptr& device, const wchar_t* name);
@@ -412,8 +392,7 @@ namespace XUSG
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache) = 0;
 		virtual void Update(uint8_t frameIndex) = 0;
-		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world,
-			DirectX::FXMMATRIX* pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true) = 0;
+		virtual void SetMatrices(DirectX::CXMMATRIX world, bool isTemporal = true) = 0;
 #if TEMPORAL_AA
 		virtual void SetTemporalBias(const DirectX::XMFLOAT2& temporalBias) = 0;
 #endif
@@ -421,7 +400,8 @@ namespace XUSG
 		virtual void SetPipeline(const CommandList* pCommandList, PipelineIndex pipeline) = 0;
 		virtual void SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout) = 0;
 		virtual void Render(const CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-			PipelineLayoutIndex layout = NUM_PIPELINE_LAYOUT, uint32_t numInstances = 1) = 0;
+			PipelineLayoutIndex layout = NUM_PIPELINE_LAYOUT, const DescriptorTable* pCbvPerFrameTable = nullptr,
+			uint32_t numInstances = 1) = 0;
 
 		Model* AsModel();
 
@@ -452,19 +432,19 @@ namespace XUSG
 		{
 			SAMPLERS = VARIABLE_SLOT,
 			MATERIAL,
-			IMMUTABLE,
-			PER_FRAME,
-			ALPHA_REF = IMMUTABLE,
+			ALPHA_REF,
+			SHADOW_MAP,
+			IMMUTABLE = ALPHA_REF,
 #if TEMPORAL
-			HISTORY = IMMUTABLE
+			HISTORY = ALPHA_REF
 #endif
 		};
 
 		struct MeshLink
 		{
-			std::wstring		MeshName;
-			std::string			BoneName;
-			uint32_t			BoneIndex;
+			std::wstring	MeshName;
+			std::string		BoneName;
+			uint32_t		BoneIndex;
 		};
 
 		//Character(const Device::sptr& device, const wchar_t* name = nullptr);
@@ -482,16 +462,13 @@ namespace XUSG
 			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN) = 0;
 		virtual void InitPosition(const DirectX::XMFLOAT4& posRot) = 0;
 		virtual void Update(uint8_t frameIndex, double time) = 0;
-		virtual void Update(uint8_t frameIndex, double time, DirectX::CXMMATRIX viewProj,
-			DirectX::FXMMATRIX* pWorld = nullptr, DirectX::FXMMATRIX* pShadows = nullptr,
-			uint8_t numShadows = 0, bool isTemporal = true) = 0;
-		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX* pWorld = nullptr,
-			DirectX::FXMMATRIX* pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true) = 0;
+		virtual void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true) = 0;
+		virtual void SetMatrices(DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true) = 0;
 		virtual void SetSkinningPipeline(const CommandList* pCommandList) = 0;
 		virtual void Skinning(const CommandList* pCommandList, uint32_t& numBarriers,
 			ResourceBarrier* pBarriers, bool reset = false) = 0;
 		virtual void RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
+			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
 			uint32_t numInstances = 1) = 0;
 
 		virtual const DirectX::XMFLOAT4& GetPosition() const = 0;
@@ -519,32 +496,28 @@ namespace XUSG
 		enum DescriptorTableSlot : uint8_t
 		{
 			PER_OBJECT = VARIABLE_SLOT,
-			PER_FRAME,
 			SAMPLERS,
 			MATERIAL,
+			ALPHA_REF,
 			SHADOW_MAP,
-			IMMUATABLE,
-			ALPHA_REF = SHADOW_MAP
+			IMMUATABLE = ALPHA_REF
 		};
 
 		//StaticModel(const Device::sptr& device, const wchar_t* name = nullptr);
 		virtual ~StaticModel() {};
 
-		virtual bool Init(const InputLayout* pInputLayout, const SDKMesh::sptr& mesh,
-			const ShaderPool::sptr& shaderPool,
+		virtual bool Init(CommandList* pCommandList, const InputLayout* pInputLayout,
+			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
-			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
-			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN) = 0;
-		//virtual void CreateBoundCBuffer() = 0;
-		virtual void Update(uint8_t frameIndex) = 0;
-		virtual void Update(uint8_t frameIndex, DirectX::CXMMATRIX viewProj, DirectX::CXMMATRIX world,
-			DirectX::FXMMATRIX* pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true) = 0;
+			std::vector<Resource::uptr>& uploaders, const Format* rtvFormats = nullptr,
+			uint32_t numRTVs = 0, Format dsvFormat = Format::UNKNOWN,
+			Format shadowFormat = Format::UNKNOWN) = 0;
+		virtual void Update(uint8_t frameIndex, DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true) = 0;
 		virtual void Render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
+			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
 			uint32_t numInstances = 1) = 0;
-		//virtual void RenderBoundary(uint32_t mesh, const DirectX::XMFLOAT4* pTBox) = 0;
 
 		virtual const SDKMesh::sptr& GetMesh() const = 0;
 

@@ -74,12 +74,11 @@ Character_Impl::Character_Impl(const Device::sptr& device, const wchar_t* name) 
 	m_uavSkinningTables(),
 #if TEMPORAL
 	m_srvSkinnedTables(),
-	m_linkedWorldViewProjs(),
+	//m_linkedWorld,
 #endif
 	m_linkedMeshes(nullptr),
 	m_meshLinks(nullptr),
-	m_cbLinkedMatrices(0),
-	m_cbLinkedShadowMatrices(0)
+	m_cbLinkedMatrices(0)
 {
 }
 
@@ -134,8 +133,7 @@ void Character_Impl::Update(uint8_t frameIndex, double time)
 	m_time = time;
 }
 
-void Character_Impl::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj,
-	FXMMATRIX* pWorld, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
+void Character_Impl::Update(uint8_t frameIndex, double time, FXMMATRIX* pWorld, bool isTemporal)
 {
 	Model_Impl::Update(frameIndex);
 
@@ -144,30 +142,29 @@ void Character_Impl::Update(uint8_t frameIndex, double time, CXMMATRIX viewProj,
 	m_mesh->TransformMesh(XMMatrixIdentity(), time);
 	setSkeletalMatrices(numMeshes);
 
-	SetMatrices(viewProj, pWorld, pShadows, numShadows, isTemporal);
+	SetMatrices(pWorld, isTemporal);
 	m_time = -1.0;
 }
 
-void Character_Impl::SetMatrices(CXMMATRIX viewProj, FXMMATRIX* pWorld,
-	FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
+void Character_Impl::SetMatrices(FXMMATRIX* pWorld, bool isTemporal)
 {
 	XMMATRIX world;
 	if (!pWorld)
 	{
 		const auto translation = XMMatrixTranslation(m_vPosRot.x, m_vPosRot.y, m_vPosRot.z);
 		const auto rotation = XMMatrixRotationY(m_vPosRot.w);
-		world = XMMatrixMultiply(rotation, translation);
+		world = rotation * translation;
 		XMStoreFloat4x4(&m_mWorld, world);
 	}
 	else world = *pWorld;
 
-	Model_Impl::SetMatrices(viewProj, world, pShadows, numShadows, isTemporal);
+	Model_Impl::SetMatrices(world, isTemporal);
 
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
 		for (uint8_t m = 0; m < numLinks; ++m)
-			setLinkedMatrices(m, viewProj, world, pShadows, numShadows, isTemporal);
+			setLinkedMatrices(m, world, isTemporal);
 	}
 }
 
@@ -190,14 +187,14 @@ void Character_Impl::Skinning(const CommandList* pCommandList, uint32_t& numBarr
 }
 
 void Character_Impl::RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
+	SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
-	renderTransformed(pCommandList, layout, subsetFlags, matrixTableIndex, numInstances);
+	renderTransformed(pCommandList, layout, subsetFlags, pCbvPerFrameTable, numInstances);
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
 		//for (uint8_t m = 0; m < numLinks; ++m)
-		//	renderLinked(m, matrixTableIndex, layout, numInstances);
+		//	renderLinked(m, layout, numInstances);
 	}
 }
 
@@ -272,14 +269,6 @@ bool Character_Impl::createBuffers()
 		N_RETURN(cbLinkedMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount), false);
 	}
 
-	if (m_meshLinks) m_cbLinkedShadowMatrices.resize(m_meshLinks->size());
-	for (auto& cbLinkedMatrix : m_cbLinkedShadowMatrices)
-	{
-		cbLinkedMatrix = ConstantBuffer::MakeUnique();
-		N_RETURN(cbLinkedMatrix->Create(m_device.get(), sizeof(XMFLOAT4X4[FrameCount][MAX_SHADOW_CASCADES]),
-			MAX_SHADOW_CASCADES * FrameCount), false);
-	}
-
 	return true;
 }
 
@@ -332,24 +321,12 @@ bool Character_Impl::createPipelineLayouts()
 			roVertices = reflector->GetResourceBindingPointByName("g_roVertices", roVertices);
 #endif
 
-		// Get pixel shader slots
-		reflector = m_shaderPool->GetReflector(Shader::Stage::PS, PS_BASE_PASS);
-		if (reflector && reflector->IsValid())
-			// Get constant buffer slot
-			cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame");
-
 		const auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 
 #if TEMPORAL
 		utilPipelineLayout->SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
 		utilPipelineLayout->SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
-
-		if (cbPerFrame != UINT32_MAX)
-		{
-			utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, 0, DescriptorFlag::DATA_STATIC);
-			utilPipelineLayout->SetShaderStage(PER_FRAME, Shader::Stage::PS);
-		}
 
 		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
@@ -433,37 +410,22 @@ bool Character_Impl::createDescriptorTables()
 	return true;
 }
 
-void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX viewProj, CXMMATRIX world,
-	FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
+void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX world, bool isTemporal)
 {
 	// Set World-View-Proj matrix
 	const auto influenceMatrix = m_mesh->GetInfluenceMatrix(m_meshLinks->at(mesh).BoneIndex);
-	const auto worldViewProj = influenceMatrix * world * viewProj;
+	const auto linkedWorld = influenceMatrix * world;
 
 	// Update constant buffers
 	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbLinkedMatrices[mesh]->Map());
-	XMStoreFloat4x4(&pCBData->WorldViewProj, XMMatrixTranspose(worldViewProj));
-	XMStoreFloat3x4(&pCBData->World, world); // XMStoreFloat3x4 includes transpose.
-	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
-
-	const auto model = XMMatrixMultiply(influenceMatrix, world);
-
-	if (pShadows)
-	{
-		for (uint8_t i = 0; i < numShadows; ++i)
-		{
-			const auto shadow = XMMatrixMultiply(model, pShadows[i]);
-			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbLinkedShadowMatrices[mesh]->Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
-			cbData = XMMatrixTranspose(shadow);
-		}
-	}
+	XMStoreFloat3x4(&pCBData->World, linkedWorld); // XMStoreFloat3x4 includes transpose.
+	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, linkedWorld)));
 
 #if TEMPORAL
 	if (isTemporal)
 	{
-		XMStoreFloat4x4(&m_linkedWorldViewProjs[m_currentFrame][mesh], worldViewProj);
-		const auto worldViewProjPrev = XMLoadFloat4x4(&m_linkedWorldViewProjs[m_previousFrame][mesh]);
-		XMStoreFloat4x4(&pCBData->WorldViewProjPrev, XMMatrixTranspose(worldViewProjPrev));
+		pCBData->WorldPrev = m_linkedWorlds[mesh];
+		XMStoreFloat3x4(&m_linkedWorlds[mesh], linkedWorld);
 	}
 #endif
 }
@@ -498,9 +460,9 @@ void Character_Impl::skinning(const CommandList* pCommandList, bool reset)
 }
 
 void Character_Impl::renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances)
+	SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
-	if (layout < GLOBAL_BASE_PASS)
+	if (pCbvPerFrameTable)
 	{
 		const DescriptorPool descriptorPools[] =
 		{
@@ -510,21 +472,22 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+		pCommandList->SetGraphicsDescriptorTable(PER_FRAME, *pCbvPerFrameTable);
 #if TEMPORAL_AA
 		pCommandList->SetGraphicsDescriptorTable(TEMPORAL_BIAS, m_cbvTables[m_currentFrame][CBV_LOCAL_TEMPORAL_BIAS]);
 #endif
 	}
 
 	// Set matrices
-	pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
+	pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][CBV_MATRICES]);
 
 	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
 	for (const auto& subsetMask : subsetMasks)
 	{
-		if (layout < GLOBAL_BASE_PASS && subsetMask != SUBSET_OPAQUE)
-			pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
+		//if (pCbvPerFrameTable && subsetMask != SUBSET_OPAQUE)
+			//pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 
 		if (subsetFlags & subsetMask)
 		{
@@ -535,23 +498,22 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 
 #if TEMPORAL
 				// Set historical motion states, if neccessary
-				if (layout == BASE_PASS || layout == GLOBAL_BASE_PASS)
+				if (layout == BASE_PASS)
 					pCommandList->SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
 #endif
 
 				// Render mesh
-				render(pCommandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, numInstances);
+				render(pCommandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, pCbvPerFrameTable, numInstances);
 			}
 		}
 	}
 
 	// Clear out the vb bindings for the next pass
-	//if (layout < GLOBAL_BASS_PASS) m_commandList->IASetVertexBuffers(0, 1, nullptr);
+	//if (pCbvPerFrameTable) pCommandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
 #if 0
-void Character_Impl::renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
-	PipelineLayoutIndex layout, uint32_t numInstances)
+void Character_Impl::renderLinked(uint32_t mesh, PipelineLayoutIndex layout, uint32_t numInstances)
 {
 	// Set constant buffers
 	m_pDXContext->VSSetConstantBuffers(m_uCBMatrices, 1, m_vpCBLinkedMats[uMesh].GetAddressOf());

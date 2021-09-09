@@ -64,6 +64,9 @@ private:
 	XUSG::RenderTarget::uptr	m_renderTargets[FrameCount];
 	XUSG::CommandList::uptr		m_commandList;
 
+	XUSG::ConstantBuffer::uptr	m_cbPerFrame;
+	XUSG::DescriptorTable		m_cbvTables[FrameCount];
+
 	// App resources.
 	XUSG::Character::uptr		m_character;
 	XUSG::DepthStencil::uptr	m_depth;

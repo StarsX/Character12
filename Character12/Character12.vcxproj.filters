@@ -130,10 +130,7 @@
     <None Include="XUSG\Shaders\VSBasePass.hlsli">
       <Filter>XUSG\Shaders</Filter>
     </None>
-    <None Include="XUSG\Shaders\SHCommon.hlsli">
-      <Filter>XUSG\Shaders</Filter>
-    </None>
-    <None Include="XUSG\Shaders\VHBasePass.hlsli">
+    <None Include="XUSG\Shaders\Common.hlsli">
       <Filter>XUSG\Shaders</Filter>
     </None>
   </ItemGroup>

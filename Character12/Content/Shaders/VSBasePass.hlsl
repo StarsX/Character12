@@ -8,5 +8,5 @@
 #define	_BASEPASS_
 #define	_CHARACTER_
 
-//#include "XUSGSharedConst.h"
+#include "Common.hlsli"
 #include "VSBasePass.hlsli"

@@ -121,7 +121,6 @@ bool SDKMesh_Impl::LoadAnimation(const wchar_t* fileName)
 
 	// Find the path for the file
 	wcsncpy_s(filePath, MAX_PATH, fileName, wcslen(fileName));
-	//V_RETURN(DXUTFindDXSDKMediaFileCch(filePath, MAX_PATH, fileName));
 
 	// Open the file
 	ifstream fileStream(filePath, ios::in | ios::binary);
@@ -1120,9 +1119,9 @@ void SDKMesh_Impl::transformBindPoseFrame(uint32_t frame, CXMMATRIX parentWorld)
 	if (m_bindPoseFrameMatrices.empty()) return;
 
 	// Transform ourselves
-	const auto m = XMLoadFloat4x4(&m_pFrameArray[frame].Matrix);
-	const auto mLocalWorld = XMMatrixMultiply(m, parentWorld);
-	DirectX::XMStoreFloat4x4(&m_bindPoseFrameMatrices[frame], mLocalWorld);
+	const auto localTransform = XMLoadFloat4x4(&m_pFrameArray[frame].Matrix);
+	const auto localWorld = localTransform * parentWorld;
+	DirectX::XMStoreFloat4x4(&m_bindPoseFrameMatrices[frame], localWorld);
 
 	// Transform our siblings
 	if (m_pFrameArray[frame].SiblingFrame != INVALID_FRAME)
@@ -1130,7 +1129,7 @@ void SDKMesh_Impl::transformBindPoseFrame(uint32_t frame, CXMMATRIX parentWorld)
 
 	// Transform our children
 	if (m_pFrameArray[frame].ChildFrame != INVALID_FRAME)
-		transformBindPoseFrame(m_pFrameArray[frame].ChildFrame, mLocalWorld);
+		transformBindPoseFrame(m_pFrameArray[frame].ChildFrame, localWorld);
 }
 
 //--------------------------------------------------------------------------------------
@@ -1161,7 +1160,7 @@ void SDKMesh_Impl::transformFrame(uint32_t frame, CXMMATRIX parentWorld, double 
 	else localTransform = XMLoadFloat4x4(&m_pFrameArray[frame].Matrix);
 
 	// Transform ourselves
-	auto localWorld = XMMatrixMultiply(localTransform, parentWorld);
+	auto localWorld = localTransform * parentWorld;
 	XMStoreFloat4x4(&m_transformedFrameMatrices[frame], localWorld);
 	XMStoreFloat4x4(&m_worldPoseFrameMatrices[frame], localWorld);
 

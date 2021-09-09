@@ -90,7 +90,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders;$(ProjectDir)XUSG\Advanced</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -115,7 +115,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders;$(ProjectDir)XUSG\Advanced</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -142,7 +142,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders;$(ProjectDir)XUSG\Advanced</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -171,7 +171,7 @@ COPY /Y "$(OutDir)*.exe" "$(ProjectDir)..\Bin\"
 COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir)..\Bin\"</Command>
     </PostBuildEvent>
     <FxCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)XUSG\Shaders;$(ProjectDir)XUSG\Advanced</AdditionalIncludeDirectories>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -265,9 +265,8 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="XUSG\Shaders\Common.hlsli" />
     <None Include="XUSG\Shaders\CSSkinning.hlsli" />
-    <None Include="XUSG\Shaders\SHCommon.hlsli" />
-    <None Include="XUSG\Shaders\VHBasePass.hlsli" />
     <None Include="XUSG\Shaders\VSBasePass.hlsli" />
   </ItemGroup>
   <ItemGroup>

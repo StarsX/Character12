@@ -30,16 +30,13 @@ namespace XUSG
 			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN);
 		void InitPosition(const DirectX::XMFLOAT4& posRot);
 		void Update(uint8_t frameIndex, double time);
-		void Update(uint8_t frameIndex, double time, DirectX::CXMMATRIX viewProj,
-			DirectX::FXMMATRIX* pWorld = nullptr, DirectX::FXMMATRIX* pShadows = nullptr,
-			uint8_t numShadows = 0, bool isTemporal = true);
-		virtual void SetMatrices(DirectX::CXMMATRIX viewProj, DirectX::FXMMATRIX* pWorld = nullptr,
-			DirectX::FXMMATRIX* pShadows = nullptr, uint8_t numShadows = 0, bool isTemporal = true);
+		void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true);
+		virtual void SetMatrices(DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true);
 		void SetSkinningPipeline(const CommandList* pCommandList);
 		void Skinning(const CommandList* pCommandList, uint32_t& numBarriers,
 			ResourceBarrier* pBarriers, bool reset = false);
 		void RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlags = SUBSET_FULL, uint8_t matrixTableIndex = CBV_MATRICES,
+			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
 			uint32_t numInstances = 1);
 
 		const DirectX::XMFLOAT4& GetPosition() const;
@@ -68,14 +65,11 @@ namespace XUSG
 		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		bool createDescriptorTables();
-		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX viewProj,
-			DirectX::CXMMATRIX world, DirectX::FXMMATRIX* pShadows,
-			uint8_t numShadows, bool isTemporal);
+		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world, bool isTemporal);
 		void skinning(const CommandList* pCommandList, bool reset);
 		void renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlags, uint8_t matrixTableIndex, uint32_t numInstances);
-		void renderLinked(uint32_t mesh, uint8_t matrixTableIndex,
-			PipelineLayoutIndex layout, uint32_t numInstances);
+			SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
+		void renderLinked(uint32_t mesh, PipelineLayoutIndex layout, uint32_t numInstances);
 		void setSkeletalMatrices(uint32_t numMeshes);
 		void setBoneMatrices(uint32_t mesh);
 		void convertToDQ(DirectX::XMFLOAT4& dqTran, DirectX::CXMVECTOR quat,
@@ -99,13 +93,12 @@ namespace XUSG
 #if TEMPORAL
 		std::vector<DescriptorTable> m_srvSkinnedTables[FrameCount];
 
-		std::vector<DirectX::XMFLOAT4X4> m_linkedWorldViewProjs[FrameCount];
+		std::vector<DirectX::XMFLOAT3X4> m_linkedWorlds;
 #endif
 
 		std::shared_ptr<std::vector<SDKMesh>>	m_linkedMeshes;
 		std::shared_ptr<std::vector<MeshLink>>	m_meshLinks;
 
 		std::vector<ConstantBuffer::uptr> m_cbLinkedMatrices;
-		std::vector<ConstantBuffer::uptr> m_cbLinkedShadowMatrices;
 	};
 }

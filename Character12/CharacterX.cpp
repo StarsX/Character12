@@ -157,6 +157,18 @@ void CharacterX::LoadAssets()
 			ThrowIfFailed(E_FAIL);
 	}
 
+	// Create per-frame constant buffer
+	m_cbPerFrame = ConstantBuffer::MakeUnique();
+	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(XMFLOAT4X4[FrameCount]), FrameCount,
+		nullptr, MemoryType::UPLOAD, L"CBPerFrame"), ThrowIfFailed(E_FAIL));
+
+	for (uint8_t i = 0; i < FrameCount; ++i)
+	{
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+		descriptorTable->SetDescriptors(0, 1, &m_cbPerFrame->GetCBV(i));
+		X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), ThrowIfFailed(E_FAIL));
+	}
+
 	// Close the command list and execute it to begin the initial GPU setup.
 	N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
 	m_commandQueue->ExecuteCommandList(pCommandList);
@@ -215,8 +227,12 @@ void CharacterX::OnUpdate()
 	const auto viewProj = view * proj;
 	const auto world = XMMatrixIdentity();
 
+	// Update constant buffers
+	const auto pCBData = reinterpret_cast<XMFLOAT4X4*>(m_cbPerFrame->Map(m_frameIndex));
+	XMStoreFloat4x4(pCBData, XMMatrixTranspose(viewProj)); // XMStoreFloat3x4 includes transpose.
+
 	// Character
-	m_character->Update(m_frameIndex, time, viewProj, &world, nullptr, 0, false);
+	m_character->Update(m_frameIndex, time, &world, false);
 }
 
 // Render the scene.
@@ -351,7 +367,7 @@ void CharacterX::PopulateCommandList()
 	pCommandList->ClearDepthStencilView(m_depth->GetDSV(), ClearFlag::DEPTH, 1.0f, 0, 0, nullptr);
 	//m_commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	m_character->RenderTransformed(pCommandList, Character::BASE_PASS, SUBSET_FULL, Character::CBV_MATRICES);
+	m_character->RenderTransformed(pCommandList, Character::BASE_PASS, SUBSET_FULL, &m_cbvTables[m_frameIndex]);
 
 	// Indicate that the back buffer will now be used to present.
 	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::PRESENT);

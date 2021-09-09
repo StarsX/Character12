@@ -2,6 +2,8 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#include "XUSGAdvanced.h"
+
 //--------------------------------------------------------------------------------------
 // Definitions
 //--------------------------------------------------------------------------------------
@@ -10,6 +12,7 @@
 #define _NORMAL_
 #endif
 
+#ifndef _NO_IO_STRUCT_
 //--------------------------------------------------------------------------------------
 // Input/Output structures
 //--------------------------------------------------------------------------------------
@@ -42,7 +45,7 @@ struct IOStruct
 #endif
 
 #ifdef _CLIP_
-	float	Clip		: SV_CLIPDISTANCE;
+	float	Clip		: SV_ClipDistance;
 #endif
 };
 
@@ -51,3 +54,22 @@ struct IOStruct
 //--------------------------------------------------------------------------------------		
 typedef	IOStruct	VS_Output;
 typedef IOStruct	PS_Input;
+#endif
+
+//--------------------------------------------------------------------------------------
+// Constant buffers
+//--------------------------------------------------------------------------------------
+cbuffer cbPerFrame	: register (b1)
+{
+	float4x4 g_viewProj;
+	float3	g_eyePt;
+	float	g_time;
+	float3	g_lightPt;
+	float	g_timeStep;
+	float4x4 g_viewProjI;
+#if TEMPORAL
+	float4x4 g_viewProjPrev;
+#endif
+	float4x3 g_view;
+	float4x3 g_shadowView;
+};

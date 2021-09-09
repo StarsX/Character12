@@ -8,7 +8,7 @@
 #define	_BASEPASS_
 #define	_CHARACTER_
 
-#include "SHCommon.hlsli"
+#include "Common.hlsli"
 
 Texture2D g_albedo;
 SamplerState g_sampler;

@@ -2,23 +2,21 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#include "SHCommon.hlsli"
-#include "VHBasePass.hlsli"
-
-//--------------------------------------------------------------------------------------
-// Constant buffers
-//--------------------------------------------------------------------------------------
-#if TEMPORAL_AA
-cbuffer cbTemporalBias	: register (b3)
-{
-	float2	g_projBias;
-};
-#endif
-
-#if TEMPORAL
 //--------------------------------------------------------------------------------------
 // Input/Output structures
 //--------------------------------------------------------------------------------------
+struct VS_Input
+{
+	float3		Pos		: POSITION;		// Position
+	float3		Norm	: NORMAL;		// Normal
+	min16float2	UV		: TEXCOORD;		// Texture coordinate
+#ifdef _TANGENTS_
+	float3		Tan		: TANGENT;		// Normalized Tangent vector
+	float3		BiNorm	: BINORMAL;		// Normalized BiNormal vector
+#endif
+};
+
+#if TEMPORAL
 struct Vertex
 {
 	float3	Pos;	// Position
@@ -29,7 +27,28 @@ struct Vertex
 	uint2	BiNorm;	// Normalized BiNormal vector
 #endif
 };
+#endif
 
+//--------------------------------------------------------------------------------------
+// Constant buffers
+//--------------------------------------------------------------------------------------
+cbuffer cbMatrices : register (b0)
+{
+	float4x3 g_world;
+	float3x3 g_worldIT;
+#if TEMPORAL
+	float4x3 g_previousWorld;
+#endif
+};
+
+#if TEMPORAL_AA
+cbuffer cbTemporalBias	: register (b3)
+{
+	float2	g_projBias;
+};
+#endif
+
+#if TEMPORAL
 //--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
@@ -40,7 +59,7 @@ StructuredBuffer<Vertex> g_roVertices;
 //--------------------------------------------------------------------------------------
 // Vertex shader used for the static mesh with shadow mapping
 //--------------------------------------------------------------------------------------
-VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
+VS_Output main(uint vid : SV_VertexID, VS_Input input)
 {
 	VS_Output output;
 	float4 pos = { input.Pos, 1.0 };
@@ -48,30 +67,28 @@ VS_Output main(uint vid : SV_VERTEXID, VS_Input input)
 #if defined(_BASEPASS_) && TEMPORAL	// Temporal tracking
 
 #ifdef _CHARACTER_
-	const float4 hPos = { g_roVertices[vid].Pos, 1.0 };
+	float4 hPos = { g_roVertices[vid].Pos, 1.0 };
 #elif defined(_VEGETATION_)
 	float4 hPos = pos;
 	VegetationWave(hPos, 1.0);
 #else
 #define hPos pos
 #endif
-	output.TSPos = mul(hPos, g_previousWVP);
+	hPos.xyz = mul(hPos, g_previousWorld);
+	output.TSPos = mul(hPos, g_viewProjPrev);
 #endif
 
 #ifdef _VEGETATION_
 	VegetationWave(pos);
 #endif
 
-	output.Pos = mul(pos, g_worldViewProj);
+	pos.xyz = mul(pos, g_world);
+	output.Pos = mul(pos, g_viewProj);
 #if defined(_BASEPASS_) && TEMPORAL
 	output.CSPos = output.Pos;
 #endif
 #if TEMPORAL_AA
 	output.Pos.xy += g_projBias * output.Pos.w;
-#endif
-
-#if defined(_POSWORLD_) || defined(_CLIP_)
-	pos.xyz = mul(pos, g_world);
 #endif
 
 #ifdef _POSWORLD_

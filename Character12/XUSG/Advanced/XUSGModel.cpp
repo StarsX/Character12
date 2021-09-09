@@ -109,33 +109,18 @@ void Model_Impl::Update(uint8_t frameIndex)
 	m_previousFrame = (frameIndex + FrameCount - 1) % FrameCount;
 }
 
-void Model_Impl::SetMatrices(CXMMATRIX viewProj, CXMMATRIX world, FXMMATRIX* pShadows, uint8_t numShadows, bool isTemporal)
+void Model_Impl::SetMatrices(CXMMATRIX world, bool isTemporal)
 {
-	// Set World-View-Proj matrix
-	const auto worldViewProj = XMMatrixMultiply(world, viewProj);
-
 	// Update constant buffers
 	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices->Map(m_currentFrame));
-	XMStoreFloat4x4(&pCBData->WorldViewProj, XMMatrixTranspose(worldViewProj));
 	XMStoreFloat3x4(&pCBData->World, world); // XMStoreFloat3x4 includes transpose.
 	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
-
-	if (pShadows)
-	{
-		for (uint8_t i = 0; i < numShadows; ++i)
-		{
-			const auto shadow = XMMatrixMultiply(world, pShadows[i]);
-			auto& cbData = *reinterpret_cast<XMMATRIX*>(m_cbShadowMatrices->Map(m_currentFrame * MAX_SHADOW_CASCADES + i));
-			cbData = XMMatrixTranspose(shadow);
-		}
-	}
 
 #if TEMPORAL
 	if (isTemporal)
 	{
-		XMStoreFloat4x4(&m_worldViewProjs[m_currentFrame], worldViewProj);
-		const auto worldViewProjPrev = XMLoadFloat4x4(&m_worldViewProjs[m_previousFrame]);
-		XMStoreFloat4x4(&pCBData->WorldViewProjPrev, XMMatrixTranspose(worldViewProjPrev));
+		pCBData->WorldPrev = m_world;
+		XMStoreFloat3x4(&m_world, world);
 	}
 #endif
 }
@@ -176,14 +161,12 @@ void Model_Impl::SetPipeline(const CommandList* pCommandList, SubsetFlags subset
 	default:
 		SetPipeline(pCommandList, layout ? DEPTH_FRONT : OPAQUE_FRONT);
 	}
-	//if (subsetFlags == SUBSET_REFLECTED)
-		//SetPipeline(commandList, REFLECTED); 
 }
 
 void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-	PipelineLayoutIndex layout, uint32_t numInstances)
+	PipelineLayoutIndex layout, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
-	if (layout < GLOBAL_BASE_PASS)
+	if (pCbvPerFrameTable)
 	{
 		const DescriptorPool descriptorPools[] =
 		{
@@ -193,6 +176,7 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
+		pCommandList->SetGraphicsDescriptorTable(PER_FRAME, *pCbvPerFrameTable);
 		pCommandList->SetGraphicsDescriptorTable(m_variableSlot + SAMPLERS_OFFSET, m_samplerTable);
 #if TEMPORAL_AA
 		pCommandList->SetGraphicsDescriptorTable(TEMPORAL_BIAS, m_cbvTables[m_currentFrame][CBV_LOCAL_TEMPORAL_BIAS]);
@@ -206,11 +190,11 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 		pCommandList->IASetVertexBuffers(0, 1, &m_mesh->GetVertexBufferView(m, 0));
 
 		// Render mesh
-		render(pCommandList, m, layout, subsetFlags, numInstances);
+		render(pCommandList, m, layout, subsetFlags, pCbvPerFrameTable, numInstances);
 	}
 
 	// Clear out the vb bindings for the next pass
-	if (layout < GLOBAL_BASE_PASS) pCommandList->IASetVertexBuffers(0, 1, nullptr);
+	if (pCbvPerFrameTable) pCommandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
 bool Model_Impl::createConstantBuffers()
@@ -219,10 +203,17 @@ bool Model_Impl::createConstantBuffers()
 	N_RETURN(m_cbMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
 		MemoryType::UPLOAD, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 
-	m_cbShadowMatrices = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbShadowMatrices->Create(m_device.get(), sizeof(XMMATRIX[FrameCount][MAX_SHADOW_CASCADES]),
-		MAX_SHADOW_CASCADES * FrameCount, nullptr, MemoryType::UPLOAD, m_name.empty() ? nullptr :
-		(m_name + L".CBShadowMatrices").c_str()), false);
+	// Initialize constant buffers
+	const auto identity = XMMatrixIdentity();
+	for (uint8_t i = 0; i < FrameCount; ++i)
+	{
+		const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices->Map(i));
+		XMStoreFloat3x4(&pCBData->World, identity);
+		XMStoreFloat3x4(&pCBData->WorldIT, identity);
+#if TEMPORAL
+		XMStoreFloat3x4(&pCBData->WorldPrev, identity);
+#endif
+	}
 
 #if TEMPORAL_AA
 	m_cbTemporalBias = ConstantBuffer::MakeUnique();
@@ -354,13 +345,6 @@ bool Model_Impl::createDescriptorTables()
 			X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
 
-		for (uint8_t j = 0; j < MAX_SHADOW_CASCADES; ++j)
-		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
-			descriptorTable->SetDescriptors(0, 1, &m_cbShadowMatrices->GetCBV(i * MAX_SHADOW_CASCADES + j));
-			X_RETURN(m_cbvTables[i][CBV_SHADOW_MATRIX + j], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-		}
-
 #if TEMPORAL_AA
 		{
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
@@ -396,7 +380,7 @@ bool Model_Impl::createDescriptorTables()
 }
 
 void Model_Impl::render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlags, uint32_t numInstances)
+	SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
 	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
 
@@ -406,7 +390,7 @@ void Model_Impl::render(const CommandList* pCommandList, uint32_t mesh, Pipeline
 	const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
 
 	// Set pipeline state
-	if (layout < GLOBAL_BASE_PASS) SetPipeline(pCommandList, subsetFlags, layout);
+	if (pCbvPerFrameTable) SetPipeline(pCommandList, subsetFlags, layout);
 
 	//const uint8_t materialSlot = psBaseSlot + MATERIAL;
 	const auto numSubsets = m_mesh->GetNumSubsets(mesh, materialType);
@@ -418,8 +402,7 @@ void Model_Impl::render(const CommandList* pCommandList, uint32_t mesh, Pipeline
 		pCommandList->IASetPrimitiveTopology(primType);
 
 		// Set material
-		if (layout != DEPTH_PASS && layout != GLOBAL_DEPTH_PASS &&
-			m_mesh->GetMaterial(pSubset->MaterialID) && m_srvTables[pSubset->MaterialID])
+		if (layout != DEPTH_PASS && m_mesh->GetMaterial(pSubset->MaterialID) && m_srvTables[pSubset->MaterialID])
 			pCommandList->SetGraphicsDescriptorTable(m_variableSlot + MATERIAL_OFFSET, m_srvTables[pSubset->MaterialID]);
 
 		// Draw
@@ -447,6 +430,7 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 	{
 		// Get constant buffer slots
 		cbMatrices = reflector->GetResourceBindingPointByName("cbMatrices", cbMatrices);
+		cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame", cbPerFrame);
 #if TEMPORAL_AA
 		cbTempBias = reflector->GetResourceBindingPointByName("cbTempBias", cbTempBias);
 #endif
@@ -479,6 +463,9 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 	// Constant buffers
 	utilPipelineLayout->SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices, 0, DescriptorFlag::DATA_STATIC);
 	utilPipelineLayout->SetShaderStage(MATRICES, Shader::Stage::VS);
+
+	utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, 0, DescriptorFlag::DATA_STATIC);
+	utilPipelineLayout->SetShaderStage(PER_FRAME, Shader::Stage::VS);
 
 #if TEMPORAL_AA
 	utilPipelineLayout->SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias, 0, DescriptorFlag::DATA_STATIC);

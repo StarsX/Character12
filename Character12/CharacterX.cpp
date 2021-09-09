@@ -146,8 +146,8 @@ void CharacterX::LoadAssets()
 	{
 		m_pInputLayout = Character::CreateInputLayout(m_graphicsPipelineCache.get());
 		const auto textureCache = make_shared<TextureCache::element_type>();
-		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Media/Bright/Stars.sdkmesh",
-			L"Media/Bright/Stars.sdkmesh_anim", textureCache);
+		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Assets/Bright/Stars.sdkmesh",
+			L"Assets/Bright/Stars.sdkmesh_anim", textureCache);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
 		m_character = Character::MakeUnique(m_device, L"Stars");
 		if (!m_character) ThrowIfFailed(E_FAIL);

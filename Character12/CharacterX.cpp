@@ -26,8 +26,9 @@ CharacterX::CharacterX(uint32_t width, uint32_t height, std::wstring name) :
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 	AllocConsole();
 	FILE* stream;
-	freopen_s(&stream, "CONOUT$", "w+t", stdout);
 	freopen_s(&stream, "CONIN$", "r+t", stdin);
+	freopen_s(&stream, "CONOUT$", "w+t", stdout);
+	freopen_s(&stream, "CONOUT$", "w+t", stderr);
 #endif
 }
 
@@ -92,7 +93,7 @@ void CharacterX::LoadPipeline()
 
 	// Describe and create the swap chain.
 	m_swapChain = SwapChain::MakeUnique();
-	N_RETURN(m_swapChain->Create(factory.Get(), Win32Application::GetHwnd(), m_commandQueue.get(),
+	N_RETURN(m_swapChain->Create(factory.get(), Win32Application::GetHwnd(), m_commandQueue.get(),
 		FrameCount, m_width, m_height, Format::B8G8R8A8_UNORM), ThrowIfFailed(E_FAIL));
 
 	// This sample does not support fullscreen transitions.
@@ -160,7 +161,7 @@ void CharacterX::LoadAssets()
 	// Create per-frame constant buffer
 	m_cbPerFrame = ConstantBuffer::MakeUnique();
 	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(XMFLOAT4X4[FrameCount]), FrameCount,
-		nullptr, MemoryType::UPLOAD, L"CBPerFrame"), ThrowIfFailed(E_FAIL));
+		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerFrame"), ThrowIfFailed(E_FAIL));
 
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{

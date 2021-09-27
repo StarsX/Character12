@@ -201,7 +201,7 @@ bool Model_Impl::createConstantBuffers()
 {
 	m_cbMatrices = ConstantBuffer::MakeUnique();
 	N_RETURN(m_cbMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
-		MemoryType::UPLOAD, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
+		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 
 	// Initialize constant buffers
 	const auto identity = XMMatrixIdentity();
@@ -218,7 +218,7 @@ bool Model_Impl::createConstantBuffers()
 #if TEMPORAL_AA
 	m_cbTemporalBias = ConstantBuffer::MakeUnique();
 	N_RETURN(m_cbTemporalBias->Create(m_device.get(), sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
-		MemoryType::UPLOAD, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
+		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
 #endif
 
 	return true;

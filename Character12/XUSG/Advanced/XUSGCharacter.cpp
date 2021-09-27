@@ -235,8 +235,8 @@ bool Character_Impl::createTransformedVBs(VertexBuffer* pVertexBuffer)
 	N_RETURN(pVertexBuffer->Create(m_device.get(), numVertices, sizeof(Vertex),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
-		numMeshes, firstVertices.data(), m_name.empty() ? nullptr :
-		(m_name + L".TransformedVB").c_str()), false);
+		numMeshes, firstVertices.data(),MemoryFlag::NONE, m_name.empty() ?
+		nullptr : (m_name + L".TransformedVB").c_str()), false);
 
 	return true;
 }
@@ -257,8 +257,8 @@ bool Character_Impl::createBuffers()
 	{
 		m_boneWorlds[i] = StructuredBuffer::MakeUnique();
 		N_RETURN(m_boneWorlds[i]->Create(m_device.get(), numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
-			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, m_name.empty() ?
-			nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
+			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, MemoryFlag::NONE,
+			m_name.empty() ? nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
 
 	// Linked meshes

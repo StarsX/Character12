@@ -670,7 +670,7 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 	m_vertexBuffer = VertexBuffer::MakeShared();
 	N_RETURN(m_vertexBuffer->Create(m_device.get(), numVertices, stride, ResourceFlag::NONE,
 		MemoryType::DEFAULT, m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
-		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr,
+		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr, MemoryFlag::NONE,
 		m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
 
 	// Copy vertices into one buffer
@@ -705,9 +705,9 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 	// Create a index Buffer
 	m_indexBuffer = IndexBuffer::MakeShared();
 	N_RETURN(m_indexBuffer->Create(m_device.get(), byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
-		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE,
-		MemoryType::DEFAULT, m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1,
-		nullptr, m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
+		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE, MemoryType::DEFAULT,
+		m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1, nullptr, MemoryFlag::NONE,
+		m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
 
 	// Copy indices into one buffer
 	size_t offset = 0;

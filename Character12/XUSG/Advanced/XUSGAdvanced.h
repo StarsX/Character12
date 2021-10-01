@@ -2,7 +2,7 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
-#if HLSL_VERSION <= 0
+#ifndef HLSL_VERSION
 
 #pragma once
 
@@ -16,22 +16,22 @@
 #define _XUSG_SHARED_CONST_H_
 
 #ifndef FRAME_COUNT
-#define FRAME_COUNT		3
+#define FRAME_COUNT	3
 #endif
 
 #ifndef TEMPORAL_AA
-#define TEMPORAL_AA		1
+#define TEMPORAL_AA	1
 #endif
 
 #ifndef TEMPORAL
-#define TEMPORAL		TEMPORAL_AA
-#endif  
-
-#ifndef NUM_CASCADE
-#define NUM_CASCADE		3
+#define TEMPORAL	TEMPORAL_AA
 #endif
 
-#define PIDIV4			0.785398163f
+#ifndef NUM_CASCADE
+#define NUM_CASCADE	3
+#endif
+
+#define PIDIV4		0.785398163f
 
 static const float g_FOVAngleY = PIDIV4;
 static const float g_zNear = 1.0f;
@@ -39,7 +39,7 @@ static const float g_zFar = 1000.0f;
 
 #endif
 
-#if HLSL_VERSION <= 0
+#if !(defined(HLSL_VERSION) || defined(__HLSL_VERSION))
 
 #include "Core/XUSG.h"
 

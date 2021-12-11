@@ -14,7 +14,7 @@ namespace XUSG
 		public virtual Model_Impl
 	{
 	public:
-		Character_Impl(const Device::sptr& device, const wchar_t* name = nullptr);
+		Character_Impl(const Device::sptr& device, const wchar_t* name = nullptr, API api = API::DIRECTX_12);
 		virtual ~Character_Impl();
 
 		bool Init(const InputLayout* pInputLayout,

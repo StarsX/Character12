@@ -12,14 +12,14 @@ using namespace XUSG::Graphics;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-Model::uptr Model::MakeUnique(const Device::sptr& device, const wchar_t* name)
+Model::uptr Model::MakeUnique(const Device::sptr& device, const wchar_t* name, API api)
 {
-	return make_unique<Model_Impl>(device, name);
+	return make_unique<Model_Impl>(device, name, api);
 }
 
-Model::sptr Model::MakeShared(const Device::sptr& device, const wchar_t* name)
+Model::sptr Model::MakeShared(const Device::sptr& device, const wchar_t* name, API api)
 {
-	return make_shared<Model_Impl>(device, name);
+	return make_shared<Model_Impl>(device, name, api);
 }
 
 Model* Model::AsModel()
@@ -48,10 +48,10 @@ const InputLayout* Model::CreateInputLayout(PipelineCache* pPipelineCache)
 }
 
 SDKMesh::sptr Model::LoadSDKMesh(const Device::sptr& device, const wstring& meshFileName,
-	const TextureCache& textureCache, bool isStaticMesh)
+	const TextureCache& textureCache, bool isStaticMesh, API api)
 {
 	// Load the mesh
-	const auto mesh = SDKMesh::MakeShared();
+	const auto mesh = SDKMesh::MakeShared(api);
 	N_RETURN(mesh->Create(device, meshFileName.c_str(), textureCache, isStaticMesh), nullptr);
 
 	return mesh;
@@ -60,7 +60,8 @@ SDKMesh::sptr Model::LoadSDKMesh(const Device::sptr& device, const wstring& mesh
 //--------------------------------------------------------------------------------------
 // Model implementations
 //--------------------------------------------------------------------------------------
-Model_Impl::Model_Impl(const Device::sptr& device, const wchar_t* name) :
+Model_Impl::Model_Impl(const Device::sptr& device, const wchar_t* name, API api) :
+	m_api(api),
 	m_device(device),
 	m_currentFrame(0),
 	m_variableSlot(VARIABLE_SLOT),
@@ -199,7 +200,7 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 
 bool Model_Impl::createConstantBuffers()
 {
-	m_cbMatrices = ConstantBuffer::MakeUnique();
+	m_cbMatrices = ConstantBuffer::MakeUnique(m_api);
 	N_RETURN(m_cbMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
 		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 
@@ -216,7 +217,7 @@ bool Model_Impl::createConstantBuffers()
 	}
 
 #if TEMPORAL_AA
-	m_cbTemporalBias = ConstantBuffer::MakeUnique();
+	m_cbTemporalBias = ConstantBuffer::MakeUnique(m_api);
 	N_RETURN(m_cbTemporalBias->Create(m_device.get(), sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
 		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
 #endif
@@ -233,7 +234,7 @@ bool Model_Impl::createPipelines(bool isStatic, const InputLayout* pInputLayout,
 	dsvFormat = dsvFormat != Format::UNKNOWN ? dsvFormat : Format::D24_UNORM_S8_UINT;
 	shadowFormat = shadowFormat != Format::UNKNOWN ? shadowFormat : Format::D16_UNORM;
 
-	const auto state = Graphics::State::MakeUnique();
+	const auto state = Graphics::State::MakeUnique(m_api);
 
 	// Base pass
 	{
@@ -340,21 +341,21 @@ bool Model_Impl::createDescriptorTables()
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 			descriptorTable->SetDescriptors(0, 1, &m_cbMatrices->GetCBV(i));
 			X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
 
 #if TEMPORAL_AA
 		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 			descriptorTable->SetDescriptors(0, 1, &m_cbTemporalBias->GetCBV(i));
 			X_RETURN(m_cbvTables[i][CBV_LOCAL_TEMPORAL_BIAS], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
 #endif
 	}
 
-	const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+	const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 	const SamplerPreset samplers[] = { ANISOTROPIC_WRAP, POINT_WRAP, LINEAR_LESS_EQUAL };
 	descriptorTable->SetSamplers(0, static_cast<uint32_t>(size(samplers)), samplers, m_descriptorTableCache.get());
 	X_RETURN(m_samplerTable, descriptorTable->GetSamplerTable(m_descriptorTableCache.get()), false);
@@ -368,7 +369,7 @@ bool Model_Impl::createDescriptorTables()
 
 		if (pMaterial && pMaterial->pAlbedo && pMaterial->pNormal)
 		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 			const Descriptor descriptors[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 			X_RETURN(m_srvTables[m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
@@ -458,7 +459,7 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 	}
 
 	// Pipeline layout utility
-	const auto utilPipelineLayout = Util::PipelineLayout::MakeShared();
+	const auto utilPipelineLayout = Util::PipelineLayout::MakeShared(m_api);
 
 	// Constant buffers
 	utilPipelineLayout->SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices, 0, DescriptorFlag::DATA_STATIC);

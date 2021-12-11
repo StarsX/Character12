@@ -11,14 +11,14 @@ using namespace XUSG;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-Character::uptr Character::MakeUnique(const Device::sptr& device, const wchar_t* name)
+Character::uptr Character::MakeUnique(const Device::sptr& device, const wchar_t* name, API api)
 {
-	return make_unique<Character_Impl>(device, name);
+	return make_unique<Character_Impl>(device, name, api);
 }
 
-Character::sptr Character::MakeShared(const Device::sptr& device, const wchar_t* name)
+Character::sptr Character::MakeShared(const Device::sptr& device, const wchar_t* name, API api)
 {
-	return make_shared<Character_Impl>(device, name);
+	return make_shared<Character_Impl>(device, name, api);
 }
 
 //--------------------------------------------------------------------------------------
@@ -27,10 +27,10 @@ Character::sptr Character::MakeShared(const Device::sptr& device, const wchar_t*
 SDKMesh::sptr Character::LoadSDKMesh(const Device::sptr& device, const wstring& meshFileName,
 	const wstring& animFileName, const TextureCache& textureCache,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
-	vector<SDKMesh::sptr>* linkedMeshes)
+	vector<SDKMesh::sptr>* linkedMeshes, API api)
 {
 	// Load the animated mesh
-	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache, false);
+	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache, false, api);
 	N_RETURN(mesh->LoadAnimation(animFileName.c_str()), nullptr);
 	mesh->TransformBindPose(XMMatrixIdentity());
 
@@ -53,7 +53,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device::sptr& device, const wstring& 
 		{
 			auto& meshInfo = meshLinks->at(m);
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
-			linkedMeshes->at(m) = SDKMesh::MakeShared();
+			linkedMeshes->at(m) = SDKMesh::MakeShared(api);
 			N_RETURN(linkedMeshes->at(m)->Create(device, meshInfo.MeshName.c_str(),
 				textureCache), nullptr);
 		}
@@ -65,8 +65,8 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device::sptr& device, const wstring& 
 //--------------------------------------------------------------------------------------
 // Character implementations
 //--------------------------------------------------------------------------------------
-Character_Impl::Character_Impl(const Device::sptr& device, const wchar_t* name) :
-	Model_Impl(device, name),
+Character_Impl::Character_Impl(const Device::sptr& device, const wchar_t* name, API api) :
+	Model_Impl(device, name, api),
 	m_computePipelineCache(nullptr),
 	m_skinningPipelineLayout(nullptr),
 	m_skinningPipeline(nullptr),
@@ -212,7 +212,7 @@ bool Character_Impl::createTransformedStates()
 {
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
-		m_transformedVBs[i] = VertexBuffer::MakeUnique();
+		m_transformedVBs[i] = VertexBuffer::MakeUnique(m_api);
 		N_RETURN(createTransformedVBs(m_transformedVBs[i].get()), false);
 	}
 
@@ -255,7 +255,7 @@ bool Character_Impl::createBuffers()
 
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
-		m_boneWorlds[i] = StructuredBuffer::MakeUnique();
+		m_boneWorlds[i] = StructuredBuffer::MakeUnique(m_api);
 		N_RETURN(m_boneWorlds[i]->Create(m_device.get(), numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
 			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, MemoryFlag::NONE,
 			m_name.empty() ? nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
@@ -265,7 +265,7 @@ bool Character_Impl::createBuffers()
 	if (m_meshLinks) m_cbLinkedMatrices.resize(m_meshLinks->size());
 	for (auto& cbLinkedMatrices : m_cbLinkedMatrices)
 	{
-		cbLinkedMatrices = ConstantBuffer::MakeUnique();
+		cbLinkedMatrices = ConstantBuffer::MakeUnique(m_api);
 		N_RETURN(cbLinkedMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount), false);
 	}
 
@@ -291,7 +291,7 @@ bool Character_Impl::createPipelineLayouts()
 		}
 
 		// Pipeline layout utility
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
+		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique(m_api);
 
 		// Input vertices and bone matrices
 		utilPipelineLayout->SetRange(INPUT, DescriptorType::SRV, 1, roBoneWorld, 0, DescriptorFlag::DATA_STATIC);
@@ -359,7 +359,7 @@ bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Form
 {
 	// Skinning
 	{
-		const auto state = Compute::State::MakeUnique();
+		const auto state = Compute::State::MakeUnique(m_api);
 		state->SetPipelineLayout(m_skinningPipelineLayout);
 		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
 		X_RETURN(m_skinningPipeline, state->GetPipeline(m_computePipelineCache.get(),
@@ -385,21 +385,21 @@ bool Character_Impl::createDescriptorTables()
 		for (auto m = 0u; m < numMeshes; ++m)
 		{
 			{
-				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				const Descriptor descriptors[] = { m_boneWorlds[i]->GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
 				descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 				X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 
 			{
-				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetUAV(m));
 				X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 
 #if TEMPORAL
 			{
-				const auto descriptorTable = Util::DescriptorTable::MakeUnique();
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetSRV(m));
 				X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}

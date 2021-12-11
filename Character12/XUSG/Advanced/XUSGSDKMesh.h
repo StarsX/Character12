@@ -115,7 +115,7 @@ namespace XUSG
 		static_assert(sizeof(AnimationData) == 40, "SDK Mesh structure size incorrect");
 		static_assert(sizeof(AnimationFrameData) == 112, "SDK Mesh structure size incorrect");
 
-		SDKMesh_Impl();
+		SDKMesh_Impl(API api = API::DIRECTX_12);
 		virtual ~SDKMesh_Impl();
 
 		bool Create(const Device::sptr& device, const wchar_t* fileName,
@@ -206,6 +206,8 @@ namespace XUSG
 		void transformBindPoseFrame(uint32_t frame, DirectX::CXMMATRIX parentWorld);
 		void transformFrame(uint32_t frame, DirectX::CXMMATRIX parentWorld, double time);
 		void transformFrameAbsolute(uint32_t frame, double time);
+
+		API m_api;
 
 		// These are the pointers to the two chunks of data loaded in from the mesh file
 		uint8_t* m_pStaticMeshData;

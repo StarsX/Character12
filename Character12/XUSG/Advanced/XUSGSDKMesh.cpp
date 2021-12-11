@@ -14,14 +14,14 @@ using namespace XUSG;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-SDKMesh::uptr SDKMesh::MakeUnique()
+SDKMesh::uptr SDKMesh::MakeUnique(API api)
 {
-	return make_unique<SDKMesh_Impl>();
+	return make_unique<SDKMesh_Impl>(api);
 }
 
-SDKMesh::sptr SDKMesh::MakeShared()
+SDKMesh::sptr SDKMesh::MakeShared(API api)
 {
-	return make_shared<SDKMesh_Impl>();
+	return make_shared<SDKMesh_Impl>(api);
 }
 
 //--------------------------------------------------------------------------------------
@@ -68,7 +68,8 @@ PrimitiveTopology SDKMesh::GetPrimitiveType(PrimitiveType primType)
 //--------------------------------------------------------------------------------------
 // SDKMesh implementations
 //--------------------------------------------------------------------------------------
-SDKMesh_Impl::SDKMesh_Impl() :
+SDKMesh_Impl::SDKMesh_Impl(API api) :
+	m_api(api),
 	m_device(nullptr),
 	m_numOutstandingResources(0),
 	m_isLoading(false),
@@ -581,12 +582,13 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<ShaderResource> texture;
-				uploaders.emplace_back(Resource::MakeUnique());
+				shared_ptr<Texture> texture;
+				uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, filePathW.c_str(),
-					8192, true, texture, uploaders.back().get(), &alphaMode))
+					8192, true, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
+					MemoryFlag::NONE, m_api))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -608,12 +610,13 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<ShaderResource> texture;
-				uploaders.emplace_back(Resource::MakeUnique());
+				shared_ptr<Texture> texture;
+				uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, filePathW.c_str(),
-					8192, false, texture, uploaders.back().get(), &alphaMode))
+					8192, false, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
+					MemoryFlag::NONE, m_api))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -635,12 +638,13 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<ShaderResource> texture;
-				uploaders.emplace_back(Resource::MakeUnique());
+				shared_ptr<Texture> texture;
+				uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(m_device.get(), pCommandList, filePathW.c_str(),
-					8192, false, texture, uploaders.back().get()))
+					8192, false, texture, uploaders.back().get(), nullptr, ResourceState::COMMON,
+					MemoryFlag::NONE, m_api))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -667,7 +671,7 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 	}
 
 	// Create a vertex Buffer
-	m_vertexBuffer = VertexBuffer::MakeShared();
+	m_vertexBuffer = VertexBuffer::MakeShared(m_api);
 	N_RETURN(m_vertexBuffer->Create(m_device.get(), numVertices, stride, ResourceFlag::NONE,
 		MemoryType::DEFAULT, m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr, MemoryFlag::NONE,
@@ -685,7 +689,7 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 	}
 
 	// Upload vertices
-	uploaders.emplace_back(Resource::MakeUnique());
+	uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 	return m_vertexBuffer->Upload(pCommandList, uploaders.back().get(), bufferData.data(), bufferData.size());
 }
@@ -703,7 +707,7 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 	}
 
 	// Create a index Buffer
-	m_indexBuffer = IndexBuffer::MakeShared();
+	m_indexBuffer = IndexBuffer::MakeShared(m_api);
 	N_RETURN(m_indexBuffer->Create(m_device.get(), byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
 		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE, MemoryType::DEFAULT,
 		m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1, nullptr, MemoryFlag::NONE,
@@ -721,7 +725,7 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 	}
 
 	// Upload indices
-	uploaders.emplace_back(Resource::MakeUnique());
+	uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 	return m_indexBuffer->Upload(pCommandList, uploaders.back().get(), bufferData.data(), bufferData.size());
 }
@@ -769,8 +773,8 @@ bool SDKMesh_Impl::createFromMemory(const Device::sptr& device, uint8_t* pData,
 	XMFLOAT3 upper;
 
 	m_device = device;
-	const auto commandAllocator = CommandAllocator::MakeUnique();
-	const auto commandList = CommandList::MakeUnique();
+	const auto commandAllocator = CommandAllocator::MakeUnique(m_api);
+	const auto commandList = CommandList::MakeUnique(m_api);
 	const auto pCommandList = commandList.get();
 	if (device)
 	{
@@ -1077,7 +1081,7 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 	if (pCommandList)
 	{
 		// Create the command queue.
-		CommandQueue::uptr commandQueue = CommandQueue::MakeUnique();
+		CommandQueue::uptr commandQueue = CommandQueue::MakeUnique(m_api);
 		N_RETURN(commandQueue->Create(m_device.get(), CommandListType::DIRECT, CommandQueueFlag::NONE,
 			0, 0, (m_name + L".CommandQueue").c_str()), false);
 
@@ -1088,7 +1092,7 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
 		{
 			void* fenceEvent;
-			const auto fence = Fence::MakeUnique();
+			const auto fence = Fence::MakeUnique(m_api);
 			uint64_t fenceValue = 0;
 			N_RETURN(fence->Create(m_device.get(), fenceValue++, FenceFlag::NONE, (m_name + L".Fence").c_str()), false);
 

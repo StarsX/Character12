@@ -12,7 +12,7 @@ namespace XUSG
 		public virtual Model
 	{
 	public:
-		Model_Impl(const Device::sptr& device, const wchar_t* name);
+		Model_Impl(const Device::sptr& device, const wchar_t* name, API api);
 		virtual ~Model_Impl();
 
 		bool Init(const InputLayout* pInputLayout,
@@ -51,6 +51,7 @@ namespace XUSG
 
 		Util::PipelineLayout::sptr initPipelineLayout(VertexShader vs, PixelShader ps);
 
+		API m_api;
 		Device::sptr m_device;
 		std::wstring m_name;
 

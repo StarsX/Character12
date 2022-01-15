@@ -11,26 +11,26 @@ using namespace XUSG;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-Character::uptr Character::MakeUnique(const Device::sptr& device, const wchar_t* name, API api)
+Character::uptr Character::MakeUnique(const wchar_t* name, API api)
 {
-	return make_unique<Character_Impl>(device, name, api);
+	return make_unique<Character_Impl>(name, api);
 }
 
-Character::sptr Character::MakeShared(const Device::sptr& device, const wchar_t* name, API api)
+Character::sptr Character::MakeShared(const wchar_t* name, API api)
 {
-	return make_shared<Character_Impl>(device, name, api);
+	return make_shared<Character_Impl>(name, api);
 }
 
 //--------------------------------------------------------------------------------------
 // Static interface function
 //--------------------------------------------------------------------------------------
-SDKMesh::sptr Character::LoadSDKMesh(const Device::sptr& device, const wstring& meshFileName,
+SDKMesh::sptr Character::LoadSDKMesh(const Device* pDevice, const wstring& meshFileName,
 	const wstring& animFileName, const TextureCache& textureCache,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
 	vector<SDKMesh::sptr>* linkedMeshes, API api)
 {
 	// Load the animated mesh
-	const auto mesh = Model::LoadSDKMesh(device, meshFileName, textureCache, false, api);
+	const auto mesh = Model::LoadSDKMesh(pDevice, meshFileName, textureCache, false, api);
 	N_RETURN(mesh->LoadAnimation(animFileName.c_str()), nullptr);
 	mesh->TransformBindPose(XMMatrixIdentity());
 
@@ -54,7 +54,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device::sptr& device, const wstring& 
 			auto& meshInfo = meshLinks->at(m);
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
 			linkedMeshes->at(m) = SDKMesh::MakeShared(api);
-			N_RETURN(linkedMeshes->at(m)->Create(device, meshInfo.MeshName.c_str(),
+			N_RETURN(linkedMeshes->at(m)->Create(pDevice, meshInfo.MeshName.c_str(),
 				textureCache), nullptr);
 		}
 	}
@@ -65,8 +65,8 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device::sptr& device, const wstring& 
 //--------------------------------------------------------------------------------------
 // Character implementations
 //--------------------------------------------------------------------------------------
-Character_Impl::Character_Impl(const Device::sptr& device, const wchar_t* name, API api) :
-	Model_Impl(device, name, api),
+Character_Impl::Character_Impl(const wchar_t* name, API api) :
+	Model_Impl(name, api),
 	m_computePipelineCache(nullptr),
 	m_skinningPipelineLayout(nullptr),
 	m_skinningPipeline(nullptr),
@@ -86,9 +86,8 @@ Character_Impl::~Character_Impl(void)
 {
 }
 
-bool Character_Impl::Init(const InputLayout* pInputLayout,
-	const shared_ptr<SDKMesh>& mesh,
-	const ShaderPool::sptr& shaderPool,
+bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
+	const shared_ptr<SDKMesh>& mesh, const ShaderPool::sptr& shaderPool,
 	const Graphics::PipelineCache::sptr& graphicsPipelineCache,
 	const Compute::PipelineCache::sptr& computePipelineCache,
 	const PipelineLayoutCache::sptr& pipelineLayoutCache,
@@ -105,14 +104,14 @@ bool Character_Impl::Init(const InputLayout* pInputLayout,
 	m_linkedMeshes = linkedMeshes;
 
 	// Get SDKMesh
-	N_RETURN(Model_Impl::Init(pInputLayout, mesh, shaderPool, graphicsPipelineCache,
+	N_RETURN(Model_Impl::Init(pDevice, pInputLayout, mesh, shaderPool, graphicsPipelineCache,
 		pipelineLayoutCache, descriptorTableCache), false);
 
 	// Create buffers
-	N_RETURN(createBuffers(), false);
+	N_RETURN(createBuffers(pDevice), false);
 
 	// Create VBs that will hold all of the skinned vertices that need to be transformed output
-	N_RETURN(createTransformedStates(), false);
+	N_RETURN(createTransformedStates(pDevice), false);
 
 	// Create pipeline layout, pipelines, and descriptor tables
 	N_RETURN(createPipelineLayouts(), false);
@@ -208,18 +207,18 @@ FXMMATRIX Character_Impl::GetWorldMatrix() const
 	return XMLoadFloat4x4(&m_mWorld);
 }
 
-bool Character_Impl::createTransformedStates()
+bool Character_Impl::createTransformedStates(const Device* pDevice)
 {
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_transformedVBs[i] = VertexBuffer::MakeUnique(m_api);
-		N_RETURN(createTransformedVBs(m_transformedVBs[i].get()), false);
+		N_RETURN(createTransformedVBs(pDevice, m_transformedVBs[i].get()), false);
 	}
 
 	return true;
 }
 
-bool Character_Impl::createTransformedVBs(VertexBuffer* pVertexBuffer)
+bool Character_Impl::createTransformedVBs(const Device* pDevice, VertexBuffer* pVertexBuffer)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
 	auto numVertices = 0u;
@@ -232,7 +231,7 @@ bool Character_Impl::createTransformedVBs(VertexBuffer* pVertexBuffer)
 		numVertices += static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 	}
 
-	N_RETURN(pVertexBuffer->Create(m_device.get(), numVertices, sizeof(Vertex),
+	N_RETURN(pVertexBuffer->Create(pDevice, numVertices, sizeof(Vertex),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
 		numMeshes, firstVertices.data(),MemoryFlag::NONE, m_name.empty() ?
@@ -241,7 +240,7 @@ bool Character_Impl::createTransformedVBs(VertexBuffer* pVertexBuffer)
 	return true;
 }
 
-bool Character_Impl::createBuffers()
+bool Character_Impl::createBuffers(const Device* pDevice)
 {
 	// Bone world matrices
 	auto numElements = 0u;
@@ -256,7 +255,7 @@ bool Character_Impl::createBuffers()
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_boneWorlds[i] = StructuredBuffer::MakeUnique(m_api);
-		N_RETURN(m_boneWorlds[i]->Create(m_device.get(), numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
+		N_RETURN(m_boneWorlds[i]->Create(pDevice, numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
 			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, MemoryFlag::NONE,
 			m_name.empty() ? nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
@@ -266,7 +265,7 @@ bool Character_Impl::createBuffers()
 	for (auto& cbLinkedMatrices : m_cbLinkedMatrices)
 	{
 		cbLinkedMatrices = ConstantBuffer::MakeUnique(m_api);
-		N_RETURN(cbLinkedMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount), false);
+		N_RETURN(cbLinkedMatrices->Create(pDevice, sizeof(CBMatrices[FrameCount]), FrameCount), false);
 	}
 
 	return true;

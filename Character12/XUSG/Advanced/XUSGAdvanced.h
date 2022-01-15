@@ -65,12 +65,12 @@ namespace XUSG
 			Loader();
 			virtual ~Loader();
 
-			bool CreateTextureFromMemory(const Device* pDevice, CommandList* pCommandList, const uint8_t* ddsData,
+			bool CreateTextureFromMemory(CommandList* pCommandList, const uint8_t* ddsData,
 				size_t ddsDataSize, size_t maxsize, bool forceSRGB, Texture::sptr& texture, Resource* pUploader,
 				AlphaMode* alphaMode = nullptr, ResourceState state = ResourceState::COMMON,
 				MemoryFlag memoryFlags = MemoryFlag::NONE, API api = API::DIRECTX_12);
 
-			bool CreateTextureFromFile(const Device* pDevice, CommandList* pCommandList, const wchar_t* fileName,
+			bool CreateTextureFromFile(CommandList* pCommandList, const wchar_t* fileName,
 				size_t maxsize, bool forceSRGB, Texture::sptr& texture, Resource* pUploader,
 				AlphaMode* alphaMode = nullptr, ResourceState state = ResourceState::COMMON,
 				MemoryFlag memoryFlags = MemoryFlag::NONE, API api = API::DIRECTX_12);
@@ -250,9 +250,9 @@ namespace XUSG
 
 		virtual ~SDKMesh() {};
 
-		virtual bool Create(const Device::sptr& device, const wchar_t* fileName,
+		virtual bool Create(const Device* pDevice, const wchar_t* fileName,
 			const TextureCache& textureCache, bool isStaticMesh = false) = 0;
-		virtual bool Create(const Device::sptr& device, uint8_t* pData, const TextureCache& textureCache,
+		virtual bool Create(const Device* pDevice, uint8_t* pData, const TextureCache& textureCache,
 			size_t dataBytes, bool isStaticMesh = false, bool copyStatic = false) = 0;
 		virtual bool LoadAnimation(const wchar_t* fileName) = 0;
 		virtual void Destroy() = 0;
@@ -385,11 +385,11 @@ namespace XUSG
 			NUM_CBV_TABLE
 		};
 
-		//Model(const Device::sptr& device, const wchar_t* name);
+		//Model(const wchar_t* name);
 		virtual ~Model() {};
 
-		virtual bool Init(const InputLayout* pInputLayout, const SDKMesh::sptr& mesh,
-			const ShaderPool::sptr& shaderPool,
+		virtual bool Init(const Device* pDevice, const InputLayout* pInputLayout,
+			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache) = 0;
@@ -408,7 +408,7 @@ namespace XUSG
 		Model* AsModel();
 
 		static const InputLayout* CreateInputLayout(Graphics::PipelineCache* pPipelineCache);
-		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device::sptr& device, const std::wstring& meshFileName,
+		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device* pDevice, const std::wstring& meshFileName,
 			const TextureCache& textureCache, bool isStaticMesh, API api);
 
 		static constexpr uint8_t GetFrameCount() { return FrameCount; }
@@ -416,8 +416,8 @@ namespace XUSG
 		using uptr = std::unique_ptr<Model>;
 		using sptr = std::shared_ptr<Model>;
 
-		static uptr MakeUnique(const Device::sptr& device, const wchar_t* name, API api);
-		static sptr MakeShared(const Device::sptr& device, const wchar_t* name, API api);
+		static uptr MakeUnique(const wchar_t* name, API api);
+		static sptr MakeShared(const wchar_t* name, API api);
 
 	protected:
 		static const uint8_t FrameCount = FRAME_COUNT;
@@ -449,10 +449,10 @@ namespace XUSG
 			uint32_t		BoneIndex;
 		};
 
-		//Character(const Device::sptr& device, const wchar_t* name = nullptr, API api = API::DIRECTX_12);
+		//Character(const wchar_t* name = nullptr, API api = API::DIRECTX_12);
 		virtual ~Character() {};
 
-		virtual bool Init(const InputLayout* pInputLayout,
+		virtual bool Init(const Device* pDevice, const InputLayout* pInputLayout,
 			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
 			const Compute::PipelineCache::sptr& computePipelineCache,
@@ -476,7 +476,7 @@ namespace XUSG
 		virtual const DirectX::XMFLOAT4& GetPosition() const = 0;
 		virtual DirectX::FXMMATRIX GetWorldMatrix() const = 0;
 
-		static SDKMesh::sptr LoadSDKMesh(const Device::sptr& device, const std::wstring& meshFileName,
+		static SDKMesh::sptr LoadSDKMesh(const Device* pDevice, const std::wstring& meshFileName,
 			const std::wstring& animFileName, const TextureCache& textureCache,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
 			std::vector<SDKMesh::sptr>* pLinkedMeshes = nullptr, API api = API::DIRECTX_12);
@@ -484,8 +484,8 @@ namespace XUSG
 		using uptr = std::unique_ptr<Character>;
 		using sptr = std::shared_ptr<Character>;
 
-		static uptr MakeUnique(const Device::sptr& device, const wchar_t* name = nullptr, API api = API::DIRECTX_12);
-		static sptr MakeShared(const Device::sptr& device, const wchar_t* name = nullptr, API api = API::DIRECTX_12);
+		static uptr MakeUnique(const wchar_t* name = nullptr, API api = API::DIRECTX_12);
+		static sptr MakeShared(const wchar_t* name = nullptr, API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -505,7 +505,7 @@ namespace XUSG
 			IMMUATABLE = ALPHA_REF
 		};
 
-		//StaticModel(const Device::sptr& device, const wchar_t* name = nullptr);
+		//StaticModel(const wchar_t* name = nullptr);
 		virtual ~StaticModel() {};
 
 		virtual bool Init(CommandList* pCommandList, const InputLayout* pInputLayout,
@@ -523,14 +523,14 @@ namespace XUSG
 
 		virtual const SDKMesh::sptr& GetMesh() const = 0;
 
-		static SDKMesh::sptr LoadSDKMesh(const Device::sptr& device, const std::wstring& meshFileName,
+		static SDKMesh::sptr LoadSDKMesh(const Device* pDevice, const std::wstring& meshFileName,
 			const TextureCache& textureCache, API api = API::DIRECTX_12);
 
 		using uptr = std::unique_ptr<StaticModel>;
 		using sptr = std::shared_ptr<StaticModel>;
 
-		static uptr MakeUnique(const Device::sptr& device, const wchar_t* name = nullptr, API api = API::DIRECTX_12);
-		static sptr MakeShared(const Device::sptr& device, const wchar_t* name = nullptr, API api = API::DIRECTX_12);
+		static uptr MakeUnique(const wchar_t* name = nullptr, API api = API::DIRECTX_12);
+		static sptr MakeShared(const wchar_t* name = nullptr, API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -578,13 +578,12 @@ namespace XUSG
 	class DLL_INTERFACE Shadow
 	{
 	public:
-		//Shadow(const Device::sptr& device);
+		//Shadow();
 		virtual ~Shadow() {};
 
 		// This runs when the application is initialized.
-		virtual bool Init(float sceneMapSize, float shadowMapSize,
-			const DescriptorTableCache::sptr& descriptorTableCache,
-			uint8_t numCasLevels = NUM_CASCADE) = 0;
+		virtual bool Init(const Device* pDevice, float sceneMapSize, float shadowMapSize,
+			const DescriptorTableCache::sptr& descriptorTableCache, uint8_t numCasLevels = NUM_CASCADE) = 0;
 		virtual bool CreateDescriptorTables() = 0;
 		// This runs per frame. This data could be cached when the cameras do not move.
 		virtual void Update(uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
@@ -602,8 +601,8 @@ namespace XUSG
 		using uptr = std::unique_ptr<Shadow>;
 		using sptr = std::shared_ptr<Shadow>;
 
-		static uptr MakeUnique(const Device::sptr& device, API api = API::DIRECTX_12);
-		static sptr MakeShared(const Device::sptr& device, API api = API::DIRECTX_12);
+		static uptr MakeUnique(API api = API::DIRECTX_12);
+		static sptr MakeShared(API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -612,7 +611,7 @@ namespace XUSG
 	class DLL_INTERFACE Nature
 	{
 	public:
-		//Nature(const Device::sptr& device);
+		//Nature();
 		virtual ~Nature() {};
 
 		virtual bool Init(CommandList* pCommandList, const ShaderPool::sptr& shaderPool,
@@ -622,7 +621,7 @@ namespace XUSG
 			const std::wstring& skyTexture, std::vector<Resource::uptr>& uploaders,
 			bool renderWater, Format rtvFormat = Format::R11G11B10_FLOAT,
 			Format dsvFormat = Format::D24_UNORM_S8_UINT) = 0;
-		virtual bool CreateResources(const ShaderResource::sptr& sceneColor, const DepthStencil* pDepth) = 0;
+		virtual bool CreateResources(const Device* pDevice, const ShaderResource::sptr& sceneColor, const DepthStencil* pDepth) = 0;
 
 		virtual void Update(uint8_t frameIndex, DirectX::FXMMATRIX* pViewProj, DirectX::FXMMATRIX* pWorld = nullptr) = 0;
 		virtual void SetGlobalCBVTables(DescriptorTable cbvImmutable, DescriptorTable cbvPerFrameTable) = 0;
@@ -635,8 +634,8 @@ namespace XUSG
 		using uptr = std::unique_ptr<Nature>;
 		using sptr = std::shared_ptr<Nature>;
 
-		static uptr MakeUnique(const Device::sptr& device, API api = API::DIRECTX_12);
-		static sptr MakeShared(const Device::sptr& device, API api = API::DIRECTX_12);
+		static uptr MakeUnique(API api = API::DIRECTX_12);
+		static sptr MakeShared(API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -675,7 +674,7 @@ namespace XUSG
 #endif
 		};
 
-		//Scene(const Device::sptr& device);
+		//Scene();
 		virtual ~Scene() {};
 
 		virtual bool LoadAssets(void* pSceneReader, CommandList* pCommandList,
@@ -711,8 +710,8 @@ namespace XUSG
 		using uptr = std::unique_ptr<Scene>;
 		using sptr = std::shared_ptr<Scene>;
 
-		static uptr MakeUnique(const Device::sptr& device, API api = API::DIRECTX_12);
-		static sptr MakeShared(const Device::sptr& device, API api = API::DIRECTX_12);
+		static uptr MakeUnique(API api = API::DIRECTX_12);
+		static sptr MakeShared(API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -739,16 +738,16 @@ namespace XUSG
 			RESIZABLE_POOL
 		};
 
-		//Postprocess(const Device::sptr& device);
+		//Postprocess();
 		virtual ~Postprocess() {};
 
-		virtual bool Init(const ShaderPool::sptr& shaderPool,
+		virtual bool Init(const Device* pDevice, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
 			const Compute::PipelineCache::sptr& computePipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
 			Format hdrFormat, Format ldrFormat) = 0;
-		virtual bool ChangeWindowSize(const Texture* pReference) = 0;
+		virtual bool ChangeWindowSize(const Device* pDevice, const Texture* pReference) = 0;
 
 		virtual void Update(const DescriptorTable& cbvImmutable, const DescriptorTable& cbvPerFrameTable,
 			float timeStep) = 0;
@@ -768,8 +767,8 @@ namespace XUSG
 		using uptr = std::unique_ptr<Postprocess>;
 		using sptr = std::shared_ptr<Postprocess>;
 
-		static uptr MakeUnique(const Device::sptr& device, API api = API::DIRECTX_12);
-		static sptr MakeShared(const Device::sptr& device, API api = API::DIRECTX_12);
+		static uptr MakeUnique(API api = API::DIRECTX_12);
+		static sptr MakeShared(API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------

@@ -77,7 +77,7 @@ void CharacterX::LoadPipeline()
 		dxgiAdapter = nullptr;
 		ThrowIfFailed(factory->EnumAdapters1(i, &dxgiAdapter));
 
-		m_device = Device::MakeShared();
+		m_device = Device::MakeUnique();
 		hr = m_device->Create(dxgiAdapter.get(), D3D_FEATURE_LEVEL_11_0);
 	}
 
@@ -147,13 +147,13 @@ void CharacterX::LoadAssets()
 	{
 		m_pInputLayout = Character::CreateInputLayout(m_graphicsPipelineCache.get());
 		const auto textureCache = make_shared<TextureCache::element_type>();
-		const auto characterMesh = Character::LoadSDKMesh(m_device, L"Assets/Bright/Stars.sdkmesh",
+		const auto characterMesh = Character::LoadSDKMesh(m_device.get(), L"Assets/Bright/Stars.sdkmesh",
 			L"Assets/Bright/Stars.sdkmesh_anim", textureCache);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
-		m_character = Character::MakeUnique(m_device, L"Stars");
+		m_character = Character::MakeUnique(L"Stars");
 		if (!m_character) ThrowIfFailed(E_FAIL);
-		if (!m_character->Init(m_pInputLayout, characterMesh, m_shaderPool,
-			m_graphicsPipelineCache, m_computePipelineCache,
+		if (!m_character->Init(m_device.get(), m_pInputLayout, characterMesh,
+			m_shaderPool, m_graphicsPipelineCache, m_computePipelineCache,
 			m_pipelineLayoutCache, m_descriptorTableCache))
 			ThrowIfFailed(E_FAIL);
 	}

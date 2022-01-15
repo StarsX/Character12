@@ -14,12 +14,11 @@ namespace XUSG
 		public virtual Model_Impl
 	{
 	public:
-		Character_Impl(const Device::sptr& device, const wchar_t* name = nullptr, API api = API::DIRECTX_12);
+		Character_Impl(const wchar_t* name = nullptr, API api = API::DIRECTX_12);
 		virtual ~Character_Impl();
 
-		bool Init(const InputLayout* pInputLayout,
-			const SDKMesh::sptr& mesh,
-			const ShaderPool::sptr& shaderPool,
+		bool Init(const Device* pDevice, const InputLayout* pInputLayout,
+			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
 			const Compute::PipelineCache::sptr& computePipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
@@ -58,9 +57,9 @@ namespace XUSG
 #endif
 		};
 
-		bool createTransformedStates();
-		bool createTransformedVBs(VertexBuffer* pVertexBuffer);
-		bool createBuffers();
+		bool createTransformedStates(const Device* pDevice);
+		bool createTransformedVBs(const Device* pDevice, VertexBuffer* pVertexBuffer);
+		bool createBuffers(const Device* pDevice);
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);

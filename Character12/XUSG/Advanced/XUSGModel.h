@@ -12,10 +12,10 @@ namespace XUSG
 		public virtual Model
 	{
 	public:
-		Model_Impl(const Device::sptr& device, const wchar_t* name, API api);
+		Model_Impl(const wchar_t* name, API api);
 		virtual ~Model_Impl();
 
-		bool Init(const InputLayout* pInputLayout,
+		bool Init(const Device* pDevice, const InputLayout* pInputLayout,
 			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
@@ -42,7 +42,7 @@ namespace XUSG
 #endif
 		};
 
-		bool createConstantBuffers();
+		bool createConstantBuffers(const Device* pDevice);
 		bool createPipelines(bool isStatic, const InputLayout* pInputLayout, const Format* rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
 		bool createDescriptorTables();
@@ -52,7 +52,6 @@ namespace XUSG
 		Util::PipelineLayout::sptr initPipelineLayout(VertexShader vs, PixelShader ps);
 
 		API m_api;
-		Device::sptr m_device;
 		std::wstring m_name;
 
 		uint8_t		m_currentFrame;

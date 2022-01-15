@@ -118,9 +118,9 @@ namespace XUSG
 		SDKMesh_Impl(API api = API::DIRECTX_12);
 		virtual ~SDKMesh_Impl();
 
-		bool Create(const Device::sptr& device, const wchar_t* fileName,
+		bool Create(const Device* pDevice, const wchar_t* fileName,
 			const TextureCache& textureCache, bool isStaticMesh = false);
-		bool Create(const Device::sptr& device, uint8_t* pData, const TextureCache& textureCache,
+		bool Create(const Device* pDevice, uint8_t* pData, const TextureCache& textureCache,
 			size_t dataBytes, bool isStaticMesh = false, bool copyStatic = false);
 		bool LoadAnimation(const wchar_t* fileName);
 		void Destroy();
@@ -193,9 +193,9 @@ namespace XUSG
 		bool createVertexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders);
 		bool createIndexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders);
 
-		virtual bool createFromFile(const Device::sptr& device, const wchar_t* fileName,
+		virtual bool createFromFile(const Device* pDevice, const wchar_t* fileName,
 			const TextureCache& textureCache, bool isStaticMesh);
-		virtual bool createFromMemory(const Device::sptr& device, uint8_t* pData, const TextureCache& textureCache,
+		virtual bool createFromMemory(const Device* pDevice, uint8_t* pData, const TextureCache& textureCache,
 			size_t dataBytes, bool isStaticMesh, bool copyStatic);
 
 		void createAsStaticMesh();
@@ -251,7 +251,6 @@ namespace XUSG
 		std::vector<DirectX::XMFLOAT4X4> m_worldPoseFrameMatrices;
 
 	private:
-		Device::sptr m_device;
 		uint32_t m_numOutstandingResources;
 		bool m_isLoading;
 	};

@@ -12,14 +12,14 @@ using namespace XUSG::Graphics;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-Model::uptr Model::MakeUnique(const Device::sptr& device, const wchar_t* name, API api)
+Model::uptr Model::MakeUnique(const wchar_t* name, API api)
 {
-	return make_unique<Model_Impl>(device, name, api);
+	return make_unique<Model_Impl>(name, api);
 }
 
-Model::sptr Model::MakeShared(const Device::sptr& device, const wchar_t* name, API api)
+Model::sptr Model::MakeShared(const wchar_t* name, API api)
 {
-	return make_shared<Model_Impl>(device, name, api);
+	return make_shared<Model_Impl>(name, api);
 }
 
 Model* Model::AsModel()
@@ -47,12 +47,12 @@ const InputLayout* Model::CreateInputLayout(PipelineCache* pPipelineCache)
 	return pPipelineCache->CreateInputLayout(inputElements, static_cast<uint32_t>(size(inputElements)));
 }
 
-SDKMesh::sptr Model::LoadSDKMesh(const Device::sptr& device, const wstring& meshFileName,
+SDKMesh::sptr Model::LoadSDKMesh(const Device* pDevice, const wstring& meshFileName,
 	const TextureCache& textureCache, bool isStaticMesh, API api)
 {
 	// Load the mesh
 	const auto mesh = SDKMesh::MakeShared(api);
-	N_RETURN(mesh->Create(device, meshFileName.c_str(), textureCache, isStaticMesh), nullptr);
+	N_RETURN(mesh->Create(pDevice, meshFileName.c_str(), textureCache, isStaticMesh), nullptr);
 
 	return mesh;
 }
@@ -60,9 +60,8 @@ SDKMesh::sptr Model::LoadSDKMesh(const Device::sptr& device, const wstring& mesh
 //--------------------------------------------------------------------------------------
 // Model implementations
 //--------------------------------------------------------------------------------------
-Model_Impl::Model_Impl(const Device::sptr& device, const wchar_t* name, API api) :
+Model_Impl::Model_Impl(const wchar_t* name, API api) :
 	m_api(api),
-	m_device(device),
 	m_currentFrame(0),
 	m_variableSlot(VARIABLE_SLOT),
 	m_mesh(nullptr),
@@ -83,8 +82,9 @@ Model_Impl::~Model_Impl()
 {
 }
 
-bool Model_Impl::Init(const InputLayout* pInputLayout, const SDKMesh::sptr& mesh,
-	const ShaderPool::sptr& shaderPool, const PipelineCache::sptr& pipelineCache,
+bool Model_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
+	const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
+	const PipelineCache::sptr& pipelineCache,
 	const PipelineLayoutCache::sptr& pipelineLayoutCache,
 	const DescriptorTableCache::sptr& descriptorTableCache)
 {
@@ -98,7 +98,7 @@ bool Model_Impl::Init(const InputLayout* pInputLayout, const SDKMesh::sptr& mesh
 	m_mesh = mesh;
 
 	// Create buffers and descriptor tables
-	N_RETURN(createConstantBuffers(), false);
+	N_RETURN(createConstantBuffers(pDevice), false);
 	N_RETURN(createDescriptorTables(), false);
 
 	return true;
@@ -198,10 +198,10 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 	if (pCbvPerFrameTable) pCommandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
-bool Model_Impl::createConstantBuffers()
+bool Model_Impl::createConstantBuffers(const Device* pDevice)
 {
 	m_cbMatrices = ConstantBuffer::MakeUnique(m_api);
-	N_RETURN(m_cbMatrices->Create(m_device.get(), sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
+	N_RETURN(m_cbMatrices->Create(pDevice, sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
 		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 
 	// Initialize constant buffers
@@ -218,7 +218,7 @@ bool Model_Impl::createConstantBuffers()
 
 #if TEMPORAL_AA
 	m_cbTemporalBias = ConstantBuffer::MakeUnique(m_api);
-	N_RETURN(m_cbTemporalBias->Create(m_device.get(), sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
+	N_RETURN(m_cbTemporalBias->Create(pDevice, sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
 		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
 #endif
 

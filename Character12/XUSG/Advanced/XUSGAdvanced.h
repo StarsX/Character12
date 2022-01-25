@@ -33,9 +33,9 @@
 
 #define PIDIV4		0.785398163f
 
-static const float g_FOVAngleY = PIDIV4;
-static const float g_zNear = 1.0f;
-static const float g_zFar = 1000.0f;
+static const float	g_FOVAngleY = PIDIV4;
+static const float	g_zNear = 1.0f;
+static const float	g_zFar = 1000.0f;
 
 #endif
 
@@ -770,6 +770,14 @@ namespace XUSG
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
 	};
+
+	//--------------------------------------------------------------------------------------
+	// Halton sequence helpers
+	//--------------------------------------------------------------------------------------
+
+	DLL_INTERFACE float Halton(uint32_t i, uint32_t b);
+	DLL_INTERFACE DirectX::XMFLOAT2 Halton(uint32_t i);
+	DLL_INTERFACE const DirectX::XMFLOAT2& IncrementalHalton();
 
 	//--------------------------------------------------------------------------------------
 	// Intrinsic shader Ids

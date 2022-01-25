@@ -3,7 +3,6 @@
 //--------------------------------------------------------------------------------------
 
 #include "XUSGSDKMesh.h"
-#include "XUSGDDSLoader.h"
 #include "Core/XUSG_DX12.h"
 
 using namespace std;

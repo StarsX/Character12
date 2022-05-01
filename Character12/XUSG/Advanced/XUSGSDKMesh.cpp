@@ -621,6 +621,25 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 				}
 			}
 		}
+		if (pMaterials[m].SpecularTexture[0] == 0)
+		{
+			string specularTexture = pMaterials[m].AlbedoTexture;
+			const auto found = specularTexture.rfind('.');
+			if (found != string::npos) specularTexture.replace(found, 1, "S.");
+
+			filePath = m_filePath + specularTexture;
+			ifstream fileStream(filePath, ios::in | ios::binary);
+			if (fileStream)
+			{
+				fileStream.close();
+				memcpy(pMaterials[m].SpecularTexture, specularTexture.c_str(), specularTexture.length() + 1);
+			}
+			else
+			{
+				const char defaultSpecularTexture[] = "default-specularmap.dds";
+				memcpy(pMaterials[m].SpecularTexture, defaultSpecularTexture, sizeof(defaultSpecularTexture));
+			}
+		}
 		if (pMaterials[m].SpecularTexture[0] != 0)
 		{
 			filePath = m_filePath + pMaterials[m].SpecularTexture;
@@ -667,7 +686,7 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 
 	// Create a vertex Buffer
 	m_vertexBuffer = VertexBuffer::MakeShared(m_api);
-	N_RETURN(m_vertexBuffer->Create(pCommandList->GetDevice(), numVertices, stride, ResourceFlag::NONE,
+	XUSG_N_RETURN(m_vertexBuffer->Create(pCommandList->GetDevice(), numVertices, stride, ResourceFlag::NONE,
 		MemoryType::DEFAULT, m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr, MemoryFlag::NONE,
 		m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
@@ -703,7 +722,7 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 
 	// Create a index Buffer
 	m_indexBuffer = IndexBuffer::MakeShared(m_api);
-	N_RETURN(m_indexBuffer->Create(pCommandList->GetDevice(), byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
+	XUSG_N_RETURN(m_indexBuffer->Create(pCommandList->GetDevice(), byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
 		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE, MemoryType::DEFAULT,
 		m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1, nullptr, MemoryFlag::NONE,
 		m_name.empty() ? nullptr : (m_name + L".IndexBuffer").c_str()), false);
@@ -772,8 +791,8 @@ bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
 	const auto pCommandList = commandList.get();
 	if (pDevice)
 	{
-		N_RETURN(commandAllocator->Create(pDevice, CommandListType::DIRECT, (m_name + L".CommandAllocator").c_str()), false);
-		N_RETURN(pCommandList->Create(pDevice, 0, CommandListType::DIRECT, commandAllocator.get(),
+		XUSG_N_RETURN(commandAllocator->Create(pDevice, CommandListType::DIRECT, (m_name + L".CommandAllocator").c_str()), false);
+		XUSG_N_RETURN(pCommandList->Create(pDevice, 0, CommandListType::DIRECT, commandAllocator.get(),
 			nullptr, (m_name + L".CommandList").c_str()), false);
 	}
 
@@ -925,8 +944,8 @@ bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
 	classifyMaterialType();
 
 	//Create vertex Buffer and index buffer
-	N_RETURN(createVertexBuffer(pCommandList, uploaders), false);
-	N_RETURN(createIndexBuffer(pCommandList, uploaders), false);
+	XUSG_N_RETURN(createVertexBuffer(pCommandList, uploaders), false);
+	XUSG_N_RETURN(createIndexBuffer(pCommandList, uploaders), false);
 
 	// Execute commands
 	return executeCommandList(pCommandList);
@@ -1078,11 +1097,11 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 
 		// Create the command queue.
 		CommandQueue::uptr commandQueue = CommandQueue::MakeUnique(m_api);
-		N_RETURN(commandQueue->Create(pDevice, CommandListType::DIRECT, CommandQueueFlag::NONE,
+		XUSG_N_RETURN(commandQueue->Create(pDevice, CommandListType::DIRECT, CommandQueueFlag::NONE,
 			0, 0, (m_name + L".CommandQueue").c_str()), false);
 
 		// Close the command list and execute it to begin the initial GPU setup.
-		N_RETURN(pCommandList->Close(), false);
+		XUSG_N_RETURN(pCommandList->Close(), false);
 		commandQueue->ExecuteCommandList(pCommandList);
 
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
@@ -1090,7 +1109,7 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 			void* fenceEvent;
 			const auto fence = Fence::MakeUnique(m_api);
 			uint64_t fenceValue = 0;
-			N_RETURN(fence->Create(pDevice, fenceValue++, FenceFlag::NONE, (m_name + L".Fence").c_str()), false);
+			XUSG_N_RETURN(fence->Create(pDevice, fenceValue++, FenceFlag::NONE, (m_name + L".Fence").c_str()), false);
 
 			// Create an event handle to use for frame synchronization.
 			fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -1100,10 +1119,10 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 			// list in our main loop but for now, we just want to wait for setup to 
 			// complete before continuing.
 			// Schedule a Signal command in the queue.
-			N_RETURN(commandQueue->Signal(fence.get(), fenceValue), false);
+			XUSG_N_RETURN(commandQueue->Signal(fence.get(), fenceValue), false);
 
 			// Wait until the fence has been processed, and increment the fence value for the current frame.
-			N_RETURN(fence->SetEventOnCompletion(fenceValue++, fenceEvent), false);
+			XUSG_N_RETURN(fence->SetEventOnCompletion(fenceValue++, fenceEvent), false);
 			WaitForSingleObject(fenceEvent, INFINITE);
 		}
 	}

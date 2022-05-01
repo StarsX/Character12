@@ -35,13 +35,10 @@ const InputLayout* Model::CreateInputLayout(PipelineCache* pPipelineCache)
 	// Define vertex data layout for post-transformed objects
 	const InputElement inputElements[] =
 	{
-		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,						InputClassification::PER_VERTEX_DATA, 0 },
-		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
-#if HAS_TANGENTS
-		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
-		{ "BINORMAL",	0, Format::R16G16B16A16_FLOAT,	0, APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 }
-#endif
+		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,							InputClassification::PER_VERTEX_DATA, 0 },
+		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, XUSG_APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, XUSG_APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, XUSG_APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
 	};
 
 	return pPipelineCache->CreateInputLayout(inputElements, static_cast<uint32_t>(size(inputElements)));
@@ -52,7 +49,7 @@ SDKMesh::sptr Model::LoadSDKMesh(const Device* pDevice, const wstring& meshFileN
 {
 	// Load the mesh
 	const auto mesh = SDKMesh::MakeShared(api);
-	N_RETURN(mesh->Create(pDevice, meshFileName.c_str(), textureCache, isStaticMesh), nullptr);
+	XUSG_N_RETURN(mesh->Create(pDevice, meshFileName.c_str(), textureCache, isStaticMesh), nullptr);
 
 	return mesh;
 }
@@ -67,11 +64,11 @@ Model_Impl::Model_Impl(const wchar_t* name, API api) :
 	m_mesh(nullptr),
 	m_shaderPool(nullptr),
 	m_graphicsPipelineCache(nullptr),
+	m_pipelineLayoutCache(nullptr),
 	m_descriptorTableCache(nullptr),
 	m_pipelineLayouts(),
 	m_pipelines(),
 	m_cbvTables(),
-	m_samplerTable(nullptr),
 	m_srvTables(0)
 {
 	if (name) m_name = name;
@@ -86,8 +83,11 @@ bool Model_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
 	const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 	const PipelineCache::sptr& pipelineCache,
 	const PipelineLayoutCache::sptr& pipelineLayoutCache,
-	const DescriptorTableCache::sptr& descriptorTableCache)
+	const DescriptorTableCache::sptr& descriptorTableCache,
+	bool twoSidedAll)
 {
+	m_twoSidedAll = twoSidedAll;
+
 	// Set shader pool and states
 	m_shaderPool = shaderPool;
 	m_graphicsPipelineCache = pipelineCache;
@@ -98,8 +98,8 @@ bool Model_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
 	m_mesh = mesh;
 
 	// Create buffers and descriptor tables
-	N_RETURN(createConstantBuffers(pDevice), false);
-	N_RETURN(createDescriptorTables(), false);
+	XUSG_N_RETURN(createConstantBuffers(pDevice), false);
+	XUSG_N_RETURN(createDescriptorTables(), false);
 
 	return true;
 }
@@ -117,7 +117,7 @@ void Model_Impl::SetMatrices(CXMMATRIX world, bool isTemporal)
 	XMStoreFloat3x4(&pCBData->World, world); // XMStoreFloat3x4 includes transpose.
 	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 	if (isTemporal)
 	{
 		pCBData->WorldPrev = m_world;
@@ -126,7 +126,7 @@ void Model_Impl::SetMatrices(CXMMATRIX world, bool isTemporal)
 #endif
 }
 
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 void Model_Impl::SetTemporalBias(const XMFLOAT2& temporalBias)
 {
 	const auto pCBData = reinterpret_cast<XMFLOAT2*>(m_cbTemporalBias->Map(m_currentFrame));
@@ -137,8 +137,6 @@ void Model_Impl::SetTemporalBias(const XMFLOAT2& temporalBias)
 void Model_Impl::SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout)
 {
 	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
-	if (layout != DEPTH_PASS)
-		pCommandList->SetGraphicsDescriptorTable(m_variableSlot + SAMPLERS_OFFSET, m_samplerTable);
 }
 
 void Model_Impl::SetPipeline(const CommandList* pCommandList, PipelineIndex pipeline)
@@ -154,13 +152,15 @@ void Model_Impl::SetPipeline(const CommandList* pCommandList, SubsetFlags subset
 	switch (subsetFlags)
 	{
 	case SUBSET_ALPHA_TEST:
-		SetPipeline(pCommandList, layout ? DEPTH_TWO_SIDED : OPAQUE_TWO_SIDED);
+		SetPipeline(pCommandList, layout ? DEPTH_ALPHA_TWO_SIDED : ALPHA_TEST_TWO_SIDED);
 		break;
 	case SUBSET_ALPHA:
 		SetPipeline(pCommandList, ALPHA_TWO_SIDED);
 		break;
 	default:
-		SetPipeline(pCommandList, layout ? DEPTH_FRONT : OPAQUE_FRONT);
+		SetPipeline(pCommandList, layout ?
+			(m_twoSidedAll ? DEPTH_TWO_SIDED : DEPTH_FRONT) :
+			(m_twoSidedAll ? OPAQUE_TWO_SIDED : OPAQUE_FRONT));
 	}
 }
 
@@ -169,17 +169,12 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 {
 	if (pCbvPerFrameTable)
 	{
-		const DescriptorPool descriptorPools[] =
-		{
-			m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
-			m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
-		};
-		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		const auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
+		pCommandList->SetDescriptorPools(1, &descriptorPool);
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
 		pCommandList->SetGraphicsDescriptorTable(PER_FRAME, *pCbvPerFrameTable);
-		pCommandList->SetGraphicsDescriptorTable(m_variableSlot + SAMPLERS_OFFSET, m_samplerTable);
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 		pCommandList->SetGraphicsDescriptorTable(TEMPORAL_BIAS, m_cbvTables[m_currentFrame][CBV_LOCAL_TEMPORAL_BIAS]);
 #endif
 	}
@@ -198,10 +193,15 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 	if (pCbvPerFrameTable) pCommandList->IASetVertexBuffers(0, 1, nullptr);
 }
 
+bool Model_Impl::IsTwoSidedAll() const
+{
+	return m_twoSidedAll;
+}
+
 bool Model_Impl::createConstantBuffers(const Device* pDevice)
 {
 	m_cbMatrices = ConstantBuffer::MakeUnique(m_api);
-	N_RETURN(m_cbMatrices->Create(pDevice, sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
+	XUSG_N_RETURN(m_cbMatrices->Create(pDevice, sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
 		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 
 	// Initialize constant buffers
@@ -211,69 +211,69 @@ bool Model_Impl::createConstantBuffers(const Device* pDevice)
 		const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices->Map(i));
 		XMStoreFloat3x4(&pCBData->World, identity);
 		XMStoreFloat3x4(&pCBData->WorldIT, identity);
-#if TEMPORAL
+#if XUSG_TEMPORAL
 		XMStoreFloat3x4(&pCBData->WorldPrev, identity);
 #endif
 	}
 
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 	m_cbTemporalBias = ConstantBuffer::MakeUnique(m_api);
-	N_RETURN(m_cbTemporalBias->Create(pDevice, sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
+	XUSG_N_RETURN(m_cbTemporalBias->Create(pDevice, sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
 		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
 #endif
 
 	return true;
 }
 
-bool Model_Impl::createPipelines(bool isStatic, const InputLayout* pInputLayout, const Format* rtvFormats,
-	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
+bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats, uint32_t numRTVs,
+	Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual)
 {
 	const auto defaultRtvFormat = Format::B8G8R8A8_UNORM;
 	numRTVs = numRTVs > 0 ? numRTVs : 1;
 	rtvFormats = rtvFormats ? rtvFormats : &defaultRtvFormat;
 	dsvFormat = dsvFormat != Format::UNKNOWN ? dsvFormat : Format::D24_UNORM_S8_UINT;
-	shadowFormat = shadowFormat != Format::UNKNOWN ? shadowFormat : Format::D16_UNORM;
+	shadowFormat = shadowFormat != Format::UNKNOWN ? shadowFormat : Format::D24_UNORM_S8_UINT;
 
 	const auto state = Graphics::State::MakeUnique(m_api);
 
 	// Base pass
 	{
 		const auto vsBasePass = isStatic ? VS_BASE_PASS_STATIC : VS_BASE_PASS;
-		const auto psBasePass = isStatic ? PS_BASE_PASS_STATIC : PS_BASE_PASS;
-		const auto psAlphaTest = isStatic ? PS_ALPHA_TEST_STATIC : PS_ALPHA_TEST;
 
 		// Get opaque pipelines
 		state->IASetInputLayout(pInputLayout);
 		state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
 		state->SetPipelineLayout(m_pipelineLayouts[BASE_PASS]);
 		state->SetShader(Shader::Stage::VS, m_shaderPool->GetShader(Shader::Stage::VS, vsBasePass));
-		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psBasePass));
+		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, PS_BASE_PASS));
+		state->DSSetState(useZEqual ? Graphics::DepthStencilPreset::DEPTH_READ_EQUAL :
+			Graphics::DepthStencilPreset::DEFAULT_LESS, m_graphicsPipelineCache.get());
 		state->OMSetRTVFormats(rtvFormats, numRTVs);
 		state->OMSetDSVFormat(dsvFormat);
-		X_RETURN(m_pipelines[OPAQUE_FRONT], state->GetPipeline(m_graphicsPipelineCache.get(),
+		XUSG_X_RETURN(m_pipelines[OPAQUE_FRONT], state->GetPipeline(m_graphicsPipelineCache.get(),
 			m_name.empty() ? nullptr : (m_name + L".OpaqueFront").c_str()), false);
 
-		state->DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_EQUAL, m_graphicsPipelineCache.get());
-		X_RETURN(m_pipelines[OPAQUE_FRONT_EQUAL], state->GetPipeline(m_graphicsPipelineCache.get(),
-			m_name.empty() ? nullptr : (m_name + L".OpaqueFrontZEqual").c_str()), false);
-
-		// Get transparent pipeline
+		// Get opaque two-sided pipelines
 		state->RSSetState(Graphics::RasterizerPreset::CULL_NONE, m_graphicsPipelineCache.get());
-		state->DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS, m_graphicsPipelineCache.get());
-		state->OMSetBlendState(Graphics::BlendPreset::AUTO_NON_PREMUL, m_graphicsPipelineCache.get());
-		X_RETURN(m_pipelines[ALPHA_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
-			m_name.empty() ? nullptr : (m_name + L".AlphaTwoSided").c_str()), false);
-
-		// Get alpha-test pipelines
-		state->SetShader(Shader::Stage::PS, m_shaderPool->GetShader(Shader::Stage::PS, psAlphaTest));
-		state->DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, m_graphicsPipelineCache.get());
-		state->OMSetBlendState(Graphics::DEFAULT_OPAQUE, m_graphicsPipelineCache.get());
-		X_RETURN(m_pipelines[OPAQUE_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
+		XUSG_X_RETURN(m_pipelines[OPAQUE_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
 			m_name.empty() ? nullptr : (m_name + L".OpaqueTwoSided").c_str()), false);
 
-		state->DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_EQUAL, m_graphicsPipelineCache.get());
-		X_RETURN(m_pipelines[OPAQUE_TWO_SIDED_EQUAL], state->GetPipeline(m_graphicsPipelineCache.get(),
-			m_name.empty() ? nullptr : (m_name + L".OpaqueTwoSidedZEqual").c_str()), false);
+		// Get transparent pipeline
+		state->DSSetState(Graphics::DepthStencilPreset::DEPTH_READ_LESS, m_graphicsPipelineCache.get());
+		state->OMSetBlendState(Graphics::BlendPreset::AUTO_NON_PREMUL, m_graphicsPipelineCache.get());
+		XUSG_X_RETURN(m_pipelines[ALPHA_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
+			m_name.empty() ? nullptr : (m_name + L".AlphaTwoSided").c_str()), false);
+
+		const auto psAlphaTest = m_shaderPool->GetShader(Shader::Stage::PS, PS_ALPHA_TEST);
+		if (psAlphaTest)
+		{
+			// Get alpha-test two-sided pipelines
+			state->SetShader(Shader::Stage::PS, psAlphaTest);
+			state->DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, m_graphicsPipelineCache.get());
+			state->OMSetBlendState(Graphics::BlendPreset::DEFAULT_OPAQUE, m_graphicsPipelineCache.get());
+			XUSG_X_RETURN(m_pipelines[ALPHA_TEST_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
+				m_name.empty() ? nullptr : (m_name + L".AlphaTestTwoSided").c_str()), false);
+		}
 	}
 
 	// Depth and shadow passes
@@ -298,15 +298,19 @@ bool Model_Impl::createPipelines(bool isStatic, const InputLayout* pInputLayout,
 			state->SetPipelineLayout(m_pipelineLayouts[DEPTH_PASS]);
 			state->SetShader(Shader::Stage::VS, vsDepth);
 			state->SetShader(Shader::Stage::PS, nullptr);
-			X_RETURN(m_pipelines[DEPTH_FRONT], state->GetPipeline(m_graphicsPipelineCache.get(),
+			XUSG_X_RETURN(m_pipelines[DEPTH_FRONT], state->GetPipeline(m_graphicsPipelineCache.get(),
 				m_name.empty() ? nullptr : (m_name + L".DepthFront").c_str()), false);
+
+			// Get depth two-sided opaque pipeline
+			state->RSSetState(Graphics::RasterizerPreset::CULL_NONE, m_graphicsPipelineCache.get());
+			XUSG_X_RETURN(m_pipelines[DEPTH_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
+				m_name.empty() ? nullptr : (m_name + L".DepthTwoSided").c_str()), false);
 
 			// Get depth alpha-test pipeline
 			state->SetPipelineLayout(m_pipelineLayouts[DEPTH_ALPHA_PASS]);
 			state->SetShader(Shader::Stage::PS, psDepth);
-			state->RSSetState(Graphics::RasterizerPreset::CULL_NONE, m_graphicsPipelineCache.get());
-			X_RETURN(m_pipelines[DEPTH_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
-				m_name.empty() ? nullptr : (m_name + L".DepthTwoSided").c_str()), false);
+			XUSG_X_RETURN(m_pipelines[DEPTH_ALPHA_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
+				m_name.empty() ? nullptr : (m_name + L".DepthAlpha").c_str()), false);
 		}
 
 		if (vsShadow)
@@ -316,22 +320,22 @@ bool Model_Impl::createPipelines(bool isStatic, const InputLayout* pInputLayout,
 			state->SetShader(Shader::Stage::VS, vsShadow);
 			state->SetShader(Shader::Stage::PS, nullptr);
 			state->OMSetDSVFormat(shadowFormat);
-			X_RETURN(m_pipelines[SHADOW_FRONT], state->GetPipeline(m_graphicsPipelineCache.get(),
+			XUSG_X_RETURN(m_pipelines[SHADOW_FRONT], state->GetPipeline(m_graphicsPipelineCache.get(),
 				m_name.empty() ? nullptr : (m_name + L".ShadowFront").c_str()), false);
+
+			// Get shadow two-sided opaque pipeline
+			state->RSSetState(Graphics::RasterizerPreset::CULL_NONE, m_graphicsPipelineCache.get());
+			XUSG_X_RETURN(m_pipelines[SHADOW_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
+				m_name.empty() ? nullptr : (m_name + L".ShadowTwoSided").c_str()), false);
 
 			// Get shadow alpha-test pipeline
 			state->SetPipelineLayout(m_pipelineLayouts[DEPTH_ALPHA_PASS]);
 			state->SetShader(Shader::Stage::PS, psDepth);
 			state->RSSetState(Graphics::RasterizerPreset::CULL_NONE, m_graphicsPipelineCache.get());
-			X_RETURN(m_pipelines[SHADOW_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
-				m_name.empty() ? nullptr : (m_name + L".ShadowTwoSided").c_str()), false);
+			XUSG_X_RETURN(m_pipelines[SHADOW_ALPHA_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
+				m_name.empty() ? nullptr : (m_name + L".ShadowAlpha").c_str()), false);
 		}
 	}
-
-	// Get reflected pipeline
-	//state->RSSetState(Graphics::RasterizerPreset::CULL_FRONT, m_pipelineCache.get());
-	//state->OMSetBlendState(Graphics::BlendPreset::DEFAULT_OPAQUE, m_pipelineCache.get());
-	//m_pipelines[REFLECTED] = state->GetPipeline(m_pipelineCache.get());
 
 	return true;
 }
@@ -343,22 +347,17 @@ bool Model_Impl::createDescriptorTables()
 		{
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 			descriptorTable->SetDescriptors(0, 1, &m_cbMatrices->GetCBV(i));
-			X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			XUSG_X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
 
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 		{
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 			descriptorTable->SetDescriptors(0, 1, &m_cbTemporalBias->GetCBV(i));
-			X_RETURN(m_cbvTables[i][CBV_LOCAL_TEMPORAL_BIAS], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			XUSG_X_RETURN(m_cbvTables[i][CBV_LOCAL_TEMPORAL_BIAS], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
 #endif
 	}
-
-	const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-	const SamplerPreset samplers[] = { ANISOTROPIC_WRAP, POINT_WRAP, LINEAR_LESS_EQUAL };
-	descriptorTable->SetSamplers(0, static_cast<uint32_t>(size(samplers)), samplers, m_descriptorTableCache.get());
-	X_RETURN(m_samplerTable, descriptorTable->GetSamplerTable(m_descriptorTableCache.get()), false);
 
 	// Materials
 	const auto numMaterials = m_mesh->GetNumMaterials();
@@ -367,12 +366,17 @@ bool Model_Impl::createDescriptorTables()
 	{
 		const auto pMaterial = m_mesh->GetMaterial(m);
 
-		if (pMaterial && pMaterial->pAlbedo && pMaterial->pNormal)
+		if (pMaterial && pMaterial->pAlbedo && pMaterial->pNormal && pMaterial->pSpecular)
 		{
 			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-			const Descriptor descriptors[] = { pMaterial->pAlbedo->GetSRV(), pMaterial->pNormal->GetSRV() };
+			const Descriptor descriptors[] =
+			{
+				pMaterial->pAlbedo->GetSRV(),
+				pMaterial->pNormal->GetSRV(),
+				pMaterial->pSpecular->GetSRV()
+			};
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-			X_RETURN(m_srvTables[m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			XUSG_X_RETURN(m_srvTables[m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 		}
 		else m_srvTables[m] = nullptr;
 	}
@@ -414,16 +418,17 @@ void Model_Impl::render(const CommandList* pCommandList, uint32_t mesh, Pipeline
 
 Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, PixelShader ps)
 {
+	auto perFrameStage = Shader::Stage::VS;
 	auto cbMatrices = 0u;
 	auto cbPerFrame = cbMatrices + 1;
 	auto cbPerObject = cbPerFrame + 1;
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 	auto cbTempBias = cbPerObject + 1;
 #endif
-	auto txDiffuse = 0u;
-	auto txNormal = txDiffuse + 1;
+	auto txBaseColor = 0u;
+	auto txNormal = txBaseColor + 1;
+	auto txSpecular = txNormal + 1;
 	auto smpAnisoWrap = 0u;
-	auto smpLinearCmp = smpAnisoWrap + 2;
 
 	// Get vertex shader slots
 	auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, vs);
@@ -432,7 +437,7 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 		// Get constant buffer slots
 		cbMatrices = reflector->GetResourceBindingPointByName("cbMatrices", cbMatrices);
 		cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame", cbPerFrame);
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 		cbTempBias = reflector->GetResourceBindingPointByName("cbTempBias", cbTempBias);
 #endif
 	}
@@ -447,14 +452,16 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 			// Get constant buffer slots
 			cbImmutable = reflector->GetResourceBindingPointByName("cbImmutable");
 			cbPerObject = reflector->GetResourceBindingPointByName("cbPerObject", cbPerObject);
+			const auto bindPoint = reflector->GetResourceBindingPointByName("cbPerFrame");
+			if (bindPoint != UINT32_MAX && cbPerFrame == bindPoint) perFrameStage = Shader::Stage::ALL;
 
 			// Get shader resource slots
-			txDiffuse = reflector->GetResourceBindingPointByName("g_txAlbedo", txDiffuse);
+			txBaseColor = reflector->GetResourceBindingPointByName("g_txBaseColor", txBaseColor);
 			txNormal = reflector->GetResourceBindingPointByName("g_txNormal", txNormal);
+			txSpecular = reflector->GetResourceBindingPointByName("g_txSpecular", txSpecular);
 			
 			// Get sampler slots
 			smpAnisoWrap = reflector->GetResourceBindingPointByName("g_smpLinear", smpAnisoWrap);
-			smpLinearCmp = reflector->GetResourceBindingPointByName("g_smpCmpLinear", smpLinearCmp);
 		}
 	}
 
@@ -466,9 +473,9 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 	utilPipelineLayout->SetShaderStage(MATRICES, Shader::Stage::VS);
 
 	utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, 0, DescriptorFlag::DATA_STATIC);
-	utilPipelineLayout->SetShaderStage(PER_FRAME, Shader::Stage::VS);
+	utilPipelineLayout->SetShaderStage(PER_FRAME, perFrameStage);
 
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 	utilPipelineLayout->SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias, 0, DescriptorFlag::DATA_STATIC);
 	utilPipelineLayout->SetShaderStage(TEMPORAL_BIAS, Shader::Stage::VS);
 #endif
@@ -485,20 +492,28 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 
 		// Textures (material)
 		const uint8_t materialSlot = m_variableSlot + MATERIAL_OFFSET;
-		utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV, 1, txDiffuse, 0, DescriptorFlag::DATA_STATIC);
-		if (ps != PS_DEPTH) utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV,
-			1, txNormal, 0, DescriptorFlag::DATA_STATIC);
+		utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV, 1, txBaseColor, 0, DescriptorFlag::DATA_STATIC);
+		if (ps != PS_DEPTH)
+		{
+			utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV,
+				1, txNormal, 0, DescriptorFlag::DATA_STATIC);
+			utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV,
+				1, txSpecular, 0, DescriptorFlag::DATA_STATIC);
+		}
 		utilPipelineLayout->SetShaderStage(materialSlot, Shader::Stage::PS);
 
 		if (ps == PS_DEPTH)
 			utilPipelineLayout->SetConstants(m_variableSlot + ALPHA_REF_OFFSET,
-				SizeOfInUint32(XMFLOAT2), cbPerObject, 0, Shader::Stage::PS);
+				XUSG_SizeOfInUint32(XMFLOAT2), cbPerObject, 0, Shader::Stage::PS);
 
 		// Samplers
-		const uint8_t samplerSlot = m_variableSlot + SAMPLERS_OFFSET;
-		utilPipelineLayout->SetRange(samplerSlot, DescriptorType::SAMPLER, 2, smpAnisoWrap);
-		if (ps != PS_DEPTH) utilPipelineLayout->SetRange(samplerSlot, DescriptorType::SAMPLER, 1, smpLinearCmp);
-		utilPipelineLayout->SetShaderStage(samplerSlot, Shader::Stage::PS);
+		const Sampler samplers[] =
+		{
+			m_descriptorTableCache->GetSampler(ANISOTROPIC_WRAP),
+			m_descriptorTableCache->GetSampler(POINT_WRAP)
+		};
+		utilPipelineLayout->SetStaticSamplers(samplers, static_cast<uint32_t>(size(samplers)),
+			smpAnisoWrap, 0, Shader::Stage::PS);
 	}
 
 	return utilPipelineLayout;

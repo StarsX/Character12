@@ -10,21 +10,19 @@ struct VS_Input
 	float3		Pos		: POSITION;		// Position
 	float3		Norm	: NORMAL;		// Normal
 	min16float2	UV		: TEXCOORD;		// Texture coordinate
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	float3		Tan		: TANGENT;		// Normalized Tangent vector
-	float3		BiNorm	: BINORMAL;		// Normalized BiNormal vector
 #endif
 };
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 struct Vertex
 {
 	float3	Pos;	// Position
 	uint2	Norm;	// Normal
 	uint	UV;		// Texture coordinate
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	uint2	Tan;	// Normalized Tangent vector
-	uint2	BiNorm;	// Normalized BiNormal vector
 #endif
 };
 #endif
@@ -36,19 +34,19 @@ cbuffer cbMatrices : register (b0)
 {
 	float4x3 g_world;
 	float3x3 g_worldIT;
-#if TEMPORAL
+#if XUSG_TEMPORAL
 	float4x3 g_previousWorld;
 #endif
 };
 
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 cbuffer cbTemporalBias	: register (b3)
 {
 	float2	g_projBias;
 };
 #endif
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 //--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
@@ -64,7 +62,7 @@ VS_Output main(uint vid : SV_VertexID, VS_Input input)
 	VS_Output output;
 	float4 pos = { input.Pos, 1.0 };
 
-#if defined(_BASEPASS_) && TEMPORAL	// Temporal tracking
+#if defined(_BASEPASS_) && XUSG_TEMPORAL // Temporal tracking
 
 #ifdef _CHARACTER_
 	float4 hPos = { g_roVertices[vid].Pos, 1.0 };
@@ -84,10 +82,10 @@ VS_Output main(uint vid : SV_VertexID, VS_Input input)
 
 	pos.xyz = mul(pos, g_world);
 	output.Pos = mul(pos, g_viewProj);
-#if defined(_BASEPASS_) && TEMPORAL
+#if defined(_BASEPASS_) && XUSG_TEMPORAL
 	output.CSPos = output.Pos;
 #endif
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 	output.Pos.xy += g_projBias * output.Pos.w;
 #endif
 
@@ -99,9 +97,8 @@ VS_Output main(uint vid : SV_VertexID, VS_Input input)
 	output.Norm = min16float3(normalize(mul(input.Norm, g_worldIT)));
 #endif
 
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	output.Tangent = min16float3(normalize(mul(input.Tan, (float3x3)g_world)));
-	output.BiNorm = min16float3(normalize(mul(input.BiNorm, (float3x3)g_world)));
 #endif
 
 	output.UV = input.UV;

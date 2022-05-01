@@ -26,7 +26,8 @@ namespace XUSG
 			const std::shared_ptr<std::vector<SDKMesh>>& linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
-			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN);
+			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
+			bool twoSidedAll = false, bool useZEqual = true);
 		void InitPosition(const DirectX::XMFLOAT4& posRot);
 		void Update(uint8_t frameIndex, double time);
 		void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true);
@@ -52,9 +53,7 @@ namespace XUSG
 		{
 			DirectX::XMFLOAT3	Pos;
 			DirectX::XMUINT3	NormTex;
-#if HAS_TANGENTS
-			DirectX::XMUINT4	TanBiNrm;
-#endif
+			DirectX::XMUINT2	Tangent;
 		};
 
 		bool createTransformedStates(const Device* pDevice);
@@ -62,7 +61,7 @@ namespace XUSG
 		bool createBuffers(const Device* pDevice);
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
-			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
+			uint32_t numRTVs, Format dsvFormat, Format shadowFormat, bool useZEqual);
 		bool createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world, bool isTemporal);
 		void skinning(const CommandList* pCommandList, bool reset);
@@ -89,7 +88,7 @@ namespace XUSG
 		Pipeline		m_skinningPipeline;
 		std::vector<DescriptorTable> m_srvSkinningTables[FrameCount];
 		std::vector<DescriptorTable> m_uavSkinningTables[FrameCount];
-#if TEMPORAL
+#if XUSG_TEMPORAL
 		std::vector<DescriptorTable> m_srvSkinnedTables[FrameCount];
 
 		std::vector<DirectX::XMFLOAT3X4> m_linkedWorlds;

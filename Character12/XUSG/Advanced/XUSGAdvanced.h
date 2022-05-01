@@ -15,27 +15,27 @@
 #ifndef _XUSG_SHARED_CONST_H_
 #define _XUSG_SHARED_CONST_H_
 
-#ifndef FRAME_COUNT
-#define FRAME_COUNT	3
+#ifndef XUSG_FRAME_COUNT
+#define XUSG_FRAME_COUNT	3
 #endif
 
-#ifndef TEMPORAL_AA
-#define TEMPORAL_AA	1
+#ifndef XUSG_TEMPORAL_AA
+#define XUSG_TEMPORAL_AA	1
 #endif
 
-#ifndef TEMPORAL
-#define TEMPORAL	TEMPORAL_AA
+#ifndef XUSG_TEMPORAL
+#define XUSG_TEMPORAL		XUSG_TEMPORAL_AA
 #endif
 
-#ifndef NUM_CASCADE
-#define NUM_CASCADE	3
+#ifndef XUSG_NUM_CASCADE
+#define XUSG_NUM_CASCADE	3
 #endif
 
-#define PIDIV4		0.785398163f
+#define XUSG_PIDIV4			0.785398163f
 
-static const float	g_FOVAngleY = PIDIV4;
-static const float	g_zNear = 1.0f;
-static const float	g_zFar = 1000.0f;
+static const float	XUSG_FOVAngleY = XUSG_PIDIV4;
+static const float	XUSG_zNear = 1.0f;
+static const float	XUSG_zFar = 1000.0f;
 
 #endif
 
@@ -59,7 +59,7 @@ namespace XUSG
 			ALPHA_MODE_CUSTOM
 		};
 
-		class DLL_INTERFACE Loader
+		class XUSG_INTERFACE Loader
 		{
 		public:
 			Loader();
@@ -92,7 +92,7 @@ namespace XUSG
 		NUM_SUBSET_TYPE = 2
 	};
 
-	DEFINE_ENUM_FLAG_OPERATORS(SubsetFlags);
+	XUSG_DEF_ENUM_FLAG_OPERATORS(SubsetFlags);
 
 	struct TextureCacheEntry
 	{
@@ -101,7 +101,7 @@ namespace XUSG
 	};
 	using TextureCache = std::shared_ptr<std::map<std::string, TextureCacheEntry>>;
 
-	class DLL_INTERFACE SDKMesh
+	class XUSG_INTERFACE SDKMesh
 	{
 	public:
 		static const uint32_t MAX_VERTEX_STREAMS	= 16;
@@ -329,7 +329,7 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Model base
 	//--------------------------------------------------------------------------------------
-	class DLL_INTERFACE Model
+	class XUSG_INTERFACE Model
 	{
 	public:
 		enum PipelineLayoutIndex : uint8_t
@@ -344,15 +344,15 @@ namespace XUSG
 		enum PipelineIndex : uint8_t
 		{
 			OPAQUE_FRONT,
-			OPAQUE_FRONT_EQUAL,
 			OPAQUE_TWO_SIDED,
-			OPAQUE_TWO_SIDED_EQUAL,
 			ALPHA_TWO_SIDED,
+			ALPHA_TEST_TWO_SIDED,
 			DEPTH_FRONT,
 			DEPTH_TWO_SIDED,
+			DEPTH_ALPHA_TWO_SIDED,
 			SHADOW_FRONT,
 			SHADOW_TWO_SIDED,
-			REFLECTED,
+			SHADOW_ALPHA_TWO_SIDED,
 
 			NUM_PIPELINE
 		};
@@ -361,7 +361,7 @@ namespace XUSG
 		{
 			MATRICES,
 			PER_FRAME,
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 			TEMPORAL_BIAS,
 #endif
 			VARIABLE_SLOT
@@ -369,7 +369,6 @@ namespace XUSG
 
 		enum DescriptorTableSlotOffset : uint8_t
 		{
-			SAMPLERS_OFFSET,
 			MATERIAL_OFFSET,
 			ALPHA_REF_OFFSET,
 			IMMUTABLE_OFFSET = ALPHA_REF_OFFSET
@@ -378,7 +377,7 @@ namespace XUSG
 		enum CBVTableIndex : uint8_t
 		{
 			CBV_MATRICES,
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 			CBV_LOCAL_TEMPORAL_BIAS,
 #endif
 
@@ -392,10 +391,11 @@ namespace XUSG
 			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache) = 0;
+			const DescriptorTableCache::sptr& descriptorTableCache,
+			bool twoSidedAll) = 0;
 		virtual void Update(uint8_t frameIndex) = 0;
 		virtual void SetMatrices(DirectX::CXMMATRIX world, bool isTemporal = true) = 0;
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 		virtual void SetTemporalBias(const DirectX::XMFLOAT2& temporalBias) = 0;
 #endif
 		virtual void SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout) = 0;
@@ -404,6 +404,8 @@ namespace XUSG
 		virtual void Render(const CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
 			PipelineLayoutIndex layout = NUM_PIPELINE_LAYOUT, const DescriptorTable* pCbvPerFrameTable = nullptr,
 			uint32_t numInstances = 1) = 0;
+
+		virtual bool IsTwoSidedAll() const = 0;
 
 		Model* AsModel();
 
@@ -420,24 +422,23 @@ namespace XUSG
 		static sptr MakeShared(const wchar_t* name, API api);
 
 	protected:
-		static const uint8_t FrameCount = FRAME_COUNT;
+		static const uint8_t FrameCount = XUSG_FRAME_COUNT;
 	};
 
 	//--------------------------------------------------------------------------------------
 	// Character model
 	//--------------------------------------------------------------------------------------
-	class DLL_INTERFACE Character :
+	class XUSG_INTERFACE Character :
 		public virtual Model
 	{
 	public:
 		enum DescriptorTableSlot : uint8_t
 		{
-			SAMPLERS = VARIABLE_SLOT,
-			MATERIAL,
+			MATERIAL = VARIABLE_SLOT,
 			ALPHA_REF,
 			SHADOW_MAP,
 			IMMUTABLE = ALPHA_REF,
-#if TEMPORAL
+#if XUSG_TEMPORAL
 			HISTORY = ALPHA_REF
 #endif
 		};
@@ -461,7 +462,8 @@ namespace XUSG
 			const std::shared_ptr<std::vector<SDKMesh>>& linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
-			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN) = 0;
+			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
+			bool twoSidedAll = false, bool useZEqual = true) = 0;
 		virtual void InitPosition(const DirectX::XMFLOAT4& posRot) = 0;
 		virtual void Update(uint8_t frameIndex, double time) = 0;
 		virtual void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true) = 0;
@@ -491,14 +493,13 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Static model
 	//--------------------------------------------------------------------------------------
-	class DLL_INTERFACE StaticModel :
+	class XUSG_INTERFACE StaticModel :
 		public virtual Model
 	{
 	public:
 		enum DescriptorTableSlot : uint8_t
 		{
 			PER_OBJECT = VARIABLE_SLOT,
-			SAMPLERS,
 			MATERIAL,
 			ALPHA_REF,
 			SHADOW_MAP,
@@ -513,9 +514,10 @@ namespace XUSG
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
-			std::vector<Resource::uptr>& uploaders, const Format* rtvFormats = nullptr,
-			uint32_t numRTVs = 0, Format dsvFormat = Format::UNKNOWN,
-			Format shadowFormat = Format::UNKNOWN) = 0;
+			std::vector<Resource::uptr>& uploaders,
+			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
+			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
+			bool twoSidedAll = false, bool useZEqual = true) = 0;
 		virtual void Update(uint8_t frameIndex, DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true) = 0;
 		virtual void Render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
@@ -538,7 +540,7 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	class OctNode;
 	using Octree = std::unique_ptr<OctNode>;
-	class DLL_INTERFACE OctNode
+	class XUSG_INTERFACE OctNode
 	{
 	public:
 		enum Visibility : uint8_t
@@ -575,7 +577,7 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Shadow
 	//--------------------------------------------------------------------------------------
-	class DLL_INTERFACE Shadow
+	class XUSG_INTERFACE Shadow
 	{
 	public:
 		//Shadow();
@@ -583,7 +585,9 @@ namespace XUSG
 
 		// This runs when the application is initialized.
 		virtual bool Init(const Device* pDevice, float sceneMapSize, float shadowMapSize,
-			const DescriptorTableCache::sptr& descriptorTableCache, uint8_t numCasLevels = NUM_CASCADE) = 0;
+			const DescriptorTableCache::sptr& descriptorTableCache,
+			Format format = Format::D24_UNORM_S8_UINT,
+			uint8_t numCasLevels = XUSG_NUM_CASCADE) = 0;
 		virtual bool CreateDescriptorTables() = 0;
 		// This runs per frame. This data could be cached when the cameras do not move.
 		virtual void Update(uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
@@ -593,7 +597,7 @@ namespace XUSG
 		virtual void GetShadowMatrices(DirectX::XMMATRIX* pShadows) const = 0;
 
 		virtual const DepthStencil::uptr& GetShadowMap() const = 0;
-		virtual const DescriptorTable& GetShadowTable() const = 0;
+		virtual const DescriptorTable& GetShadowDescriptorTable() const = 0;
 		virtual const Framebuffer& GetFramebuffer() const = 0;
 		virtual DirectX::FXMMATRIX GetShadowMatrix(uint8_t i) const = 0;
 		virtual DirectX::FXMMATRIX GetShadowViewMatrix() const = 0;
@@ -606,9 +610,38 @@ namespace XUSG
 	};
 
 	//--------------------------------------------------------------------------------------
+	// Spherical harmonics
+	//--------------------------------------------------------------------------------------
+	class XUSG_INTERFACE SphericalHarmonics
+	{
+	public:
+		//SphericalHarmonics();
+		virtual ~SphericalHarmonics() {}
+
+		virtual bool Init(const Device* pDevice, const ShaderPool::sptr& shaderPool,
+			const Compute::PipelineCache::sptr& computePipelineCache,
+			const PipelineLayoutCache::sptr& pipelineLayoutCache,
+			const DescriptorTableCache::sptr& descriptorTableCache,
+			uint8_t baseCSIndex, uint8_t descriptorPoolIndex) = 0;
+
+		virtual void Transform(CommandList* pCommandList, Resource* pRadiance,
+			const DescriptorTable& srvTable, uint8_t order = 3) = 0;
+
+		virtual StructuredBuffer::sptr GetSHCoefficients() const = 0;
+
+		virtual const DescriptorTable& GetSHCoeffSRVTable() const = 0;
+
+		using uptr = std::unique_ptr<SphericalHarmonics>;
+		using sptr = std::shared_ptr<SphericalHarmonics>;
+
+		static uptr MakeUnique(API api = API::DIRECTX_12);
+		static sptr MakeShared(API api = API::DIRECTX_12);
+	};
+
+	//--------------------------------------------------------------------------------------
 	// Nature objects 
 	//--------------------------------------------------------------------------------------
-	class DLL_INTERFACE Nature
+	class XUSG_INTERFACE Nature
 	{
 	public:
 		//Nature();
@@ -616,12 +649,14 @@ namespace XUSG
 
 		virtual bool Init(CommandList* pCommandList, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
+			const Compute::PipelineCache::sptr& computePipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
 			const std::wstring& skyTexture, std::vector<Resource::uptr>& uploaders,
 			bool renderWater, Format rtvFormat = Format::R11G11B10_FLOAT,
 			Format dsvFormat = Format::D24_UNORM_S8_UINT) = 0;
-		virtual bool CreateResources(const Device* pDevice, const ShaderResource::sptr& sceneColor, const DepthStencil* pDepth) = 0;
+		virtual bool CreateResources(const Device* pDevice, const ShaderResource::sptr& sceneColor,
+			const DepthStencil* pDepth, bool renderWater) = 0;
 
 		virtual void Update(uint8_t frameIndex, DirectX::FXMMATRIX* pViewProj, DirectX::FXMMATRIX* pWorld = nullptr) = 0;
 		virtual void SetGlobalCBVTables(DescriptorTable cbvImmutable, DescriptorTable cbvPerFrameTable) = 0;
@@ -630,6 +665,7 @@ namespace XUSG
 			uint32_t& numBarriers, ResourceBarrier* pBarriers, bool reset = false) = 0;
 
 		virtual Descriptor GetSkySRV() const = 0;
+		virtual DescriptorTable GetSHCoeffSRVTable(CommandList* pCommandList) = 0;
 
 		using uptr = std::unique_ptr<Nature>;
 		using sptr = std::shared_ptr<Nature>;
@@ -641,7 +677,7 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Scene
 	//--------------------------------------------------------------------------------------
-	class DLL_INTERFACE Scene
+	class XUSG_INTERFACE Scene
 	{
 	public:
 		enum GBufferIndex : uint8_t
@@ -649,7 +685,7 @@ namespace XUSG
 			ALBEDO_IDX,
 			NORMAL_IDX,
 			RGHMTL_IDX,
-#if TEMPORAL
+#if XUSG_TEMPORAL
 			MOTION_IDX,
 #endif
 			AO_IDX,
@@ -663,12 +699,12 @@ namespace XUSG
 		{
 			CBV_IMMUTABLE,
 			CBV_PER_FRAME_VS,
-			CBV_PER_FRAME_PS = CBV_PER_FRAME_VS + FRAME_COUNT,	// Window size dependent
-#if TEMPORAL_AA
-			CBV_TEMPORAL_BIAS0 = CBV_PER_FRAME_PS + FRAME_COUNT,
+			CBV_PER_FRAME_PS = CBV_PER_FRAME_VS + XUSG_FRAME_COUNT,	// Window size dependent
+#if XUSG_TEMPORAL_AA
+			CBV_TEMPORAL_BIAS0 = CBV_PER_FRAME_PS + XUSG_FRAME_COUNT,
 			CBV_TEMPORAL_BIAS,
 
-			NUM_CBV_TABLE = CBV_TEMPORAL_BIAS + FRAME_COUNT
+			NUM_CBV_TABLE = CBV_TEMPORAL_BIAS + XUSG_FRAME_COUNT
 #else
 			NUM_CBV_TABLE = CBV_PER_FRAME_PS + FrameCount
 #endif
@@ -683,7 +719,8 @@ namespace XUSG
 			const Compute::PipelineCache::sptr& computePipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
-			std::vector<Resource::uptr>& uploaders, Format rtvFormat, Format dsvFormat,
+			std::vector<Resource::uptr>& uploaders, Format rtvFormat,
+			Format dsvFormat, Format shadowFormat = Format::D24_UNORM_S8_UINT,
 			bool useIBL = false) = 0;
 		virtual bool ChangeWindowSize(CommandList* pCommandList,
 			std::vector<Resource::uptr>& uploaders,
@@ -717,7 +754,7 @@ namespace XUSG
 	//--------------------------------------------------------------------------------------
 	// Postprocess
 	//--------------------------------------------------------------------------------------
-	class DLL_INTERFACE Postprocess
+	class XUSG_INTERFACE Postprocess
 	{
 	public:
 		enum PipelineIndex : uint8_t
@@ -754,7 +791,8 @@ namespace XUSG
 		virtual void Render(CommandList* pCommandList, RenderTarget* pDst, Texture* pSrc,
 			const DescriptorTable& srvTable, bool clearRT = false) = 0;
 		virtual void ScreenRender(const CommandList* pCommandList, PipelineIndex pipelineIndex,
-			const DescriptorTable& srvTable, bool hasPerFrameCB, bool hasSampler, bool reset = false) = 0;
+			const DescriptorTable& srvTable, bool hasImmutableCB, bool hasPerFrameCB,
+			bool reset = false) = 0;
 		virtual void LumAdaption(const CommandList* pCommandList, const DescriptorTable& uavSrvTable, bool reset = false) = 0;
 		virtual void Antialias(CommandList* pCommandList, RenderTarget** ppDsts, Texture** ppSrcs,
 			const DescriptorTable& srvTable, uint8_t numRTVs, uint8_t numSRVs, bool reset = false) = 0;
@@ -775,9 +813,9 @@ namespace XUSG
 	// Halton sequence helpers
 	//--------------------------------------------------------------------------------------
 
-	DLL_INTERFACE float Halton(uint32_t i, uint32_t b);
-	DLL_INTERFACE DirectX::XMFLOAT2 Halton(uint32_t i);
-	DLL_INTERFACE const DirectX::XMFLOAT2& IncrementalHalton();
+	XUSG_INTERFACE float Halton(uint32_t i, uint32_t b);
+	XUSG_INTERFACE DirectX::XMFLOAT2 Halton(uint32_t i);
+	XUSG_INTERFACE const DirectX::XMFLOAT2& IncrementalHalton();
 
 	//--------------------------------------------------------------------------------------
 	// Intrinsic shader Ids
@@ -806,10 +844,8 @@ namespace XUSG
 		PS_AMBIENT_OCCLUSION,
 
 		PS_BASE_PASS,
-		PS_BASE_PASS_STATIC,
 		PS_DEPTH,
 		PS_ALPHA_TEST,
-		PS_ALPHA_TEST_STATIC,
 
 		PS_SKYDOME,
 		PS_SS_REFLECT,
@@ -819,7 +855,6 @@ namespace XUSG
 		PS_POST_PROC,
 		PS_TONE_MAP,
 		PS_TEMPORAL_AA,
-		PS_FXAA,
 
 		PS_NULL_INDEX
 	};
@@ -828,6 +863,9 @@ namespace XUSG
 	enum ComputeShader : uint8_t
 	{
 		CS_SKINNING,
+		CS_SH_CUBE_MAP,
+		CS_SH_SUM,
+		CS_SH_NORMALIZE,
 		CS_RESAMPLE,
 		CS_LUM_ADAPT
 	};

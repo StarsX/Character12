@@ -15,9 +15,8 @@ struct VS_Input
 	uint4	Bones	: BONES;		// Bone indices
 	float3	Norm	: NORMAL;		// Normal
 	uint	UV		: TEXCOORD;		// Texture coordinate
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	float3	Tan		: TANGENT;		// Normalized Tangent vector
-	float3	BiNorm	: BINORMAL;		// Normalized BiNormal vector
 #endif
 };
 
@@ -41,9 +40,8 @@ struct SkinnedInfo
 	float3	Pos;
 	float3	Norm;
 	uint	UV;
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	float3	Tan;
-	float3	BiNorm;
 #endif
 };
 
@@ -102,9 +100,8 @@ SkinnedInfo SkinVert(VS_Input input)
 	// fast dqs 
 	dualQ /= length(rotQ);
 	float3 normal = input.Norm / scale;
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	float3 tangent = input.Tan * scale;
-	float3 binorm = input.BiNorm * scale;
 #endif
 	float3 pos = input.Pos * scale;
 	pos = RotateWithDQ(pos, dualQ);
@@ -112,9 +109,8 @@ SkinnedInfo SkinVert(VS_Input input)
 
 	output.Pos = pos;
 	output.Norm = RotateWithDQ(normal, dualQ);
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	output.Tan = RotateWithDQ(tangent, dualQ);
-	output.BiNorm = RotateWithDQ(binorm, dualQ);
 #endif
 	output.UV = input.UV;
 

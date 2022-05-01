@@ -31,7 +31,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device* pDevice, const wstring& meshF
 {
 	// Load the animated mesh
 	const auto mesh = Model::LoadSDKMesh(pDevice, meshFileName, textureCache, false, api);
-	N_RETURN(mesh->LoadAnimation(animFileName.c_str()), nullptr);
+	XUSG_N_RETURN(mesh->LoadAnimation(animFileName.c_str()), nullptr);
 	mesh->TransformBindPose(XMMatrixIdentity());
 
 	// Fix the frame name to avoid space
@@ -54,7 +54,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device* pDevice, const wstring& meshF
 			auto& meshInfo = meshLinks->at(m);
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
 			linkedMeshes->at(m) = SDKMesh::MakeShared(api);
-			N_RETURN(linkedMeshes->at(m)->Create(pDevice, meshInfo.MeshName.c_str(),
+			XUSG_N_RETURN(linkedMeshes->at(m)->Create(pDevice, meshInfo.MeshName.c_str(),
 				textureCache), nullptr);
 		}
 	}
@@ -72,7 +72,7 @@ Character_Impl::Character_Impl(const wchar_t* name, API api) :
 	m_skinningPipeline(nullptr),
 	m_srvSkinningTables(),
 	m_uavSkinningTables(),
-#if TEMPORAL
+#if XUSG_TEMPORAL
 	m_srvSkinnedTables(),
 	//m_linkedWorld,
 #endif
@@ -95,7 +95,8 @@ bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout
 	const shared_ptr<vector<SDKMesh>>& linkedMeshes,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
 	const Format* rtvFormats, uint32_t numRTVs,
-	Format dsvFormat, Format shadowFormat)
+	Format dsvFormat, Format shadowFormat,
+	bool twoSidedAll, bool useZEqual)
 {
 	m_computePipelineCache = computePipelineCache;
 
@@ -104,19 +105,20 @@ bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout
 	m_linkedMeshes = linkedMeshes;
 
 	// Get SDKMesh
-	N_RETURN(Model_Impl::Init(pDevice, pInputLayout, mesh, shaderPool, graphicsPipelineCache,
-		pipelineLayoutCache, descriptorTableCache), false);
+	XUSG_N_RETURN(Model_Impl::Init(pDevice, pInputLayout, mesh, shaderPool, graphicsPipelineCache,
+		pipelineLayoutCache, descriptorTableCache, twoSidedAll), false);
 
 	// Create buffers
-	N_RETURN(createBuffers(pDevice), false);
+	XUSG_N_RETURN(createBuffers(pDevice), false);
 
 	// Create VBs that will hold all of the skinned vertices that need to be transformed output
-	N_RETURN(createTransformedStates(pDevice), false);
+	XUSG_N_RETURN(createTransformedStates(pDevice), false);
 
 	// Create pipeline layout, pipelines, and descriptor tables
-	N_RETURN(createPipelineLayouts(), false);
-	N_RETURN(createPipelines(pInputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat), false);
-	N_RETURN(createDescriptorTables(), false);
+	XUSG_N_RETURN(createPipelineLayouts(), false);
+	XUSG_N_RETURN(createPipelines(pInputLayout, rtvFormats,
+		numRTVs, dsvFormat, shadowFormat, useZEqual), false);
+	XUSG_N_RETURN(createDescriptorTables(), false);
 
 	return true;
 }
@@ -212,7 +214,7 @@ bool Character_Impl::createTransformedStates(const Device* pDevice)
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_transformedVBs[i] = VertexBuffer::MakeUnique(m_api);
-		N_RETURN(createTransformedVBs(pDevice, m_transformedVBs[i].get()), false);
+		XUSG_N_RETURN(createTransformedVBs(pDevice, m_transformedVBs[i].get()), false);
 	}
 
 	return true;
@@ -231,7 +233,7 @@ bool Character_Impl::createTransformedVBs(const Device* pDevice, VertexBuffer* p
 		numVertices += static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
 	}
 
-	N_RETURN(pVertexBuffer->Create(pDevice, numVertices, sizeof(Vertex),
+	XUSG_N_RETURN(pVertexBuffer->Create(pDevice, numVertices, sizeof(Vertex),
 		ResourceFlag::ALLOW_UNORDERED_ACCESS, MemoryType::DEFAULT,
 		numMeshes, firstVertices.data(), numMeshes, firstVertices.data(),
 		numMeshes, firstVertices.data(),MemoryFlag::NONE, m_name.empty() ?
@@ -255,7 +257,7 @@ bool Character_Impl::createBuffers(const Device* pDevice)
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		m_boneWorlds[i] = StructuredBuffer::MakeUnique(m_api);
-		N_RETURN(m_boneWorlds[i]->Create(pDevice, numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
+		XUSG_N_RETURN(m_boneWorlds[i]->Create(pDevice, numElements, sizeof(XMFLOAT3X4), ResourceFlag::NONE,
 			MemoryType::UPLOAD, numMeshes, firstElements.data(), 1, nullptr, MemoryFlag::NONE,
 			m_name.empty() ? nullptr : (m_name + L".BoneWorld" + to_wstring(i)).c_str()), false);
 	}
@@ -265,7 +267,7 @@ bool Character_Impl::createBuffers(const Device* pDevice)
 	for (auto& cbLinkedMatrices : m_cbLinkedMatrices)
 	{
 		cbLinkedMatrices = ConstantBuffer::MakeUnique(m_api);
-		N_RETURN(cbLinkedMatrices->Create(pDevice, sizeof(CBMatrices[FrameCount]), FrameCount), false);
+		XUSG_N_RETURN(cbLinkedMatrices->Create(pDevice, sizeof(CBMatrices[FrameCount]), FrameCount), false);
 	}
 
 	return true;
@@ -303,14 +305,14 @@ bool Character_Impl::createPipelineLayouts()
 		utilPipelineLayout->SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
-		X_RETURN(m_skinningPipelineLayout, utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_skinningPipelineLayout, utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str()), false);
 	}
 
 	// Base pass
 	{
 		auto cbPerFrame = 1u;
-#if TEMPORAL
+#if XUSG_TEMPORAL
 		auto roVertices = 0u;
 
 		// Get vertex shader slots
@@ -322,12 +324,12 @@ bool Character_Impl::createPipelineLayouts()
 
 		const auto utilPipelineLayout = initPipelineLayout(VS_BASE_PASS, PS_BASE_PASS);
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 		utilPipelineLayout->SetRange(HISTORY, DescriptorType::SRV, 1, roVertices);
 		utilPipelineLayout->SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
 
-		X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str()), false);
 	}
@@ -336,7 +338,7 @@ bool Character_Impl::createPipelineLayouts()
 	{
 		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_NULL_INDEX);
 
-		X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str()), false);
 	}
@@ -345,7 +347,7 @@ bool Character_Impl::createPipelineLayouts()
 	{
 		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
 
-		X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthAlphaPassLayout").c_str()), false);
 	}
@@ -354,19 +356,20 @@ bool Character_Impl::createPipelineLayouts()
 }
 
 bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
-	uint32_t numRTVs, Format dsvFormat, Format shadowFormat)
+	uint32_t numRTVs, Format dsvFormat, Format shadowFormat, bool useZEqual)
 {
 	// Skinning
 	{
 		const auto state = Compute::State::MakeUnique(m_api);
 		state->SetPipelineLayout(m_skinningPipelineLayout);
 		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
-		X_RETURN(m_skinningPipeline, state->GetPipeline(m_computePipelineCache.get(),
+		XUSG_X_RETURN(m_skinningPipeline, state->GetPipeline(m_computePipelineCache.get(),
 			m_name.empty() ? nullptr : (m_name + L".SkinningPipe").c_str()), false);
 	}
 
 	// Rendering
-	return Model_Impl::createPipelines(false, pInputLayout, rtvFormats, numRTVs, dsvFormat, shadowFormat);
+	return Model_Impl::createPipelines(pInputLayout, rtvFormats,
+		numRTVs, dsvFormat, shadowFormat, false, useZEqual);
 }
 
 bool Character_Impl::createDescriptorTables()
@@ -377,7 +380,7 @@ bool Character_Impl::createDescriptorTables()
 	{
 		m_srvSkinningTables[i].resize(numMeshes);
 		m_uavSkinningTables[i].resize(numMeshes);
-#if TEMPORAL
+#if XUSG_TEMPORAL
 		m_srvSkinnedTables[i].resize(numMeshes);
 #endif
 
@@ -387,20 +390,20 @@ bool Character_Impl::createDescriptorTables()
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				const Descriptor descriptors[] = { m_boneWorlds[i]->GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
 				descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-				X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+				XUSG_X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 
 			{
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetUAV(m));
-				X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+				XUSG_X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 			{
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetSRV(m));
-				X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+				XUSG_X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
 			}
 #endif
 		}
@@ -420,7 +423,7 @@ void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX world, bool isTe
 	XMStoreFloat3x4(&pCBData->World, linkedWorld); // XMStoreFloat3x4 includes transpose.
 	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, linkedWorld)));
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 	if (isTemporal)
 	{
 		pCBData->WorldPrev = m_linkedWorlds[mesh];
@@ -454,7 +457,7 @@ void Character_Impl::skinning(const CommandList* pCommandList, bool reset)
 
 		// Skinning
 		const auto numVertices = static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
-		pCommandList->Dispatch(DIV_UP(numVertices, 64), 1, 1);
+		pCommandList->Dispatch(XUSG_DIV_UP(numVertices, 64), 1, 1);
 	}
 }
 
@@ -463,16 +466,11 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 {
 	if (pCbvPerFrameTable)
 	{
-		const DescriptorPool descriptorPools[] =
-		{
-			m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL),
-			m_descriptorTableCache->GetDescriptorPool(SAMPLER_POOL)
-		};
-		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
+		const auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
+		pCommandList->SetDescriptorPools(1, &descriptorPool);
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
-		pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
 		pCommandList->SetGraphicsDescriptorTable(PER_FRAME, *pCbvPerFrameTable);
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 		pCommandList->SetGraphicsDescriptorTable(TEMPORAL_BIAS, m_cbvTables[m_currentFrame][CBV_LOCAL_TEMPORAL_BIAS]);
 #endif
 	}
@@ -485,9 +483,6 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 	const auto numMeshes = m_mesh->GetNumMeshes();
 	for (const auto& subsetMask : subsetMasks)
 	{
-		//if (pCbvPerFrameTable && subsetMask != SUBSET_OPAQUE)
-			//pCommandList->SetGraphicsDescriptorTable(SAMPLERS, m_samplerTable);
-
 		if (subsetFlags & subsetMask)
 		{
 			for (auto m = 0u; m < numMeshes; ++m)
@@ -495,7 +490,7 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 				// Set IA parameters
 				pCommandList->IASetVertexBuffers(0, 1, &m_transformedVBs[m_currentFrame]->GetVBV(m));
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 				// Set historical motion states, if neccessary
 				if (layout == BASE_PASS)
 					pCommandList->SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);

@@ -88,12 +88,12 @@ void CharacterX::LoadPipeline()
 
 	// Create the command queue.
 	m_commandQueue = CommandQueue::MakeUnique();
-	N_RETURN(m_commandQueue->Create(m_device.get(), CommandListType::DIRECT, CommandQueueFlag::NONE,
+	XUSG_N_RETURN(m_commandQueue->Create(m_device.get(), CommandListType::DIRECT, CommandQueueFlag::NONE,
 		0, 0, L"CommandQueue"), ThrowIfFailed(E_FAIL));
 
 	// Describe and create the swap chain.
 	m_swapChain = SwapChain::MakeUnique();
-	N_RETURN(m_swapChain->Create(factory.get(), Win32Application::GetHwnd(), m_commandQueue.get(),
+	XUSG_N_RETURN(m_swapChain->Create(factory.get(), Win32Application::GetHwnd(), m_commandQueue.get(),
 		FrameCount, m_width, m_height, Format::B8G8R8A8_UNORM), ThrowIfFailed(E_FAIL));
 
 	// This sample does not support fullscreen transitions.
@@ -108,16 +108,16 @@ void CharacterX::LoadPipeline()
 	for (uint8_t n = 0; n < FrameCount; ++n)
 	{
 		m_renderTargets[n] = RenderTarget::MakeUnique();
-		N_RETURN(m_renderTargets[n]->CreateFromSwapChain(m_device.get(), m_swapChain.get(), n), ThrowIfFailed(E_FAIL));
+		XUSG_N_RETURN(m_renderTargets[n]->CreateFromSwapChain(m_device.get(), m_swapChain.get(), n), ThrowIfFailed(E_FAIL));
 
 		m_commandAllocators[n] = CommandAllocator::MakeUnique();
-		N_RETURN(m_commandAllocators[n]->Create(m_device.get(), CommandListType::DIRECT,
+		XUSG_N_RETURN(m_commandAllocators[n]->Create(m_device.get(), CommandListType::DIRECT,
 			(L"CommandAllocator" + to_wstring(n)).c_str()), ThrowIfFailed(E_FAIL));
 	}
 
 	// Create a DSV
 	m_depth = DepthStencil::MakeUnique();
-	N_RETURN(m_depth->Create(m_device.get(), m_width, m_height, Format::D24_UNORM_S8_UINT,
+	XUSG_N_RETURN(m_depth->Create(m_device.get(), m_width, m_height, Format::D24_UNORM_S8_UINT,
 		ResourceFlag::DENY_SHADER_RESOURCE), ThrowIfFailed(E_FAIL));
 }
 
@@ -140,7 +140,7 @@ void CharacterX::LoadAssets()
 	// Create the command list.
 	m_commandList = CommandList::MakeUnique();
 	const auto pCommandList = m_commandList.get();
-	N_RETURN(pCommandList->Create(m_device.get(), 0, CommandListType::DIRECT,
+	XUSG_N_RETURN(pCommandList->Create(m_device.get(), 0, CommandListType::DIRECT,
 		m_commandAllocators[m_frameIndex].get(), nullptr), ThrowIfFailed(E_FAIL));
 
 	// Load character asset
@@ -154,24 +154,25 @@ void CharacterX::LoadAssets()
 		if (!m_character) ThrowIfFailed(E_FAIL);
 		if (!m_character->Init(m_device.get(), m_pInputLayout, characterMesh,
 			m_shaderPool, m_graphicsPipelineCache, m_computePipelineCache,
-			m_pipelineLayoutCache, m_descriptorTableCache))
+			m_pipelineLayoutCache, m_descriptorTableCache, nullptr, nullptr,
+			nullptr, 0, Format::UNKNOWN, Format::UNKNOWN, false, false))
 			ThrowIfFailed(E_FAIL);
 	}
 
 	// Create per-frame constant buffer
 	m_cbPerFrame = ConstantBuffer::MakeUnique();
-	N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(XMFLOAT4X4[FrameCount]), FrameCount,
+	XUSG_N_RETURN(m_cbPerFrame->Create(m_device.get(), sizeof(XMFLOAT4X4[FrameCount]), FrameCount,
 		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"CBPerFrame"), ThrowIfFailed(E_FAIL));
 
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_cbPerFrame->GetCBV(i));
-		X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), ThrowIfFailed(E_FAIL));
+		XUSG_X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), ThrowIfFailed(E_FAIL));
 	}
 
 	// Close the command list and execute it to begin the initial GPU setup.
-	N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
 	m_commandQueue->ExecuteCommandList(pCommandList);
 
 	// Create synchronization objects and wait until assets have been uploaded to the GPU.
@@ -179,7 +180,7 @@ void CharacterX::LoadAssets()
 		if (!m_fence)
 		{
 			m_fence = Fence::MakeUnique();
-			N_RETURN(m_fence->Create(m_device.get(), m_fenceValues[m_frameIndex]++, FenceFlag::NONE, L"Fence"), ThrowIfFailed(E_FAIL));
+			XUSG_N_RETURN(m_fence->Create(m_device.get(), m_fenceValues[m_frameIndex]++, FenceFlag::NONE, L"Fence"), ThrowIfFailed(E_FAIL));
 		}
 
 		// Create an event handle to use for frame synchronization.
@@ -195,7 +196,7 @@ void CharacterX::LoadAssets()
 	// Projection
 	{
 		const auto aspectRatio = m_width / static_cast<float>(m_height);
-		const auto proj = XMMatrixPerspectiveFovLH(g_FOVAngleY, aspectRatio, g_zNear, g_zFar);
+		const auto proj = XMMatrixPerspectiveFovLH(XUSG_FOVAngleY, aspectRatio, XUSG_zNear, XUSG_zFar);
 		XMStoreFloat4x4(&m_proj, proj);
 	}
 
@@ -246,7 +247,7 @@ void CharacterX::OnRender()
 	m_commandQueue->ExecuteCommandList(m_commandList.get());
 
 	// Present the frame.
-	N_RETURN(m_swapChain->Present(0, 0), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(m_swapChain->Present(0, 0), ThrowIfFailed(E_FAIL));
 
 	MoveToNextFrame();
 }
@@ -339,13 +340,13 @@ void CharacterX::PopulateCommandList()
 	// command lists have finished execution on the GPU; apps should use 
 	// fences to determine GPU execution progress.
 	const auto pCommandAllocator = m_commandAllocators[m_frameIndex].get();
-	N_RETURN(pCommandAllocator->Reset(), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(pCommandAllocator->Reset(), ThrowIfFailed(E_FAIL));
 
 	// However, when ExecuteCommandList() is called on a particular command 
 	// list, that command list can then be reset at any time and must be before 
 	// re-recording.
 	const auto pCommandList = m_commandList.get();
-	N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
 
 	// Skinning
 	auto numBarriers = 0u;
@@ -374,17 +375,17 @@ void CharacterX::PopulateCommandList()
 	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::PRESENT);
 	pCommandList->Barrier(numBarriers, barriers);
 
-	N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
 }
 
 // Wait for pending GPU work to complete.
 void CharacterX::WaitForGpu()
 {
 	// Schedule a Signal command in the queue.
-	N_RETURN(m_commandQueue->Signal(m_fence.get(), m_fenceValues[m_frameIndex]), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(m_commandQueue->Signal(m_fence.get(), m_fenceValues[m_frameIndex]), ThrowIfFailed(E_FAIL));
 
 	// Wait until the fence has been processed, and increment the fence value for the current frame.
-	N_RETURN(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex]++, m_fenceEvent), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex]++, m_fenceEvent), ThrowIfFailed(E_FAIL));
 	WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 }
 
@@ -393,7 +394,7 @@ void CharacterX::MoveToNextFrame()
 {
 	// Schedule a Signal command in the queue.
 	const auto currentFenceValue = m_fenceValues[m_frameIndex];
-	N_RETURN(m_commandQueue->Signal(m_fence.get(), currentFenceValue), ThrowIfFailed(E_FAIL));
+	XUSG_N_RETURN(m_commandQueue->Signal(m_fence.get(), currentFenceValue), ThrowIfFailed(E_FAIL));
 
 	// Update the frame index.
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
@@ -401,7 +402,7 @@ void CharacterX::MoveToNextFrame()
 	// If the next frame is not ready to be rendered yet, wait until it is ready.
 	if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex])
 	{
-		N_RETURN(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent), ThrowIfFailed(E_FAIL));
+		XUSG_N_RETURN(m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent), ThrowIfFailed(E_FAIL));
 		WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 	}
 

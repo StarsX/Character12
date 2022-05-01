@@ -19,10 +19,11 @@ namespace XUSG
 			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
 			const Graphics::PipelineCache::sptr& pipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache);
+			const DescriptorTableCache::sptr& descriptorTableCache,
+			bool twoSidedAll);
 		void Update(uint8_t frameIndex);
 		void SetMatrices(DirectX::CXMMATRIX world, bool isTemporal = true);
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 		void SetTemporalBias(const DirectX::XMFLOAT2& temporalBias);
 #endif
 		void SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout);
@@ -32,19 +33,21 @@ namespace XUSG
 			PipelineLayoutIndex layout = NUM_PIPELINE_LAYOUT, const DescriptorTable* pCbvPerFrameTable = nullptr,
 			uint32_t numInstances = 1);
 
+		bool IsTwoSidedAll() const;
+
 	protected:
 		struct CBMatrices
 		{
 			DirectX::XMFLOAT3X4 World;
 			DirectX::XMFLOAT3X4 WorldIT;
-#if TEMPORAL
+#if XUSG_TEMPORAL
 			DirectX::XMFLOAT3X4 WorldPrev;
 #endif
 		};
 
 		bool createConstantBuffers(const Device* pDevice);
-		bool createPipelines(bool isStatic, const InputLayout* pInputLayout, const Format* rtvFormats,
-			uint32_t numRTVs, Format dsvFormat, Format shadowFormat);
+		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats, uint32_t numRTVs,
+			Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual);
 		bool createDescriptorTables();
 		void render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
@@ -65,19 +68,20 @@ namespace XUSG
 		PipelineLayoutCache::sptr		m_pipelineLayoutCache;
 		DescriptorTableCache::sptr		m_descriptorTableCache;
 
-#if TEMPORAL
+#if XUSG_TEMPORAL
 		DirectX::XMFLOAT3X4		m_world;
 #endif
 
 		ConstantBuffer::uptr	m_cbMatrices;
-#if TEMPORAL_AA
+#if XUSG_TEMPORAL_AA
 		ConstantBuffer::uptr	m_cbTemporalBias;
 #endif
 
 		PipelineLayout			m_pipelineLayouts[NUM_PIPELINE_LAYOUT];
 		Pipeline				m_pipelines[NUM_PIPELINE];
 		DescriptorTable			m_cbvTables[FrameCount][NUM_CBV_TABLE];
-		DescriptorTable			m_samplerTable;
 		std::vector<DescriptorTable> m_srvTables;
+
+		bool					m_twoSidedAll;
 	};
 }

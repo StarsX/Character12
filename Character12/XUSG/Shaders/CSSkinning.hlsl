@@ -2,6 +2,8 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#define _TANGENT_
+
 #include "CSSkinning.hlsli"
 
 //--------------------------------------------------------------------------------------
@@ -14,9 +16,8 @@ struct CS_Input
 	uint	Bones;		// Bone indices
 	uint2	Norm;		// Normal
 	uint	UV;			// Texture coordinate
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	uint2	Tan;		// Normalized Tangent vector
-	uint2	BiNorm;		// Normalized BiNormal vector
 #endif
 };
 
@@ -25,9 +26,8 @@ struct CS_Output
 	float3	Pos;		// Position
 	uint2	Norm;		// Normal
 	uint	UV;			// Texture coordinate
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	uint2	Tan;		// Normalized Tangent vector
-	uint2	BiNorm;		// Normalized BiNormal vector
 #endif
 };
 
@@ -81,9 +81,8 @@ VS_Input LoadVertex(uint i)
 	vertex.Weights = DecodeRGBA8(vertexIn.Weights);
 	vertex.Bones = DecodeRGBA8u(vertexIn.Bones);
 	vertex.Norm = DecodeRGB16f(vertexIn.Norm);
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	vertex.Tan = DecodeRGB16f(vertexIn.Tan);
-	vertex.BiNorm = DecodeRGB16f(vertexIn.BiNorm);
 #endif
 	vertex.UV = vertexIn.UV;
 	
@@ -99,9 +98,8 @@ void StoreVertex(SkinnedInfo skinned, uint i)
 	output.Pos = skinned.Pos;
 	output.Norm = EncodeRGB16f(skinned.Norm);
 	output.UV = skinned.UV;
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	output.Tan = EncodeRGB16f(skinned.Tan);
-	output.BiNorm = EncodeRGB16f(skinned.BiNorm);
 #endif
 
 	g_rwVertices[i] = output;

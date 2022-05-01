@@ -10,7 +10,12 @@
 #ifdef _BASEPASS_
 #define _POSWORLD_
 #define _NORMAL_
+#define _TANGENT_
 #endif
+
+#define GENERAL_SHADING	0
+#define SKIN_SHADING	1
+#define HAIR_SHADING	2
 
 #ifndef _NO_IO_STRUCT_
 //--------------------------------------------------------------------------------------
@@ -34,12 +39,11 @@ struct IOStruct
 	float4	SSPos		: POSSCREEN;	// Screen space Pos
 #endif
 
-#ifdef _TANGENTS_
+#ifdef _TANGENT_
 	min16float3	Tangent	: TANGENT;		// Normalized Tangent vector
-	min16float3	BiNorm	: BINORMAL;		// Normalized BiNormal vector
 #endif
 
-#if defined(_BASEPASS_) && TEMPORAL
+#if defined(_BASEPASS_) && XUSG_TEMPORAL
 	float4	CSPos		: POSCURRENT;	// Current motion-state position
 	float4	TSPos		: POSHISTORY;	// Historical motion-state position
 #endif
@@ -67,9 +71,14 @@ cbuffer cbPerFrame	: register (b1)
 	float3	g_lightPt;
 	float	g_timeStep;
 	float4x4 g_viewProjI;
-#if TEMPORAL
+#if XUSG_TEMPORAL
 	float4x4 g_viewProjPrev;
 #endif
 	float4x3 g_view;
 	float4x3 g_shadowView;
 };
+
+uint GetShadingMode(float specularZ)
+{
+	return round(specularZ * 15.0);
+}

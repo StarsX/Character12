@@ -80,6 +80,7 @@ Character_Impl::Character_Impl(const wchar_t* name, API api) :
 	m_meshLinks(nullptr),
 	m_cbLinkedMatrices(0)
 {
+	m_variableSlot = VARIABLE_SLOT;
 }
 
 Character_Impl::~Character_Impl(void)

@@ -393,6 +393,8 @@ namespace XUSG
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
 			bool twoSidedAll) = 0;
+		virtual bool CreateDescriptorTables() = 0;
+
 		virtual void Update(uint8_t frameIndex) = 0;
 		virtual void SetMatrices(DirectX::CXMMATRIX world, bool isTemporal = true) = 0;
 #if XUSG_TEMPORAL_AA
@@ -464,6 +466,8 @@ namespace XUSG
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
 			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
 			bool twoSidedAll = false, bool useZEqual = true) = 0;
+		virtual bool CreateDescriptorTables() = 0;
+
 		virtual void InitPosition(const DirectX::XMFLOAT4& posRot) = 0;
 		virtual void Update(uint8_t frameIndex, double time) = 0;
 		virtual void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true) = 0;
@@ -518,6 +522,8 @@ namespace XUSG
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
 			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
 			bool twoSidedAll = false, bool useZEqual = true) = 0;
+		virtual bool CreateDescriptorTables() = 0;
+
 		virtual void Update(uint8_t frameIndex, DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true) = 0;
 		virtual void Render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
@@ -589,6 +595,7 @@ namespace XUSG
 			Format format = Format::D24_UNORM_S8_UINT,
 			uint8_t numCasLevels = XUSG_NUM_CASCADE) = 0;
 		virtual bool CreateDescriptorTables() = 0;
+
 		// This runs per frame. This data could be cached when the cameras do not move.
 		virtual void Update(uint8_t frameIndex, const DirectX::XMFLOAT4X4& view,
 			const DirectX::XMFLOAT4X4& proj, const DirectX::XMFLOAT4& lightPt) = 0;
@@ -622,7 +629,7 @@ namespace XUSG
 			const Compute::PipelineCache::sptr& computePipelineCache,
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
-			uint8_t baseCSIndex, uint8_t descriptorPoolIndex) = 0;
+			uint8_t baseCSIndex, uint8_t descriptorPoolIndex = 0) = 0;
 
 		virtual void Transform(CommandList* pCommandList, Resource* pRadiance,
 			const DescriptorTable& srvTable, uint8_t order = 3) = 0;
@@ -660,9 +667,9 @@ namespace XUSG
 
 		virtual void Update(uint8_t frameIndex, DirectX::FXMMATRIX* pViewProj, DirectX::FXMMATRIX* pWorld = nullptr) = 0;
 		virtual void SetGlobalCBVTables(DescriptorTable cbvImmutable, DescriptorTable cbvPerFrameTable) = 0;
-		virtual void RenderSky(const CommandList* pCommandList, bool reset = false) = 0;
+		virtual void RenderSky(const CommandList* pCommandList) = 0;
 		virtual void RenderWater(CommandList* pCommandList, const Framebuffer& framebuffer,
-			uint32_t& numBarriers, ResourceBarrier* pBarriers, bool reset = false) = 0;
+			uint32_t& numBarriers, ResourceBarrier* pBarriers) = 0;
 
 		virtual Descriptor GetSkySRV() const = 0;
 		virtual DescriptorTable GetSHCoeffSRVTable(CommandList* pCommandList) = 0;
@@ -728,6 +735,7 @@ namespace XUSG
 			const DepthStencil::sptr& sceneDepth,
 			const RenderTarget::sptr& sceneMasks) = 0;
 		virtual bool CreateResources(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders) = 0;
+
 		virtual void Update(uint8_t frameIndex, double time, float timeStep) = 0;
 		virtual void Update(uint8_t frameIndex, double time, float timeStep,
 			DirectX::CXMMATRIX view, DirectX::CXMMATRIX proj,
@@ -769,12 +777,6 @@ namespace XUSG
 			NUM_PIPELINE
 		};
 
-		enum DescriptorPoolIndex : uint8_t
-		{
-			IMMUTABLE_POOL,
-			RESIZABLE_POOL
-		};
-
 		//Postprocess();
 		virtual ~Postprocess() {};
 
@@ -791,13 +793,12 @@ namespace XUSG
 		virtual void Render(CommandList* pCommandList, RenderTarget* pDst, Texture* pSrc,
 			const DescriptorTable& srvTable, bool clearRT = false) = 0;
 		virtual void ScreenRender(const CommandList* pCommandList, PipelineIndex pipelineIndex,
-			const DescriptorTable& srvTable, bool hasImmutableCB, bool hasPerFrameCB,
-			bool reset = false) = 0;
-		virtual void LumAdaption(const CommandList* pCommandList, const DescriptorTable& uavSrvTable, bool reset = false) = 0;
+			const DescriptorTable& srvTable, bool hasImmutableCB, bool hasPerFrameCB) = 0;
+		virtual void LumAdaption(const CommandList* pCommandList, const DescriptorTable& uavSrvTable) = 0;
 		virtual void Antialias(CommandList* pCommandList, RenderTarget** ppDsts, Texture** ppSrcs,
-			const DescriptorTable& srvTable, uint8_t numRTVs, uint8_t numSRVs, bool reset = false) = 0;
-		virtual void Unsharp(const CommandList* pCommandList, const Descriptor* pRTVs, const DescriptorTable& srvTable,
-			uint8_t numRTVs = 1, bool reset = false) = 0;
+			const DescriptorTable& srvTable, uint8_t numRTVs, uint8_t numSRVs) = 0;
+		virtual void Unsharp(const CommandList* pCommandList, const Descriptor* pRTVs,
+			const DescriptorTable& srvTable, uint8_t numRTVs = 1) = 0;
 
 		virtual DescriptorTable CreateTemporalAASRVTable(const Descriptor& srvCurrent, const Descriptor& srvPrevious,
 			const Descriptor& srvVelocity, const Descriptor& srvMasks, const Descriptor& srvMeta) = 0;

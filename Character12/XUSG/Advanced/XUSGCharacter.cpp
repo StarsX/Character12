@@ -115,11 +115,52 @@ bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout
 	// Create VBs that will hold all of the skinned vertices that need to be transformed output
 	XUSG_N_RETURN(createTransformedStates(pDevice), false);
 
-	// Create pipeline layout, pipelines, and descriptor tables
+	// Create pipeline layout and pipelines
 	XUSG_N_RETURN(createPipelineLayouts(), false);
 	XUSG_N_RETURN(createPipelines(pInputLayout, rtvFormats,
 		numRTVs, dsvFormat, shadowFormat, useZEqual), false);
-	XUSG_N_RETURN(createDescriptorTables(), false);
+
+	return true;
+}
+
+bool Character_Impl::CreateDescriptorTables()
+{
+	XUSG_N_RETURN(Model_Impl::CreateDescriptorTables(), false);
+
+	const auto numMeshes = m_mesh->GetNumMeshes();
+
+	for (uint8_t i = 0; i < FrameCount; ++i)
+	{
+		m_srvSkinningTables[i].resize(numMeshes);
+		m_uavSkinningTables[i].resize(numMeshes);
+#if XUSG_TEMPORAL
+		m_srvSkinnedTables[i].resize(numMeshes);
+#endif
+
+		for (auto m = 0u; m < numMeshes; ++m)
+		{
+			{
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+				const Descriptor descriptors[] = { m_boneWorlds[i]->GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
+				descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+				XUSG_X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			}
+
+			{
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetUAV(m));
+				XUSG_X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			}
+
+#if XUSG_TEMPORAL
+			{
+				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetSRV(m));
+				XUSG_X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+			}
+#endif
+		}
+	}
 
 	return true;
 }
@@ -373,46 +414,6 @@ bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Form
 		numRTVs, dsvFormat, shadowFormat, false, useZEqual);
 }
 
-bool Character_Impl::createDescriptorTables()
-{
-	const auto numMeshes = m_mesh->GetNumMeshes();
-
-	for (uint8_t i = 0; i < FrameCount; ++i)
-	{
-		m_srvSkinningTables[i].resize(numMeshes);
-		m_uavSkinningTables[i].resize(numMeshes);
-#if XUSG_TEMPORAL
-		m_srvSkinnedTables[i].resize(numMeshes);
-#endif
-
-		for (auto m = 0u; m < numMeshes; ++m)
-		{
-			{
-				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-				const Descriptor descriptors[] = { m_boneWorlds[i]->GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
-				descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-				XUSG_X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-			}
-
-			{
-				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetUAV(m));
-				XUSG_X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-			}
-
-#if XUSG_TEMPORAL
-			{
-				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetSRV(m));
-				XUSG_X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-			}
-#endif
-		}
-	}
-
-	return true;
-}
-
 void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX world, bool isTemporal)
 {
 	// Set World-View-Proj matrix
@@ -437,9 +438,6 @@ void Character_Impl::skinning(const CommandList* pCommandList, bool reset)
 {
 	if (reset)
 	{
-		const DescriptorPool descriptorPools[] =
-		{ m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL) };
-		pCommandList->SetDescriptorPools(static_cast<uint32_t>(size(descriptorPools)), descriptorPools);
 		pCommandList->SetComputePipelineLayout(m_skinningPipelineLayout);
 		pCommandList->SetPipelineState(m_skinningPipeline);
 	}
@@ -467,8 +465,6 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 {
 	if (pCbvPerFrameTable)
 	{
-		const auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
-		pCommandList->SetDescriptorPools(1, &descriptorPool);
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		pCommandList->SetGraphicsDescriptorTable(PER_FRAME, *pCbvPerFrameTable);
 #if XUSG_TEMPORAL_AA

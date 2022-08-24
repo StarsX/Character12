@@ -150,13 +150,14 @@ void CharacterX::LoadAssets()
 		const auto characterMesh = Character::LoadSDKMesh(m_device.get(), L"Assets/Bright/Stars.sdkmesh",
 			L"Assets/Bright/Stars.sdkmesh_anim", textureCache);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
+
 		m_character = Character::MakeUnique(L"Stars");
-		if (!m_character) ThrowIfFailed(E_FAIL);
-		if (!m_character->Init(m_device.get(), m_pInputLayout, characterMesh,
+		XUSG_N_RETURN(m_character->Init(m_device.get(), m_pInputLayout, characterMesh,
 			m_shaderPool, m_graphicsPipelineCache, m_computePipelineCache,
 			m_pipelineLayoutCache, m_descriptorTableCache, nullptr, nullptr,
-			nullptr, 0, Format::UNKNOWN, Format::UNKNOWN, false, false))
-			ThrowIfFailed(E_FAIL);
+			nullptr, 0, Format::UNKNOWN, Format::UNKNOWN, false, false),
+			ThrowIfFailed(E_FAIL));
+		XUSG_N_RETURN(m_character->CreateDescriptorTables(), ThrowIfFailed(E_FAIL));
 	}
 
 	// Create per-frame constant buffer
@@ -347,6 +348,10 @@ void CharacterX::PopulateCommandList()
 	// re-recording.
 	const auto pCommandList = m_commandList.get();
 	XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
+
+	// Set Descriptor pool
+	auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
+	pCommandList->SetDescriptorPools(1, &descriptorPool);
 
 	// Skinning
 	auto numBarriers = 0u;

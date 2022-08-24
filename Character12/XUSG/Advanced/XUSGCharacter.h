@@ -28,6 +28,8 @@ namespace XUSG
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
 			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
 			bool twoSidedAll = false, bool useZEqual = true);
+		bool CreateDescriptorTables();
+
 		void InitPosition(const DirectX::XMFLOAT4& posRot);
 		void Update(uint8_t frameIndex, double time);
 		void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true);
@@ -62,7 +64,6 @@ namespace XUSG
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
 			uint32_t numRTVs, Format dsvFormat, Format shadowFormat, bool useZEqual);
-		bool createDescriptorTables();
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world, bool isTemporal);
 		void skinning(const CommandList* pCommandList, bool reset);
 		void renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,

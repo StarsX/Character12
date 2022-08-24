@@ -21,6 +21,8 @@ namespace XUSG
 			const PipelineLayoutCache::sptr& pipelineLayoutCache,
 			const DescriptorTableCache::sptr& descriptorTableCache,
 			bool twoSidedAll);
+		bool CreateDescriptorTables();
+
 		void Update(uint8_t frameIndex);
 		void SetMatrices(DirectX::CXMMATRIX world, bool isTemporal = true);
 #if XUSG_TEMPORAL_AA
@@ -48,7 +50,6 @@ namespace XUSG
 		bool createConstantBuffers(const Device* pDevice);
 		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats, uint32_t numRTVs,
 			Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual);
-		bool createDescriptorTables();
 		void render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
 

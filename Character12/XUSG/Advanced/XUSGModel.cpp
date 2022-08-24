@@ -97,9 +97,52 @@ bool Model_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
 	// Get SDKMesh
 	m_mesh = mesh;
 
-	// Create buffers and descriptor tables
+	// Create buffers
 	XUSG_N_RETURN(createConstantBuffers(pDevice), false);
-	XUSG_N_RETURN(createDescriptorTables(), false);
+
+	return true;
+}
+
+bool Model_Impl::CreateDescriptorTables()
+{
+	for (uint8_t i = 0; i < FrameCount; ++i)
+	{
+		{
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+			descriptorTable->SetDescriptors(0, 1, &m_cbMatrices->GetCBV(i));
+			XUSG_X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+		}
+
+#if XUSG_TEMPORAL_AA
+		{
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+			descriptorTable->SetDescriptors(0, 1, &m_cbTemporalBias->GetCBV(i));
+			XUSG_X_RETURN(m_cbvTables[i][CBV_LOCAL_TEMPORAL_BIAS], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+		}
+#endif
+	}
+
+	// Materials
+	const auto numMaterials = m_mesh->GetNumMaterials();
+	m_srvTables.resize(numMaterials);
+	for (auto m = 0u; m < numMaterials; ++m)
+	{
+		const auto pMaterial = m_mesh->GetMaterial(m);
+
+		if (pMaterial && pMaterial->pAlbedo && pMaterial->pNormal && pMaterial->pSpecular)
+		{
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+			const Descriptor descriptors[] =
+			{
+				pMaterial->pAlbedo->GetSRV(),
+				pMaterial->pNormal->GetSRV(),
+				pMaterial->pSpecular->GetSRV()
+			};
+			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
+			XUSG_X_RETURN(m_srvTables[m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+		}
+		else m_srvTables[m] = nullptr;
+	}
 
 	return true;
 }
@@ -169,8 +212,6 @@ void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags
 {
 	if (pCbvPerFrameTable)
 	{
-		const auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
-		pCommandList->SetDescriptorPools(1, &descriptorPool);
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 		pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][matrixTableIndex]);
 		pCommandList->SetGraphicsDescriptorTable(PER_FRAME, *pCbvPerFrameTable);
@@ -335,50 +376,6 @@ bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* 
 			XUSG_X_RETURN(m_pipelines[SHADOW_ALPHA_TWO_SIDED], state->GetPipeline(m_graphicsPipelineCache.get(),
 				m_name.empty() ? nullptr : (m_name + L".ShadowAlpha").c_str()), false);
 		}
-	}
-
-	return true;
-}
-
-bool Model_Impl::createDescriptorTables()
-{
-	for (uint8_t i = 0; i < FrameCount; ++i)
-	{
-		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-			descriptorTable->SetDescriptors(0, 1, &m_cbMatrices->GetCBV(i));
-			XUSG_X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-		}
-
-#if XUSG_TEMPORAL_AA
-		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-			descriptorTable->SetDescriptors(0, 1, &m_cbTemporalBias->GetCBV(i));
-			XUSG_X_RETURN(m_cbvTables[i][CBV_LOCAL_TEMPORAL_BIAS], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-		}
-#endif
-	}
-
-	// Materials
-	const auto numMaterials = m_mesh->GetNumMaterials();
-	m_srvTables.resize(numMaterials);
-	for (auto m = 0u; m < numMaterials; ++m)
-	{
-		const auto pMaterial = m_mesh->GetMaterial(m);
-
-		if (pMaterial && pMaterial->pAlbedo && pMaterial->pNormal && pMaterial->pSpecular)
-		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
-			const Descriptor descriptors[] =
-			{
-				pMaterial->pAlbedo->GetSRV(),
-				pMaterial->pNormal->GetSRV(),
-				pMaterial->pSpecular->GetSRV()
-			};
-			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-			XUSG_X_RETURN(m_srvTables[m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
-		}
-		else m_srvTables[m] = nullptr;
 	}
 
 	return true;

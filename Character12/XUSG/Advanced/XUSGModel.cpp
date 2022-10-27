@@ -156,7 +156,7 @@ void Model_Impl::Update(uint8_t frameIndex)
 void Model_Impl::SetMatrices(CXMMATRIX world, bool isTemporal)
 {
 	// Update constant buffers
-	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices->Map(m_currentFrame));
+	const auto pCBData = static_cast<CBMatrices*>(m_cbMatrices->Map(m_currentFrame));
 	XMStoreFloat3x4(&pCBData->World, world); // XMStoreFloat3x4 includes transpose.
 	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, world)));
 
@@ -172,7 +172,7 @@ void Model_Impl::SetMatrices(CXMMATRIX world, bool isTemporal)
 #if XUSG_TEMPORAL_AA
 void Model_Impl::SetTemporalBias(const XMFLOAT2& temporalBias)
 {
-	const auto pCBData = reinterpret_cast<XMFLOAT2*>(m_cbTemporalBias->Map(m_currentFrame));
+	const auto pCBData = static_cast<XMFLOAT2*>(m_cbTemporalBias->Map(m_currentFrame));
 	*pCBData = temporalBias;
 }
 #endif
@@ -249,7 +249,7 @@ bool Model_Impl::createConstantBuffers(const Device* pDevice)
 	const auto identity = XMMatrixIdentity();
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
-		const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbMatrices->Map(i));
+		const auto pCBData = static_cast<CBMatrices*>(m_cbMatrices->Map(i));
 		XMStoreFloat3x4(&pCBData->World, identity);
 		XMStoreFloat3x4(&pCBData->WorldIT, identity);
 #if XUSG_TEMPORAL
@@ -504,12 +504,12 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 				XUSG_SizeOfInUint32(XMFLOAT2), cbPerObject, 0, Shader::Stage::PS);
 
 		// Samplers
-		const Sampler samplers[] =
+		const Sampler* pSamplers[] =
 		{
 			m_descriptorTableCache->GetSampler(ANISOTROPIC_WRAP),
 			m_descriptorTableCache->GetSampler(POINT_WRAP)
 		};
-		utilPipelineLayout->SetStaticSamplers(samplers, static_cast<uint32_t>(size(samplers)),
+		utilPipelineLayout->SetStaticSamplers(pSamplers, static_cast<uint32_t>(size(pSamplers)),
 			smpAnisoWrap, 0, Shader::Stage::PS);
 	}
 

@@ -421,7 +421,7 @@ void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX world, bool isTe
 	const auto linkedWorld = influenceMatrix * world;
 
 	// Update constant buffers
-	const auto pCBData = reinterpret_cast<CBMatrices*>(m_cbLinkedMatrices[mesh]->Map());
+	const auto pCBData = static_cast<CBMatrices*>(m_cbLinkedMatrices[mesh]->Map());
 	XMStoreFloat3x4(&pCBData->World, linkedWorld); // XMStoreFloat3x4 includes transpose.
 	XMStoreFloat3x4(&pCBData->WorldIT, XMMatrixTranspose(XMMatrixInverse(nullptr, linkedWorld)));
 
@@ -529,7 +529,7 @@ void Character_Impl::setSkeletalMatrices(uint32_t numMeshes)
 
 void Character_Impl::setBoneMatrices(uint32_t mesh)
 {
-	const auto pDataBoneWorld = reinterpret_cast<XMFLOAT3X4*>(m_boneWorlds[m_currentFrame]->Map(mesh));
+	const auto pDataBoneWorld = static_cast<XMFLOAT3X4*>(m_boneWorlds[m_currentFrame]->Map(mesh));
 
 	const auto numBones = m_mesh->GetNumInfluences(mesh);
 	for (auto i = 0u; i < numBones; ++i)

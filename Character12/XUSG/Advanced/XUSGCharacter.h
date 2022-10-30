@@ -18,11 +18,11 @@ namespace XUSG
 		virtual ~Character_Impl();
 
 		bool Init(const Device* pDevice, const InputLayout* pInputLayout,
-			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
-			const Compute::PipelineCache::sptr& computePipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+			const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& graphicsPipelineLib,
+			const Compute::PipelineLib::sptr& computePipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			const std::shared_ptr<std::vector<SDKMesh>>& linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
@@ -35,7 +35,7 @@ namespace XUSG
 		void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true);
 		virtual void SetMatrices(DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true);
 		void SetSkinningPipeline(const CommandList* pCommandList);
-		void Skinning(const CommandList* pCommandList, uint32_t& numBarriers,
+		void Skinning(CommandList* pCommandList, uint32_t& numBarriers,
 			ResourceBarrier* pBarriers, bool reset = false);
 		void RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
@@ -75,7 +75,7 @@ namespace XUSG
 			const DirectX::XMFLOAT3& tran) const;
 		DirectX::FXMMATRIX getDualQuat(uint32_t mesh, uint32_t influence) const;
 
-		std::shared_ptr<Compute::PipelineCache> m_computePipelineCache;
+		std::shared_ptr<Compute::PipelineLib> m_computePipelineLib;
 
 		VertexBuffer::uptr	m_transformedVBs[FrameCount];
 		DirectX::XMFLOAT4X4	m_mWorld;

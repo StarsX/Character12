@@ -94,12 +94,12 @@ namespace XUSG
 
 	XUSG_DEF_ENUM_FLAG_OPERATORS(SubsetFlags);
 
-	struct TextureCacheEntry
+	struct TextureRecord
 	{
 		Texture::sptr Texture;
 		uint8_t AlphaMode;
 	};
-	using TextureCache = std::shared_ptr<std::map<std::string, TextureCacheEntry>>;
+	using TextureLib = std::shared_ptr<std::map<std::string, TextureRecord>>;
 
 	class XUSG_INTERFACE SDKMesh
 	{
@@ -251,8 +251,8 @@ namespace XUSG
 		virtual ~SDKMesh() {};
 
 		virtual bool Create(const Device* pDevice, const wchar_t* fileName,
-			const TextureCache& textureCache, bool isStaticMesh = false) = 0;
-		virtual bool Create(const Device* pDevice, uint8_t* pData, const TextureCache& textureCache,
+			const TextureLib& textureLib, bool isStaticMesh = false) = 0;
+		virtual bool Create(const Device* pDevice, uint8_t* pData, const TextureLib& textureLib,
 			size_t dataBytes, bool isStaticMesh = false, bool copyStatic = false) = 0;
 		virtual bool LoadAnimation(const wchar_t* fileName) = 0;
 		virtual void Destroy() = 0;
@@ -388,10 +388,10 @@ namespace XUSG
 		virtual ~Model() {};
 
 		virtual bool Init(const Device* pDevice, const InputLayout* pInputLayout,
-			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& pipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+			const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& pipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			bool twoSidedAll) = 0;
 		virtual bool CreateDescriptorTables() = 0;
 
@@ -411,9 +411,9 @@ namespace XUSG
 
 		Model* AsModel();
 
-		static const InputLayout* CreateInputLayout(Graphics::PipelineCache* pPipelineCache);
+		static const InputLayout* CreateInputLayout(Graphics::PipelineLib* pPipelineLib);
 		static std::shared_ptr<SDKMesh> LoadSDKMesh(const Device* pDevice, const std::wstring& meshFileName,
-			const TextureCache& textureCache, bool isStaticMesh, API api);
+			const TextureLib& textureLib, bool isStaticMesh, API api);
 
 		static constexpr uint8_t GetFrameCount() { return FrameCount; }
 
@@ -456,11 +456,11 @@ namespace XUSG
 		virtual ~Character() {};
 
 		virtual bool Init(const Device* pDevice, const InputLayout* pInputLayout,
-			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
-			const Compute::PipelineCache::sptr& computePipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+			const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& graphicsPipelineLib,
+			const Compute::PipelineLib::sptr& computePipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			const std::shared_ptr<std::vector<SDKMesh>>& linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
@@ -473,7 +473,7 @@ namespace XUSG
 		virtual void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true) = 0;
 		virtual void SetMatrices(DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true) = 0;
 		virtual void SetSkinningPipeline(const CommandList* pCommandList) = 0;
-		virtual void Skinning(const CommandList* pCommandList, uint32_t& numBarriers,
+		virtual void Skinning(CommandList* pCommandList, uint32_t& numBarriers,
 			ResourceBarrier* pBarriers, bool reset = false) = 0;
 		virtual void RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
@@ -483,7 +483,7 @@ namespace XUSG
 		virtual DirectX::FXMMATRIX GetWorldMatrix() const = 0;
 
 		static SDKMesh::sptr LoadSDKMesh(const Device* pDevice, const std::wstring& meshFileName,
-			const std::wstring& animFileName, const TextureCache& textureCache,
+			const std::wstring& animFileName, const TextureLib& textureLib,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
 			std::vector<SDKMesh::sptr>* pLinkedMeshes = nullptr, API api = API::DIRECTX_12);
 
@@ -514,10 +514,10 @@ namespace XUSG
 		virtual ~StaticModel() {};
 
 		virtual bool Init(CommandList* pCommandList, const InputLayout* pInputLayout,
-			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& pipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+			const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& pipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			std::vector<Resource::uptr>& uploaders,
 			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
 			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
@@ -532,7 +532,7 @@ namespace XUSG
 		virtual const SDKMesh::sptr& GetMesh() const = 0;
 
 		static SDKMesh::sptr LoadSDKMesh(const Device* pDevice, const std::wstring& meshFileName,
-			const TextureCache& textureCache, API api = API::DIRECTX_12);
+			const TextureLib& textureLib, API api = API::DIRECTX_12);
 
 		using uptr = std::unique_ptr<StaticModel>;
 		using sptr = std::shared_ptr<StaticModel>;
@@ -591,7 +591,7 @@ namespace XUSG
 
 		// This runs when the application is initialized.
 		virtual bool Init(const Device* pDevice, float sceneMapSize, float shadowMapSize,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			Format format = Format::D24_UNORM_S8_UINT,
 			uint8_t numCasLevels = XUSG_NUM_CASCADE) = 0;
 		virtual bool CreateDescriptorTables() = 0;
@@ -625,10 +625,10 @@ namespace XUSG
 		//SphericalHarmonics();
 		virtual ~SphericalHarmonics() {}
 
-		virtual bool Init(const Device* pDevice, const ShaderPool::sptr& shaderPool,
-			const Compute::PipelineCache::sptr& computePipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+		virtual bool Init(const Device* pDevice, const ShaderLib::sptr& shaderLib,
+			const Compute::PipelineLib::sptr& computePipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			uint8_t baseCSIndex, uint8_t descriptorPoolIndex = 0) = 0;
 
 		virtual void Transform(CommandList* pCommandList, Resource* pRadiance,
@@ -654,11 +654,11 @@ namespace XUSG
 		//Nature();
 		virtual ~Nature() {};
 
-		virtual bool Init(CommandList* pCommandList, const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
-			const Compute::PipelineCache::sptr& computePipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+		virtual bool Init(CommandList* pCommandList, const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& graphicsPipelineLib,
+			const Compute::PipelineLib::sptr& computePipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			const std::wstring& skyTexture, std::vector<Resource::uptr>& uploaders,
 			bool renderWater, Format rtvFormat = Format::R11G11B10_FLOAT,
 			Format dsvFormat = Format::D24_UNORM_S8_UINT) = 0;
@@ -721,11 +721,11 @@ namespace XUSG
 		virtual ~Scene() {};
 
 		virtual bool LoadAssets(void* pSceneReader, CommandList* pCommandList,
-			const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
-			const Compute::PipelineCache::sptr& computePipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+			const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& graphicsPipelineLib,
+			const Compute::PipelineLib::sptr& computePipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			std::vector<Resource::uptr>& uploaders, Format rtvFormat,
 			Format dsvFormat, Format shadowFormat = Format::D24_UNORM_S8_UINT,
 			bool useIBL = false) = 0;
@@ -780,11 +780,11 @@ namespace XUSG
 		//Postprocess();
 		virtual ~Postprocess() {};
 
-		virtual bool Init(const Device* pDevice, const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& graphicsPipelineCache,
-			const Compute::PipelineCache::sptr& computePipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+		virtual bool Init(const Device* pDevice, const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& graphicsPipelineLib,
+			const Compute::PipelineLib::sptr& computePipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			Format hdrFormat, Format ldrFormat) = 0;
 		virtual bool ChangeWindowSize(const Device* pDevice, const Texture* pReference) = 0;
 

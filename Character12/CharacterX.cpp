@@ -101,7 +101,7 @@ void CharacterX::LoadPipeline()
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-	m_descriptorTableCache = DescriptorTableCache::MakeShared(m_device.get(), L"DescriptorTableCache");
+	m_descriptorTableLib = DescriptorTableLib::MakeShared(m_device.get(), L"DescriptorTableLib");
 
 	// Create frame resources.
 	// Create a RTV and a command allocator for each frame.
@@ -124,17 +124,17 @@ void CharacterX::LoadPipeline()
 // Load the sample assets.
 void CharacterX::LoadAssets()
 {
-	m_shaderPool = ShaderPool::MakeShared();
-	m_graphicsPipelineCache = Graphics::PipelineCache::MakeShared(m_device.get());
-	m_computePipelineCache = Compute::PipelineCache::MakeShared(m_device.get());
-	m_pipelineLayoutCache = PipelineLayoutCache::MakeShared(m_device.get());
+	m_shaderLib = ShaderLib::MakeShared();
+	m_graphicsPipelineLib = Graphics::PipelineLib::MakeShared(m_device.get());
+	m_computePipelineLib = Compute::PipelineLib::MakeShared(m_device.get());
+	m_pipelineLayoutLib = PipelineLayoutLib::MakeShared(m_device.get());
 
 	// Create the shaders.
 	{
-		m_shaderPool->CreateShader(Shader::Stage::VS, VS_BASE_PASS, L"VSBasePass.cso");
-		m_shaderPool->CreateShader(Shader::Stage::PS, PS_BASE_PASS, L"PSBasePass.cso");
-		m_shaderPool->CreateShader(Shader::Stage::PS, PS_ALPHA_TEST, L"PSAlphaTest.cso");
-		m_shaderPool->CreateShader(Shader::Stage::CS, CS_SKINNING, L"CSSkinning.cso");
+		m_shaderLib->CreateShader(Shader::Stage::VS, VS_BASE_PASS, L"VSBasePass.cso");
+		m_shaderLib->CreateShader(Shader::Stage::PS, PS_BASE_PASS, L"PSBasePass.cso");
+		m_shaderLib->CreateShader(Shader::Stage::PS, PS_ALPHA_TEST, L"PSAlphaTest.cso");
+		m_shaderLib->CreateShader(Shader::Stage::CS, CS_SKINNING, L"CSSkinning.cso");
 	}
 
 	// Create the command list.
@@ -145,16 +145,16 @@ void CharacterX::LoadAssets()
 
 	// Load character asset
 	{
-		m_pInputLayout = Character::CreateInputLayout(m_graphicsPipelineCache.get());
-		const auto textureCache = make_shared<TextureCache::element_type>();
+		m_pInputLayout = Character::CreateInputLayout(m_graphicsPipelineLib.get());
+		const auto textureLib = make_shared<TextureLib::element_type>();
 		const auto characterMesh = Character::LoadSDKMesh(m_device.get(), L"Assets/Bright/Stars.sdkmesh",
-			L"Assets/Bright/Stars.sdkmesh_anim", textureCache);
+			L"Assets/Bright/Stars.sdkmesh_anim", textureLib);
 		if (!characterMesh) ThrowIfFailed(E_FAIL);
 
 		m_character = Character::MakeUnique(L"Stars");
 		XUSG_N_RETURN(m_character->Init(m_device.get(), m_pInputLayout, characterMesh,
-			m_shaderPool, m_graphicsPipelineCache, m_computePipelineCache,
-			m_pipelineLayoutCache, m_descriptorTableCache, nullptr, nullptr,
+			m_shaderLib, m_graphicsPipelineLib, m_computePipelineLib,
+			m_pipelineLayoutLib, m_descriptorTableLib, nullptr, nullptr,
 			nullptr, 0, Format::UNKNOWN, Format::UNKNOWN, false, false),
 			ThrowIfFailed(E_FAIL));
 		XUSG_N_RETURN(m_character->CreateDescriptorTables(), ThrowIfFailed(E_FAIL));
@@ -169,7 +169,7 @@ void CharacterX::LoadAssets()
 	{
 		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_cbPerFrame->GetCBV(i));
-		XUSG_X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), ThrowIfFailed(E_FAIL));
+		XUSG_X_RETURN(m_cbvTables[i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), ThrowIfFailed(E_FAIL));
 	}
 
 	// Close the command list and execute it to begin the initial GPU setup.
@@ -350,7 +350,7 @@ void CharacterX::PopulateCommandList()
 	XUSG_N_RETURN(pCommandList->Reset(pCommandAllocator, nullptr), ThrowIfFailed(E_FAIL));
 
 	// Set Descriptor pool
-	auto descriptorPool = m_descriptorTableCache->GetDescriptorPool(CBV_SRV_UAV_POOL);
+	auto descriptorPool = m_descriptorTableLib->GetDescriptorPool(CBV_SRV_UAV_POOL);
 	pCommandList->SetDescriptorPools(1, &descriptorPool);
 
 	// Skinning

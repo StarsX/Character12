@@ -25,12 +25,12 @@ Character::sptr Character::MakeShared(const wchar_t* name, API api)
 // Static interface function
 //--------------------------------------------------------------------------------------
 SDKMesh::sptr Character::LoadSDKMesh(const Device* pDevice, const wstring& meshFileName,
-	const wstring& animFileName, const TextureCache& textureCache,
+	const wstring& animFileName, const TextureLib& textureLib,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
 	vector<SDKMesh::sptr>* linkedMeshes, API api)
 {
 	// Load the animated mesh
-	const auto mesh = Model::LoadSDKMesh(pDevice, meshFileName, textureCache, false, api);
+	const auto mesh = Model::LoadSDKMesh(pDevice, meshFileName, textureLib, false, api);
 	XUSG_N_RETURN(mesh->LoadAnimation(animFileName.c_str()), nullptr);
 	mesh->TransformBindPose(XMMatrixIdentity());
 
@@ -55,7 +55,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device* pDevice, const wstring& meshF
 			meshInfo.BoneIndex = mesh->FindFrameIndex(meshInfo.BoneName.c_str());
 			linkedMeshes->at(m) = SDKMesh::MakeShared(api);
 			XUSG_N_RETURN(linkedMeshes->at(m)->Create(pDevice, meshInfo.MeshName.c_str(),
-				textureCache), nullptr);
+				textureLib), nullptr);
 		}
 	}
 
@@ -67,7 +67,7 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device* pDevice, const wstring& meshF
 //--------------------------------------------------------------------------------------
 Character_Impl::Character_Impl(const wchar_t* name, API api) :
 	Model_Impl(name, api),
-	m_computePipelineCache(nullptr),
+	m_computePipelineLib(nullptr),
 	m_skinningPipelineLayout(nullptr),
 	m_skinningPipeline(nullptr),
 	m_srvSkinningTables(),
@@ -88,26 +88,26 @@ Character_Impl::~Character_Impl(void)
 }
 
 bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
-	const shared_ptr<SDKMesh>& mesh, const ShaderPool::sptr& shaderPool,
-	const Graphics::PipelineCache::sptr& graphicsPipelineCache,
-	const Compute::PipelineCache::sptr& computePipelineCache,
-	const PipelineLayoutCache::sptr& pipelineLayoutCache,
-	const DescriptorTableCache::sptr& descriptorTableCache,
+	const shared_ptr<SDKMesh>& mesh, const ShaderLib::sptr& shaderLib,
+	const Graphics::PipelineLib::sptr& graphicsPipelineLib,
+	const Compute::PipelineLib::sptr& computePipelineLib,
+	const PipelineLayoutLib::sptr& pipelineLayoutLib,
+	const DescriptorTableLib::sptr& descriptorTableLib,
 	const shared_ptr<vector<SDKMesh>>& linkedMeshes,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
 	const Format* rtvFormats, uint32_t numRTVs,
 	Format dsvFormat, Format shadowFormat,
 	bool twoSidedAll, bool useZEqual)
 {
-	m_computePipelineCache = computePipelineCache;
+	m_computePipelineLib = computePipelineLib;
 
 	// Set the Linked Meshes
 	m_meshLinks = meshLinks;
 	m_linkedMeshes = linkedMeshes;
 
 	// Get SDKMesh
-	XUSG_N_RETURN(Model_Impl::Init(pDevice, pInputLayout, mesh, shaderPool, graphicsPipelineCache,
-		pipelineLayoutCache, descriptorTableCache, twoSidedAll), false);
+	XUSG_N_RETURN(Model_Impl::Init(pDevice, pInputLayout, mesh, shaderLib, graphicsPipelineLib,
+		pipelineLayoutLib, descriptorTableLib, twoSidedAll), false);
 
 	// Create buffers
 	XUSG_N_RETURN(createBuffers(pDevice), false);
@@ -143,20 +143,20 @@ bool Character_Impl::CreateDescriptorTables()
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				const Descriptor descriptors[] = { m_boneWorlds[i]->GetSRV(m), m_mesh->GetVertexBufferSRV(m, 0) };
 				descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
-				XUSG_X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+				XUSG_X_RETURN(m_srvSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 			}
 
 			{
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetUAV(m));
-				XUSG_X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+				XUSG_X_RETURN(m_uavSkinningTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 			}
 
 #if XUSG_TEMPORAL
 			{
 				const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
 				descriptorTable->SetDescriptors(0, 1, &m_transformedVBs[i]->GetSRV(m));
-				XUSG_X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableCache.get()), false);
+				XUSG_X_RETURN(m_srvSkinnedTables[i][m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 			}
 #endif
 		}
@@ -217,16 +217,18 @@ void Character_Impl::SetSkinningPipeline(const CommandList* pCommandList)
 	pCommandList->SetPipelineState(m_skinningPipeline);
 }
 
-void Character_Impl::Skinning(const CommandList* pCommandList, uint32_t& numBarriers,
+void Character_Impl::Skinning(CommandList* pCommandList, uint32_t& numBarriers,
 	ResourceBarrier* pBarriers, bool reset)
 {
 	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
-	m_transformedVBs[m_currentFrame]->SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS); // Implicit state promotion
+	numBarriers = m_transformedVBs[m_currentFrame]->SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS,
+		numBarriers, XUSG_BARRIER_ALL_SUBRESOURCES, BarrierFlag::RESET_SRC_STATE);
+	pCommandList->Barrier(numBarriers, pBarriers);
 	skinning(pCommandList, reset);
 
 	// Prepare VBV | SRV states for the vertex buffer
-	numBarriers = m_transformedVBs[m_currentFrame]->SetBarrier(pBarriers, ResourceState::VERTEX_AND_CONSTANT_BUFFER |
-		ResourceState::NON_PIXEL_SHADER_RESOURCE, numBarriers);
+	numBarriers = m_transformedVBs[m_currentFrame]->SetBarrier(pBarriers,
+		ResourceState::VERTEX_AND_CONSTANT_BUFFER | ResourceState::NON_PIXEL_SHADER_RESOURCE);
 }
 
 void Character_Impl::RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
@@ -324,7 +326,7 @@ bool Character_Impl::createPipelineLayouts()
 		auto roVertices = roBoneWorld + 1;
 
 		// Get compute shader slots
-		const auto reflector = m_shaderPool->GetReflector(Shader::Stage::CS, CS_SKINNING);
+		const auto reflector = m_shaderLib->GetReflector(Shader::Stage::CS, CS_SKINNING);
 		if (reflector && reflector->IsValid())
 		{
 			// Get shader resource slots
@@ -347,7 +349,7 @@ bool Character_Impl::createPipelineLayouts()
 		utilPipelineLayout->SetShaderStage(OUTPUT, Shader::Stage::CS);
 
 		// Get pipeline layout
-		XUSG_X_RETURN(m_skinningPipelineLayout, utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_skinningPipelineLayout, utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::NONE, m_name.empty() ? nullptr : (m_name + L".SkinningLayout").c_str()), false);
 	}
 
@@ -358,7 +360,7 @@ bool Character_Impl::createPipelineLayouts()
 		auto roVertices = 0u;
 
 		// Get vertex shader slots
-		auto reflector = m_shaderPool->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
+		auto reflector = m_shaderLib->GetReflector(Shader::Stage::VS, VS_BASE_PASS);
 		if (reflector && reflector->IsValid())
 			// Get shader resource slot
 			roVertices = reflector->GetResourceBindingPointByName("g_roVertices", roVertices);
@@ -371,7 +373,7 @@ bool Character_Impl::createPipelineLayouts()
 		utilPipelineLayout->SetShaderStage(HISTORY, Shader::Stage::VS);
 #endif
 
-		XUSG_X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_pipelineLayouts[BASE_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".BasePassLayout").c_str()), false);
 	}
@@ -380,7 +382,7 @@ bool Character_Impl::createPipelineLayouts()
 	{
 		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_NULL_INDEX);
 
-		XUSG_X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_pipelineLayouts[DEPTH_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthPassLayout").c_str()), false);
 	}
@@ -389,7 +391,7 @@ bool Character_Impl::createPipelineLayouts()
 	{
 		const auto utilPipelineLayout = initPipelineLayout(VS_DEPTH, PS_DEPTH);
 
-		XUSG_X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutCache.get(),
+		XUSG_X_RETURN(m_pipelineLayouts[DEPTH_ALPHA_PASS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
 			m_name.empty() ? nullptr : (m_name + L".DepthAlphaPassLayout").c_str()), false);
 	}
@@ -404,8 +406,8 @@ bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Form
 	{
 		const auto state = Compute::State::MakeUnique(m_api);
 		state->SetPipelineLayout(m_skinningPipelineLayout);
-		state->SetShader(m_shaderPool->GetShader(Shader::Stage::CS, CS_SKINNING));
-		XUSG_X_RETURN(m_skinningPipeline, state->GetPipeline(m_computePipelineCache.get(),
+		state->SetShader(m_shaderLib->GetShader(Shader::Stage::CS, CS_SKINNING));
+		XUSG_X_RETURN(m_skinningPipeline, state->GetPipeline(m_computePipelineLib.get(),
 			m_name.empty() ? nullptr : (m_name + L".SkinningPipe").c_str()), false);
 	}
 

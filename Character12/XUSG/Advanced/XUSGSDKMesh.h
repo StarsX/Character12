@@ -119,8 +119,8 @@ namespace XUSG
 		virtual ~SDKMesh_Impl();
 
 		bool Create(const Device* pDevice, const wchar_t* fileName,
-			const TextureCache& textureCache, bool isStaticMesh = false);
-		bool Create(const Device* pDevice, uint8_t* pData, const TextureCache& textureCache,
+			const TextureLib& textureLib, bool isStaticMesh = false);
+		bool Create(const Device* pDevice, uint8_t* pData, const TextureLib& textureLib,
 			size_t dataBytes, bool isStaticMesh = false, bool copyStatic = false);
 		bool LoadAnimation(const wchar_t* fileName);
 		void Destroy();
@@ -194,8 +194,8 @@ namespace XUSG
 		bool createIndexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders);
 
 		virtual bool createFromFile(const Device* pDevice, const wchar_t* fileName,
-			const TextureCache& textureCache, bool isStaticMesh);
-		virtual bool createFromMemory(const Device* pDevice, uint8_t* pData, const TextureCache& textureCache,
+			const TextureLib& textureLib, bool isStaticMesh);
+		virtual bool createFromMemory(const Device* pDevice, uint8_t* pData, const TextureLib& textureLib,
 			size_t dataBytes, bool isStaticMesh, bool copyStatic);
 
 		void createAsStaticMesh();
@@ -238,7 +238,7 @@ namespace XUSG
 		std::vector<std::vector<uint32_t>> m_classifiedSubsets[NUM_SUBSET_TYPE];
 
 		// Texture cache
-		TextureCache			m_textureCache;
+		TextureLib				m_textureLib;
 
 		// Adjacency information (not part of the m_pStaticMeshData, so it must be created and destroyed separately )
 		IndexBufferHeader*		m_pAdjIndexBufferArray;

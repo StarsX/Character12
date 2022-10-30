@@ -103,16 +103,16 @@ SDKMesh_Impl::~SDKMesh_Impl()
 
 //--------------------------------------------------------------------------------------
 bool SDKMesh_Impl::Create(const Device* pDevice, const wchar_t* fileName,
-	const TextureCache& textureCache, bool isStaticMesh)
+	const TextureLib& textureLib, bool isStaticMesh)
 {
-	return createFromFile(pDevice, fileName, textureCache, isStaticMesh);
+	return createFromFile(pDevice, fileName, textureLib, isStaticMesh);
 }
 
 bool SDKMesh_Impl::Create(const Device* pDevice, uint8_t* pData,
-	const TextureCache& textureCache, size_t dataBytes,
+	const TextureLib& textureLib, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
-	return createFromMemory(pDevice, pData, textureCache, dataBytes, isStaticMesh, copyStatic);
+	return createFromMemory(pDevice, pData, textureLib, dataBytes, isStaticMesh, copyStatic);
 }
 
 bool SDKMesh_Impl::LoadAnimation(const wchar_t* fileName)
@@ -568,9 +568,9 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 		if (pMaterials[m].AlbedoTexture[0] != 0)
 		{
 			filePath = m_filePath + pMaterials[m].AlbedoTexture;
-			const auto textureIter = m_textureCache->find(filePath);
+			const auto textureIter = m_textureLib->find(filePath);
 
-			if (textureIter != m_textureCache->end())
+			if (textureIter != m_textureLib->end())
 			{
 				pMaterials[m].pAlbedo = textureIter->second.Texture.get();
 				pMaterials[m].AlphaModeAlbedo = textureIter->second.AlphaMode;
@@ -589,16 +589,16 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 				{
 					pMaterials[m].pAlbedo = texture.get();
 					pMaterials[m].AlphaModeAlbedo = alphaMode;
-					(*m_textureCache)[filePath] = { texture, alphaMode };
+					(*m_textureLib)[filePath] = { texture, alphaMode };
 				}
 			}
 		}
 		if (pMaterials[m].NormalTexture[0] != 0)
 		{
 			filePath = m_filePath + pMaterials[m].NormalTexture;
-			const auto textureIter = m_textureCache->find(filePath);
+			const auto textureIter = m_textureLib->find(filePath);
 
-			if (textureIter != m_textureCache->end())
+			if (textureIter != m_textureLib->end())
 			{
 				pMaterials[m].pNormal = textureIter->second.Texture.get();
 				pMaterials[m].AlphaModeNormal = textureIter->second.AlphaMode;
@@ -617,7 +617,7 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 				{
 					pMaterials[m].pNormal = texture.get();
 					pMaterials[m].AlphaModeNormal = alphaMode;
-					(*m_textureCache)[filePath] = { texture, alphaMode };
+					(*m_textureLib)[filePath] = { texture, alphaMode };
 				}
 			}
 		}
@@ -643,9 +643,9 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 		if (pMaterials[m].SpecularTexture[0] != 0)
 		{
 			filePath = m_filePath + pMaterials[m].SpecularTexture;
-			const auto textureIter = m_textureCache->find(filePath);
+			const auto textureIter = m_textureLib->find(filePath);
 
-			if (textureIter != m_textureCache->end())
+			if (textureIter != m_textureLib->end())
 			{
 				pMaterials[m].pSpecular = textureIter->second.Texture.get();
 				pMaterials[m].AlphaModeSpecular = textureIter->second.AlphaMode;
@@ -664,7 +664,7 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 				{
 					pMaterials[m].pSpecular = texture.get();
 					pMaterials[m].AlphaModeNormal = alphaMode;
-					(*m_textureCache)[filePath] = { texture, alphaMode };
+					(*m_textureLib)[filePath] = { texture, alphaMode };
 				}
 			}
 		}
@@ -746,7 +746,7 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 
 //--------------------------------------------------------------------------------------
 bool SDKMesh_Impl::createFromFile(const Device* pDevice, const wchar_t* fileName,
-	const TextureCache& textureCache, bool isStaticMesh)
+	const TextureLib& textureLib, bool isStaticMesh)
 {
 	// Find the path for the file
 	m_filePathW = fileName;
@@ -776,11 +776,11 @@ bool SDKMesh_Impl::createFromFile(const Device* pDevice, const wchar_t* fileName
 
 	fileStream.close();
 
-	return createFromMemory(pDevice, m_pStaticMeshData, textureCache, cBytes, isStaticMesh, false);
+	return createFromMemory(pDevice, m_pStaticMeshData, textureLib, cBytes, isStaticMesh, false);
 }
 
 bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
-	const TextureCache& textureCache, size_t dataBytes,
+	const TextureLib& textureLib, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
 	XMFLOAT3 lower;
@@ -848,7 +848,7 @@ bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
 	vector<Resource::uptr> uploaders;
 
 	// Load Materials
-	m_textureCache = textureCache;
+	m_textureLib = textureLib;
 	if (pDevice) loadMaterials(pCommandList, m_pMaterialArray, m_pMeshHeader->NumMaterials, uploaders);
 
 	// Create a place to store our bind pose frame matrices

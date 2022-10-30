@@ -16,10 +16,10 @@ namespace XUSG
 		virtual ~Model_Impl();
 
 		bool Init(const Device* pDevice, const InputLayout* pInputLayout,
-			const SDKMesh::sptr& mesh, const ShaderPool::sptr& shaderPool,
-			const Graphics::PipelineCache::sptr& pipelineCache,
-			const PipelineLayoutCache::sptr& pipelineLayoutCache,
-			const DescriptorTableCache::sptr& descriptorTableCache,
+			const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
+			const Graphics::PipelineLib::sptr& pipelineLib,
+			const PipelineLayoutLib::sptr& pipelineLayoutLib,
+			const DescriptorTableLib::sptr& descriptorTableLib,
 			bool twoSidedAll);
 		bool CreateDescriptorTables();
 
@@ -64,10 +64,10 @@ namespace XUSG
 		uint8_t		m_variableSlot;
 
 		SDKMesh::sptr					m_mesh;
-		ShaderPool::sptr				m_shaderPool;
-		Graphics::PipelineCache::sptr	m_graphicsPipelineCache;
-		PipelineLayoutCache::sptr		m_pipelineLayoutCache;
-		DescriptorTableCache::sptr		m_descriptorTableCache;
+		ShaderLib::sptr				m_shaderLib;
+		Graphics::PipelineLib::sptr	m_graphicsPipelineLib;
+		PipelineLayoutLib::sptr		m_pipelineLayoutLib;
+		DescriptorTableLib::sptr		m_descriptorTableLib;
 
 #if XUSG_TEMPORAL
 		DirectX::XMFLOAT3X4		m_world;

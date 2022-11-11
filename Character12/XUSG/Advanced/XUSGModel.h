@@ -63,11 +63,11 @@ namespace XUSG
 
 		uint8_t		m_variableSlot;
 
-		SDKMesh::sptr					m_mesh;
+		SDKMesh::sptr				m_mesh;
 		ShaderLib::sptr				m_shaderLib;
 		Graphics::PipelineLib::sptr	m_graphicsPipelineLib;
 		PipelineLayoutLib::sptr		m_pipelineLayoutLib;
-		DescriptorTableLib::sptr		m_descriptorTableLib;
+		DescriptorTableLib::sptr	m_descriptorTableLib;
 
 #if XUSG_TEMPORAL
 		DirectX::XMFLOAT3X4		m_world;

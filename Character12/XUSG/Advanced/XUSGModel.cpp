@@ -88,7 +88,7 @@ bool Model_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
 {
 	m_twoSidedAll = twoSidedAll;
 
-	// Set shader pool and states
+	// Set shader lib and states
 	m_shaderLib = shaderLib;
 	m_graphicsPipelineLib = pipelineLib;
 	m_pipelineLayoutLib = pipelineLayoutLib;

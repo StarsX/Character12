@@ -629,7 +629,7 @@ namespace XUSG
 			const Compute::PipelineLib::sptr& computePipelineLib,
 			const PipelineLayoutLib::sptr& pipelineLayoutLib,
 			const DescriptorTableLib::sptr& descriptorTableLib,
-			uint8_t baseCSIndex, uint8_t descriptorPoolIndex = 0) = 0;
+			uint8_t baseCSIndex, uint8_t descriptorHeapIndex = 0) = 0;
 
 		virtual void Transform(CommandList* pCommandList, Resource* pRadiance,
 			const DescriptorTable& srvTable, uint8_t order = 3) = 0;

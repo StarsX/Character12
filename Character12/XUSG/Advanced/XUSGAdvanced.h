@@ -741,6 +741,18 @@ namespace XUSG
 			DirectX::CXMMATRIX view, DirectX::CXMMATRIX proj,
 			DirectX::CXMVECTOR eyePt) = 0;
 		virtual void Render(CommandList* pCommandList) = 0;
+		virtual void SkinCharacters(CommandList* pCommandList, uint32_t& numBarriers,
+			ResourceBarrier* pBarriers, bool reset = false) = 0;
+		virtual void RenderDepth(CommandList* pCommandList, uint32_t& numBarriers,
+			ResourceBarrier* pBarriers, BarrierFlag barrierFlag) = 0;
+		virtual void RenderShadowMap(CommandList* pCommandList, uint32_t& numBarriers,
+			ResourceBarrier* pBarriers, BarrierFlag barrierFlag) = 0;
+		virtual void RenderGBuffersOpaque(CommandList* pCommandList, uint32_t& numBarriers,
+			ResourceBarrier* pBarriers, const BarrierFlag barrierFlags[NUM_GB_FIXED]) = 0;
+		virtual void RenderGBuffersAlpha(CommandList* pCommandList, uint32_t& numBarriers,
+			ResourceBarrier* pBarriers, const BarrierFlag barrierFlags[NUM_GB_RTV]) = 0;
+		virtual void RenderGBuffers(CommandList* pCommandList, uint32_t& numBarriers,
+			ResourceBarrier* pBarriers, const BarrierFlag barrierFlags[NUM_GB_RTV]) = 0;
 		virtual void SetViewProjMatrix(DirectX::CXMMATRIX view, DirectX::CXMMATRIX proj) = 0;
 		virtual void SetEyePoint(DirectX::CXMVECTOR eyePt) = 0;
 		virtual void SetFocusAndDistance(DirectX::CXMVECTOR focus_dist) = 0;
@@ -751,6 +763,9 @@ namespace XUSG
 		virtual DirectX::FXMVECTOR GetFocusAndDistance() const = 0;
 		virtual const DescriptorTable& GetCBVTable(uint8_t i) const = 0;
 		virtual const RenderTarget* GetGBuffer(uint8_t i) const = 0;
+
+		virtual std::vector<Character::uptr>& GetCharacters() = 0;
+		virtual std::vector<StaticModel::sptr>& GetStaticModels() = 0;
 
 		using uptr = std::unique_ptr<Scene>;
 		using sptr = std::shared_ptr<Scene>;

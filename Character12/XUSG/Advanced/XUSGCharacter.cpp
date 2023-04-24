@@ -465,6 +465,8 @@ void Character_Impl::skinning(const CommandList* pCommandList, bool reset)
 void Character_Impl::renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
 	SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
+	static const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
+
 	if (pCbvPerFrameTable)
 	{
 		pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
@@ -477,8 +479,6 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 	// Set matrices
 	pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][CBV_MATRICES]);
 
-	const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
-
 	const auto numMeshes = m_mesh->GetNumMeshes();
 	for (const auto& subsetMask : subsetMasks)
 	{
@@ -486,17 +486,21 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 		{
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
-				// Set IA parameters
-				pCommandList->IASetVertexBuffers(0, 1, &m_transformedVBs[m_currentFrame]->GetVBV(m));
+				const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
+				if (m_mesh->GetNumSubsets(m, materialType) > 0)
+				{
+					// Set IA parameters
+					pCommandList->IASetVertexBuffers(0, 1, &m_transformedVBs[m_currentFrame]->GetVBV(m));
 
 #if XUSG_TEMPORAL
-				// Set historical motion states, if neccessary
-				if (layout == BASE_PASS)
-					pCommandList->SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
+					// Set historical motion states, if neccessary
+					if (layout == BASE_PASS)
+						pCommandList->SetGraphicsDescriptorTable(HISTORY, m_srvSkinnedTables[m_previousFrame][m]);
 #endif
 
-				// Render mesh
-				render(pCommandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, pCbvPerFrameTable, numInstances);
+					// Render mesh
+					render(pCommandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, pCbvPerFrameTable, numInstances);
+				}
 			}
 		}
 	}

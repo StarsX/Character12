@@ -177,7 +177,6 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
   <ItemGroup>
     <ClInclude Include="Common\d3d12.h" />
     <ClInclude Include="Common\d3dcommon.h" />
-    <ClInclude Include="Common\d3dx12.h" />
     <ClInclude Include="Common\dds.h" />
     <ClInclude Include="Common\dxcapi.h" />
     <ClInclude Include="Common\DXFramework.h" />

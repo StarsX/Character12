@@ -28,40 +28,22 @@ SDKMesh::sptr SDKMesh::MakeShared(API api)
 //--------------------------------------------------------------------------------------
 PrimitiveTopology SDKMesh::GetPrimitiveType(PrimitiveType primType)
 {
-	PrimitiveTopology retType = PrimitiveTopology::TRIANGLELIST;
-
-	switch (primType)
+	static const PrimitiveTopology primitiveTopologies[] =
 	{
-	case PT_TRIANGLE_LIST:
-		retType = PrimitiveTopology::TRIANGLELIST;
-		break;
-	case PT_TRIANGLE_STRIP:
-		retType = PrimitiveTopology::TRIANGLESTRIP;
-		break;
-	case PT_LINE_LIST:
-		retType = PrimitiveTopology::LINELIST;
-		break;
-	case PT_LINE_STRIP:
-		retType = PrimitiveTopology::LINESTRIP;
-		break;
-	case PT_POINT_LIST:
-		retType = PrimitiveTopology::POINTLIST;
-		break;
-	case PT_TRIANGLE_LIST_ADJ:
-		retType = PrimitiveTopology::TRIANGLELIST_ADJ;
-		break;
-	case PT_TRIANGLE_STRIP_ADJ:
-		retType = PrimitiveTopology::TRIANGLESTRIP_ADJ;
-		break;
-	case PT_LINE_LIST_ADJ:
-		retType = PrimitiveTopology::LINELIST_ADJ;
-		break;
-	case PT_LINE_STRIP_ADJ:
-		retType = PrimitiveTopology::LINESTRIP_ADJ;
-		break;
+		PrimitiveTopology::TRIANGLELIST,
+		PrimitiveTopology::TRIANGLESTRIP,
+		PrimitiveTopology::LINELIST,
+		PrimitiveTopology::LINESTRIP,
+		PrimitiveTopology::POINTLIST,
+		PrimitiveTopology::TRIANGLELIST_ADJ,
+		PrimitiveTopology::TRIANGLESTRIP_ADJ,
+		PrimitiveTopology::LINELIST_ADJ,
+		PrimitiveTopology::LINESTRIP_ADJ,
+		PrimitiveTopology::CONTROL_POINT4_PATCHLIST,
+		PrimitiveTopology::CONTROL_POINT3_PATCHLIST
 	};
 
-	return retType;
+	return primitiveTopologies[primType];
 }
 
 //--------------------------------------------------------------------------------------

@@ -88,7 +88,7 @@ Character_Impl::~Character_Impl(void)
 }
 
 bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
-	const shared_ptr<SDKMesh>& mesh, const ShaderLib::sptr& shaderLib,
+	const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
 	const Graphics::PipelineLib::sptr& graphicsPipelineLib,
 	const Compute::PipelineLib::sptr& computePipelineLib,
 	const PipelineLayoutLib::sptr& pipelineLayoutLib,
@@ -232,9 +232,9 @@ void Character_Impl::Skinning(CommandList* pCommandList, uint32_t& numBarriers,
 }
 
 void Character_Impl::RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
+	SubsetFlags subsetMask, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
-	renderTransformed(pCommandList, layout, subsetFlags, pCbvPerFrameTable, numInstances);
+	renderTransformed(pCommandList, layout, subsetMask, pCbvPerFrameTable, numInstances);
 	if (m_meshLinks)
 	{
 		const auto numLinks = static_cast<uint8_t>(m_meshLinks->size());
@@ -463,9 +463,9 @@ void Character_Impl::skinning(const CommandList* pCommandList, bool reset)
 }
 
 void Character_Impl::renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
+	SubsetFlags subsetMask, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
-	static const SubsetFlags subsetMasks[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
+	static const SubsetFlags subsetFlags[] = { SUBSET_OPAQUE, SUBSET_ALPHA_TEST, SUBSET_ALPHA };
 
 	if (pCbvPerFrameTable)
 	{
@@ -480,13 +480,13 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 	pCommandList->SetGraphicsDescriptorTable(MATRICES, m_cbvTables[m_currentFrame][CBV_MATRICES]);
 
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	for (const auto& subsetMask : subsetMasks)
+	for (const auto& subsetFlag : subsetFlags)
 	{
-		if (subsetFlags & subsetMask)
+		if (subsetMask & subsetFlag)
 		{
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
-				const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
+				const auto materialType = subsetFlag != SUBSET_OPAQUE ? SUBSET_ALPHA : SUBSET_OPAQUE;
 				if (m_mesh->GetNumSubsets(m, materialType) > 0)
 				{
 					// Set IA parameters
@@ -499,7 +499,7 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 #endif
 
 					// Render mesh
-					render(pCommandList, m, layout, ~SUBSET_FULL & subsetFlags | subsetMask, pCbvPerFrameTable, numInstances);
+					render(pCommandList, m, layout, subsetFlag, pCbvPerFrameTable, numInstances);
 				}
 			}
 		}

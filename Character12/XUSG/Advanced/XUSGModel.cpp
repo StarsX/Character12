@@ -187,12 +187,12 @@ void Model_Impl::SetPipeline(const CommandList* pCommandList, PipelineIndex pipe
 	pCommandList->SetPipelineState(m_pipelines[pipeline]);
 }
 
-void Model_Impl::SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout)
+void Model_Impl::SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlag, PipelineLayoutIndex layout)
 {
-	subsetFlags = subsetFlags & SUBSET_FULL;
-	assert(subsetFlags != SUBSET_FULL);
+	subsetFlag = subsetFlag & SUBSET_FULL;
+	assert(subsetFlag != SUBSET_FULL);
 
-	switch (subsetFlags)
+	switch (subsetFlag)
 	{
 	case SUBSET_ALPHA_TEST:
 		SetPipeline(pCommandList, layout ? DEPTH_ALPHA_TWO_SIDED : ALPHA_TEST_TWO_SIDED);
@@ -382,17 +382,17 @@ bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* 
 }
 
 void Model_Impl::render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
+	SubsetFlags subsetFlag, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
 {
-	assert((subsetFlags & SUBSET_FULL) != SUBSET_FULL);
+	assert((subsetFlag & SUBSET_FULL) != SUBSET_FULL);
 
 	// Set IA parameters
 	pCommandList->IASetIndexBuffer(m_mesh->GetIndexBufferView(mesh));
 
-	const auto materialType = subsetFlags & SUBSET_OPAQUE ? SUBSET_OPAQUE : SUBSET_ALPHA;
+	const auto materialType = subsetFlag != SUBSET_OPAQUE ? SUBSET_ALPHA : SUBSET_OPAQUE;
 
 	// Set pipeline state
-	if (pCbvPerFrameTable) SetPipeline(pCommandList, subsetFlags, layout);
+	if (pCbvPerFrameTable) SetPipeline(pCommandList, subsetFlag, layout);
 
 	//const uint8_t materialSlot = psBaseSlot + MATERIAL;
 	const auto numSubsets = m_mesh->GetNumSubsets(mesh, materialType);

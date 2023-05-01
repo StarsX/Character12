@@ -30,7 +30,7 @@ namespace XUSG
 #endif
 		void SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout);
 		void SetPipeline(const CommandList* pCommandList, PipelineIndex pipeline);
-		void SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlags, PipelineLayoutIndex layout);
+		void SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlag, PipelineLayoutIndex layout);
 		void Render(const CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
 			PipelineLayoutIndex layout = NUM_PIPELINE_LAYOUT, const DescriptorTable* pCbvPerFrameTable = nullptr,
 			uint32_t numInstances = 1);
@@ -51,7 +51,7 @@ namespace XUSG
 		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats, uint32_t numRTVs,
 			Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual);
 		void render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
+			SubsetFlags subsetFlag, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
 
 		Util::PipelineLayout::sptr initPipelineLayout(VertexShader vs, PixelShader ps);
 

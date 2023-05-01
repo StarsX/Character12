@@ -38,7 +38,7 @@ namespace XUSG
 		void Skinning(CommandList* pCommandList, uint32_t& numBarriers,
 			ResourceBarrier* pBarriers, bool reset = false);
 		void RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlags = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
+			SubsetFlags subsetMask = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
 			uint32_t numInstances = 1);
 
 		const DirectX::XMFLOAT4& GetPosition() const;
@@ -67,7 +67,7 @@ namespace XUSG
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world, bool isTemporal);
 		void skinning(const CommandList* pCommandList, bool reset);
 		void renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlags, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
+			SubsetFlags subsetMask, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
 		void renderLinked(uint32_t mesh, PipelineLayoutIndex layout, uint32_t numInstances);
 		void setSkeletalMatrices(uint32_t numMeshes);
 		void setBoneMatrices(uint32_t mesh);

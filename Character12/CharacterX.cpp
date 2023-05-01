@@ -10,6 +10,7 @@
 //*********************************************************
 
 #include "CharacterX.h"
+#include "stb_image_write.h"
 
 using namespace std;
 using namespace XUSG;
@@ -94,7 +95,7 @@ void CharacterX::LoadPipeline()
 	// Describe and create the swap chain.
 	m_swapChain = SwapChain::MakeUnique();
 	XUSG_N_RETURN(m_swapChain->Create(factory.get(), Win32Application::GetHwnd(), m_commandQueue->GetHandle(),
-		FrameCount, m_width, m_height, Format::B8G8R8A8_UNORM, SwapChainFlag::ALLOW_TEARING), ThrowIfFailed(E_FAIL));
+		FrameCount, m_width, m_height, Format::R8G8B8A8_UNORM, SwapChainFlag::ALLOW_TEARING), ThrowIfFailed(E_FAIL));
 
 	// This sample does not support fullscreen transitions.
 	ThrowIfFailed(factory->MakeWindowAssociation(Win32Application::GetHwnd(), DXGI_MWA_NO_ALT_ENTER));
@@ -270,6 +271,8 @@ void CharacterX::OnKeyUp(uint8_t key)
 	case VK_SPACE:
 		m_pausing = !m_pausing;
 		break;
+	case VK_F11:
+		m_screenShot = 1;
 	}
 }
 
@@ -363,22 +366,32 @@ void CharacterX::PopulateCommandList()
 	pCommandList->RSSetViewports(1, &m_viewport);
 	pCommandList->RSSetScissorRects(1, &m_scissorRect);
 
+	const auto pRenderTarget = m_renderTargets[m_frameIndex].get();
+
 	// Indicate that the back buffer will be used as a render target.
-	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::RENDER_TARGET);
+	numBarriers = pRenderTarget->SetBarrier(barriers, ResourceState::RENDER_TARGET);
 	pCommandList->Barrier(numBarriers, barriers);
-	pCommandList->OMSetRenderTargets(1, &m_renderTargets[m_frameIndex]->GetRTV(), &m_depth->GetDSV());
+	pCommandList->OMSetRenderTargets(1, &pRenderTarget->GetRTV(), &m_depth->GetDSV());
 
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	pCommandList->ClearRenderTargetView(m_renderTargets[m_frameIndex]->GetRTV(), clearColor, 0, nullptr);
+	pCommandList->ClearRenderTargetView(pRenderTarget->GetRTV(), clearColor, 0, nullptr);
 	pCommandList->ClearDepthStencilView(m_depth->GetDSV(), ClearFlag::DEPTH, 1.0f, 0, 0, nullptr);
 	//m_commandList.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	m_character->RenderTransformed(pCommandList, Character::BASE_PASS, SUBSET_FULL, &m_cbvTables[m_frameIndex]);
 
 	// Indicate that the back buffer will now be used to present.
-	numBarriers = m_renderTargets[m_frameIndex]->SetBarrier(barriers, ResourceState::PRESENT);
+	numBarriers = pRenderTarget->SetBarrier(barriers, ResourceState::PRESENT);
 	pCommandList->Barrier(numBarriers, barriers);
+
+	// Screen-shot helper
+	if (m_screenShot == 1)
+	{
+		if (!m_readBuffer) m_readBuffer = Buffer::MakeUnique();
+		pRenderTarget->ReadBack(pCommandList, m_readBuffer.get(), &m_rowPitch);
+		m_screenShot = 2;
+	}
 
 	XUSG_N_RETURN(pCommandList->Close(), ThrowIfFailed(E_FAIL));
 }
@@ -413,6 +426,43 @@ void CharacterX::MoveToNextFrame()
 
 	// Set the fence value for the next frame.
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;
+
+	// Screen-shot helper
+	if (m_screenShot)
+	{
+		if (m_screenShot > FrameCount)
+		{
+			char timeStr[15];
+			tm dateTime;
+			const auto now = time(nullptr);
+			if (!localtime_s(&dateTime, &now) && strftime(timeStr, sizeof(timeStr), "%Y%m%d%H%M%S", &dateTime))
+				SaveImage((string("CharacterX_") + timeStr + ".png").c_str(), m_readBuffer.get(), m_width, m_height, m_rowPitch);
+			m_screenShot = 0;
+		}
+		else ++m_screenShot;
+	}
+}
+
+void CharacterX::SaveImage(char const* fileName, Buffer* imageBuffer, uint32_t w, uint32_t h, uint32_t rowPitch, uint8_t comp)
+{
+	assert(comp == 3 || comp == 4);
+	const auto pData = static_cast<uint8_t*>(imageBuffer->Map(nullptr));
+
+	//stbi_write_png_compression_level = 1024;
+	vector<uint8_t> imageData(comp * w * h);
+	const auto sw = rowPitch / 4;
+	for (auto i = 0u; i < h; ++i)
+		for (auto j = 0u; j < w; ++j)
+		{
+			const auto s = sw * i + j;
+			const auto d = w * i + j;
+			for (uint8_t k = 0; k < comp; ++k)
+				imageData[comp * d + k] = pData[4 * s + k];
+		}
+
+	stbi_write_png(fileName, w, h, comp, imageData.data(), 0);
+
+	m_readBuffer->Unmap();
 }
 
 double CharacterX::CalculateFrameStats(float* pTimeStep)
@@ -435,6 +485,8 @@ double CharacterX::CalculateFrameStats(float* pTimeStep)
 
 		wstringstream windowText;
 		windowText << setprecision(2) << fixed << L"    fps: " << fps;
+		windowText << L"    [F11] screen shot";
+
 		SetCustomWindowText(windowText.str().c_str());
 	}
 

@@ -75,6 +75,10 @@ private:
 	XMFLOAT3	m_focusPt;
 	XMFLOAT3	m_eyePt;
 
+	// Screen-shot helper
+	XUSG::Buffer::uptr	m_readBuffer;
+	uint32_t			m_rowPitch;
+
 	// Synchronization objects.
 	uint8_t		m_frameIndex;
 	HANDLE		m_fenceEvent;
@@ -89,10 +93,15 @@ private:
 	bool		m_tracking;
 	XMFLOAT2	m_mousePt;
 
+	// Screen-shot state
+	uint8_t		m_screenShot;
+
 	void LoadPipeline();
 	void LoadAssets();
 	void PopulateCommandList();
 	void WaitForGpu();
 	void MoveToNextFrame();
+	void SaveImage(char const* fileName, XUSG::Buffer* imageBuffer,
+		uint32_t w, uint32_t h, uint32_t rowPitch, uint8_t comp = 3);
 	double CalculateFrameStats(float* fTimeStep = nullptr);
 };

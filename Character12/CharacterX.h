@@ -75,10 +75,6 @@ private:
 	XMFLOAT3	m_focusPt;
 	XMFLOAT3	m_eyePt;
 
-	// Screen-shot helper
-	XUSG::Buffer::uptr	m_readBuffer;
-	uint32_t			m_rowPitch;
-
 	// Synchronization objects.
 	uint8_t		m_frameIndex;
 	HANDLE		m_fenceEvent;
@@ -93,8 +89,10 @@ private:
 	bool		m_tracking;
 	XMFLOAT2	m_mousePt;
 
-	// Screen-shot state
-	uint8_t		m_screenShot;
+	// Screen-shot helpers and state
+	XUSG::Buffer::uptr	m_readBuffer;
+	uint32_t			m_rowPitch;
+	uint8_t				m_screenShot;
 
 	void LoadPipeline();
 	void LoadAssets();

@@ -559,12 +559,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<Texture> texture;
+				Texture::sptr texture;
 				uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
-				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(),
-					8192, true, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
+				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(), 8192,
+					true, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
 					MemoryFlag::NONE, m_api))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
 				else
@@ -587,12 +587,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<Texture> texture;
+				Texture::sptr texture;
 				uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
-				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(),
-					8192, false, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
+				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(), 8192,
+					false, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
 					MemoryFlag::NONE, m_api))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
 				else
@@ -634,12 +634,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			}
 			else
 			{
-				shared_ptr<Texture> texture;
+				Texture::sptr texture;
 				uploaders.emplace_back(Resource::MakeUnique(m_api));
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
-				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(),
-					8192, false, texture, uploaders.back().get(), nullptr, ResourceState::COMMON,
+				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(), 8192,
+					false, texture, uploaders.back().get(), nullptr, ResourceState::COMMON,
 					MemoryFlag::NONE, m_api))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
 				else

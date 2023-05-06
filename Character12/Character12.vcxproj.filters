@@ -128,6 +128,9 @@
     <ClCompile Include="XUSG\Advanced\XUSGDDSLoader.cpp">
       <Filter>XUSG\Advanced\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Common\stb_image_write.cpp">
+      <Filter>Common\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="XUSG\Shaders\CSSkinning.hlsli">

@@ -734,7 +734,7 @@ namespace XUSG
 			std::vector<Resource::uptr>& uploaders,
 			const RenderTarget::sptr& sceneColor,
 			const DepthStencil::sptr& sceneDepth,
-			const RenderTarget::sptr& sceneMasks) = 0;
+			const RenderTarget::sptr& sceneShade) = 0;
 		virtual bool CreateResources(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders) = 0;
 
 		virtual void Update(uint8_t frameIndex, double time, float timeStep) = 0;
@@ -757,7 +757,7 @@ namespace XUSG
 		virtual void SetEyePoint(DirectX::CXMVECTOR eyePt) = 0;
 		virtual void SetFocusAndDistance(DirectX::CXMVECTOR focus_dist) = 0;
 		virtual void SetRenderTarget(const RenderTarget::sptr& sceneColor, const DepthStencil::sptr& sceneDepth,
-			const RenderTarget::sptr& sceneMasks, bool createFramebuffer = true) = 0;
+			const RenderTarget::sptr& sceneShade, bool createFramebuffer = true) = 0;
 		virtual void SetViewport(const Viewport& viewport, const RectRange& scissorRect) = 0;
 
 		virtual DirectX::FXMVECTOR GetFocusAndDistance() const = 0;
@@ -815,8 +815,8 @@ namespace XUSG
 		virtual void Unsharp(const CommandList* pCommandList, const Descriptor* pRTVs,
 			const DescriptorTable& srvTable, uint8_t numRTVs = 1) = 0;
 
-		virtual DescriptorTable CreateTemporalAASRVTable(const Descriptor& srvCurrent, const Descriptor& srvPrevious,
-			const Descriptor& srvVelocity, const Descriptor& srvMasks, const Descriptor& srvMeta) = 0;
+		virtual DescriptorTable CreateTAASrvTable(const Descriptor& srvCurrent, const Descriptor& srvPrevious,
+			const Descriptor& srvVelocity, const Descriptor& srvShadeAmt, const Descriptor& srvMeta) = 0;
 
 		using uptr = std::unique_ptr<Postprocess>;
 		using sptr = std::shared_ptr<Postprocess>;
@@ -882,7 +882,7 @@ namespace XUSG
 		CS_SH_CUBE_MAP,
 		CS_SH_SUM,
 		CS_SH_NORMALIZE,
-		CS_RESAMPLE,
+		//CS_BLIT_2D,
 		CS_LUM_ADAPT
 	};
 }

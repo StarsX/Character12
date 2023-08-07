@@ -72,9 +72,6 @@
     <ClInclude Include="Common\dds.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Common\dxcapi.h">
-      <Filter>Common\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Common\StepTimer.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
@@ -88,9 +85,6 @@
       <Filter>XUSG</Filter>
     </ClInclude>
     <ClInclude Include="Common\d3dcommon.h">
-      <Filter>Common\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Common\dxgicommon.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Common\dxgiformat.h">

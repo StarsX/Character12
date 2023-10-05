@@ -209,7 +209,7 @@ void CharacterX::LoadAssets()
 		m_eyePt = XMFLOAT3(m_focusPt.x, m_focusPt.y, m_focusPt.z - 25.0f);
 		const auto focusPt = XMLoadFloat3(&m_focusPt);
 		const auto eyePt = XMLoadFloat3(&m_eyePt);
-		const auto view = XMMatrixLookAtLH(eyePt, focusPt, XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f));
+		const auto view = XMMatrixLookAtLH(eyePt, focusPt, XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
 		XMStoreFloat4x4(&m_view, view);
 	}
 }

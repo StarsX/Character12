@@ -16,7 +16,7 @@ struct VS_Input
 	float3	Norm	: NORMAL;		// Normal
 	uint	UV		: TEXCOORD;		// Texture coordinate
 #ifdef _TANGENT_
-	float3	Tan		: TANGENT;		// Normalized Tangent vector
+	float4	Tan		: TANGENT;		// Normalized Tangent vector
 #endif
 };
 
@@ -41,7 +41,7 @@ struct SkinnedInfo
 	float3	Norm;
 	uint	UV;
 #ifdef _TANGENT_
-	float3	Tan;
+	float4	Tan;
 #endif
 };
 
@@ -101,7 +101,7 @@ SkinnedInfo SkinVert(VS_Input input)
 	dualQ /= length(rotQ);
 	float3 normal = input.Norm / scale;
 #ifdef _TANGENT_
-	float3 tangent = input.Tan * scale;
+	float3 tangent = input.Tan.xyz * scale;
 #endif
 	float3 pos = input.Pos * scale;
 	pos = RotateWithDQ(pos, dualQ);
@@ -110,7 +110,8 @@ SkinnedInfo SkinVert(VS_Input input)
 	output.Pos = pos;
 	output.Norm = RotateWithDQ(normal, dualQ);
 #ifdef _TANGENT_
-	output.Tan = RotateWithDQ(tangent, dualQ);
+	output.Tan.xyz = RotateWithDQ(tangent, dualQ);
+	output.Tan.w = input.Tan.w;
 #endif
 	output.UV = input.UV;
 

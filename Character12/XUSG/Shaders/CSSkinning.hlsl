@@ -46,6 +46,14 @@ uint2 EncodeRGB16f(float3 v)
 }
 
 //--------------------------------------------------------------------------------------
+// Encode R16G16B16A_FLOAT
+//--------------------------------------------------------------------------------------
+uint2 EncodeRGBA16f(float4 v)
+{
+	return uint2(f32tof16(v.x) | (f32tof16(v.y) << 16), f32tof16(v.z) | (f32tof16(v.w) << 16));
+}
+
+//--------------------------------------------------------------------------------------
 // Decode R8G8B8A8_UINT
 //--------------------------------------------------------------------------------------
 uint4 DecodeRGBA8u(uint u)
@@ -70,6 +78,14 @@ float3 DecodeRGB16f(uint2 u)
 }
 
 //--------------------------------------------------------------------------------------
+// Decode R16G16B16A16_FLOAT
+//--------------------------------------------------------------------------------------
+float4 DecodeRGBA16f(uint2 u)
+{
+	return f16tof32(uint4(u, u >> 16).xzyw);
+}
+
+//--------------------------------------------------------------------------------------
 // Load vertex data
 //--------------------------------------------------------------------------------------
 VS_Input LoadVertex(uint i)
@@ -82,7 +98,7 @@ VS_Input LoadVertex(uint i)
 	vertex.Bones = DecodeRGBA8u(vertexIn.Bones);
 	vertex.Norm = DecodeRGB16f(vertexIn.Norm);
 #ifdef _TANGENT_
-	vertex.Tan = DecodeRGB16f(vertexIn.Tan);
+	vertex.Tan = DecodeRGBA16f(vertexIn.Tan);
 #endif
 	vertex.UV = vertexIn.UV;
 	
@@ -99,7 +115,7 @@ void StoreVertex(SkinnedInfo skinned, uint i)
 	output.Norm = EncodeRGB16f(skinned.Norm);
 	output.UV = skinned.UV;
 #ifdef _TANGENT_
-	output.Tan = EncodeRGB16f(skinned.Tan);
+	output.Tan = EncodeRGBA16f(skinned.Tan);
 #endif
 
 	g_rwVertices[i] = output;

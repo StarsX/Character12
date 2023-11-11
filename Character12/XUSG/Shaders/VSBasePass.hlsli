@@ -11,7 +11,7 @@ struct VS_Input
 	float3		Norm	: NORMAL;		// Normal
 	min16float2	UV		: TEXCOORD;		// Texture coordinate
 #ifdef _TANGENT_
-	float3		Tan		: TANGENT;		// Normalized Tangent vector
+	float4		Tan		: TANGENT;		// Normalized Tangent vector
 #endif
 };
 
@@ -98,7 +98,8 @@ VS_Output main(uint vid : SV_VertexID, VS_Input input)
 #endif
 
 #ifdef _TANGENT_
-	output.Tangent = min16float3(normalize(mul(input.Tan, (float3x3)g_world)));
+	output.Tangent.xyz = min16float3(normalize(mul(input.Tan.xyz, (float3x3)g_world)));
+	output.Tangent.w = min16float(input.Tan.w);
 #endif
 
 	output.UV = input.UV;

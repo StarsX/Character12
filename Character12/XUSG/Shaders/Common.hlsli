@@ -8,7 +8,6 @@
 // Definitions
 //--------------------------------------------------------------------------------------
 #ifdef _BASEPASS_
-#define _POSWORLD_
 #define _NORMAL_
 #define _TANGENT_
 #endif
@@ -40,7 +39,7 @@ struct IOStruct
 #endif
 
 #ifdef _TANGENT_
-	min16float3	Tangent	: TANGENT;		// Normalized Tangent vector
+	min16float4	Tangent	: TANGENT;		// Normalized Tangent vector
 #endif
 
 #if defined(_BASEPASS_) && XUSG_TEMPORAL

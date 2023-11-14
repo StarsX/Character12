@@ -222,7 +222,7 @@ void Character_Impl::Skinning(CommandList* pCommandList, uint32_t& numBarriers,
 {
 	if (m_time >= 0.0) m_mesh->TransformMesh(XMMatrixIdentity(), m_time);
 	numBarriers = m_transformedVBs[m_currentFrame]->SetBarrier(pBarriers, ResourceState::UNORDERED_ACCESS,
-		numBarriers, XUSG_BARRIER_ALL_SUBRESOURCES, BarrierFlag::RESET_SRC_STATE);
+		numBarriers, XUSG_BARRIER_ALL_SUBRESOURCES, BarrierFlag::NONE, ResourceState::COMMON);
 	pCommandList->Barrier(numBarriers, pBarriers);
 	skinning(pCommandList, reset);
 

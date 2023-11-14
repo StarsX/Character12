@@ -1001,7 +1001,11 @@ void SDKMesh_Impl::createAsStaticMesh()
 				{
 					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
 					auto& tan = reinterpret_cast<XMHALF4&>(verts[offset]);
-					XMStoreHalf4(&tan, XMVector3TransformNormal(XMLoadHalf4(&tan), local));
+					auto vec = XMLoadHalf4(&tan);
+					const auto w = XMVectorGetW(vec);
+					vec = XMVector3TransformNormal(vec, local);
+					vec = XMVectorSetW(vec, w);
+					XMStoreHalf4(&tan, vec);
 					offset += sizeof(XMHALF4);
 				}
 

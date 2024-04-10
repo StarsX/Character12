@@ -487,7 +487,7 @@ void Character_Impl::renderTransformed(const CommandList* pCommandList, Pipeline
 			for (auto m = 0u; m < numMeshes; ++m)
 			{
 				const auto materialType = subsetFlag != SUBSET_OPAQUE ? SUBSET_ALPHA : SUBSET_OPAQUE;
-				if (m_mesh->GetNumSubsets(m, materialType) > 0)
+				if (m_mesh->GetNumSubsets(m, materialType))
 				{
 					// Set IA parameters
 					pCommandList->IASetVertexBuffers(0, 1, &m_transformedVBs[m_currentFrame]->GetVBV(m));

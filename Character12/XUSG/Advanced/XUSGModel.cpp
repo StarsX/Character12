@@ -141,7 +141,7 @@ bool Model_Impl::CreateDescriptorTables()
 			descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 			XUSG_X_RETURN(m_srvTables[m], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 		}
-		else m_srvTables[m] = nullptr;
+		else m_srvTables[m] = XUSG_NULL;
 	}
 
 	return true;
@@ -266,11 +266,11 @@ bool Model_Impl::createConstantBuffers(const Device* pDevice)
 	return true;
 }
 
-bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats, uint32_t numRTVs,
-	Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual)
+bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
+	uint32_t numRTVs, Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual)
 {
 	const auto defaultRtvFormat = Format::B8G8R8A8_UNORM;
-	numRTVs = numRTVs > 0 ? numRTVs : 1;
+	numRTVs = (max)(numRTVs, 1u);
 	rtvFormats = rtvFormats ? rtvFormats : &defaultRtvFormat;
 	dsvFormat = dsvFormat != Format::UNKNOWN ? dsvFormat : Format::D24_UNORM_S8_UINT;
 	shadowFormat = shadowFormat != Format::UNKNOWN ? shadowFormat : Format::D24_UNORM_S8_UINT;

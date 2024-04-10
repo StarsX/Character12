@@ -657,25 +657,25 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 {
 	// Vertex buffer info
 	auto numVertices = 0u;
-	const auto stride = static_cast<uint32_t>(m_pVertexBufferArray->StrideBytes);
+	const auto byteStride = static_cast<uint32_t>(m_pVertexBufferArray->StrideBytes);
 	vector<uint32_t> firstVertices(m_pMeshHeader->NumVertexBuffers);
 
 	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 	{
 		firstVertices[i] = numVertices;
-		numVertices += static_cast<uint32_t>(m_pVertexBufferArray[i].SizeBytes) / stride;
+		numVertices += static_cast<uint32_t>(m_pVertexBufferArray[i].SizeBytes) / byteStride;
 	}
 
 	// Create a vertex Buffer
 	m_vertexBuffer = VertexBuffer::MakeShared(m_api);
-	XUSG_N_RETURN(m_vertexBuffer->Create(pCommandList->GetDevice(), numVertices, stride, ResourceFlag::NONE,
+	XUSG_N_RETURN(m_vertexBuffer->Create(pCommandList->GetDevice(), numVertices, byteStride, ResourceFlag::NONE,
 		MemoryType::DEFAULT, m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr, MemoryFlag::NONE,
 		m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
 
 	// Copy vertices into one buffer
 	size_t offset = 0;
-	vector<uint8_t> bufferData(static_cast<size_t>(stride) * numVertices);
+	vector<uint8_t> bufferData(static_cast<size_t>(byteStride) * numVertices);
 
 	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 	{
@@ -877,9 +877,9 @@ bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
 			//m_ppIndices[i]
 			const auto indices = reinterpret_cast<uint32_t*>(m_indices[currentMesh->IndexBuffer]);
 			const auto vertices = reinterpret_cast<float*>(m_vertices[currentMesh->VertexBuffers[0]]);
-			auto stride = static_cast<uint32_t>(m_pVertexBufferArray[currentMesh->VertexBuffers[0]].StrideBytes);
-			assert(stride % 4 == 0);
-			stride /= 4;
+			auto byteStride = static_cast<uint32_t>(m_pVertexBufferArray[currentMesh->VertexBuffers[0]].StrideBytes);
+			assert(byteStride % 4 == 0);
+			byteStride /= 4;
 
 			for (auto vertIdx = indexStart; vertIdx < indexStart + indexCount; ++vertIdx)
 			{
@@ -900,7 +900,7 @@ bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
 				}
 				else currentIndex = indices[vertIdx];
 				++tris;
-				const auto pt = reinterpret_cast<XMFLOAT3*>(&vertices[stride * currentIndex]);
+				const auto pt = reinterpret_cast<XMFLOAT3*>(&vertices[byteStride * currentIndex]);
 				if (pt->x < lower.x) lower.x = pt->x;
 				if (pt->y < lower.y) lower.y = pt->y;
 				if (pt->z < lower.z) lower.z = pt->z;
@@ -966,17 +966,17 @@ void SDKMesh_Impl::createAsStaticMesh()
 			const auto vb = m_pMeshArray[m].VertexBuffers[0];
 			const auto local = GetBindMatrix(i);
 			const auto verts = m_vertices[vb];
-			const auto stride = GetVertexStride(m, 0);
+			const auto byteStride = GetVertexStride(m, 0);
 			const auto localIT = XMMatrixTranspose(XMMatrixInverse(nullptr, local));
 			const auto& pDecl = m_pVertexBufferArray[vb].Decl;
 
 			for (auto i = 0u; i < numVerts; ++i)
 			{
 				uint8_t element = 0;
-				auto offset = stride * i;
+				auto offset = byteStride * i;
 				if (pDecl[element].Usage == 0)
 				{
-					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % byteStride);
 					auto& pos = reinterpret_cast<XMFLOAT3&>(verts[offset]);
 					XMStoreFloat3(&pos, XMVector3TransformCoord(XMLoadFloat3(&pos), local));
 					offset += sizeof(XMFLOAT3);
@@ -984,7 +984,7 @@ void SDKMesh_Impl::createAsStaticMesh()
 
 				if (pDecl[++element].Usage == 3)
 				{
-					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % byteStride);
 					auto& norm = reinterpret_cast<XMHALF4&>(verts[offset]);
 					XMStoreHalf4(&norm, XMVector3TransformNormal(XMLoadHalf4(&norm), localIT));
 					offset += sizeof(XMHALF4);
@@ -993,13 +993,13 @@ void SDKMesh_Impl::createAsStaticMesh()
 				if (pDecl[++element].Usage == 5)
 				{
 					// UV is unchanged
-					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % byteStride);
 					offset += sizeof(XMHALF2);
 				}
 
 				if (pDecl[++element].Usage == 6)
 				{
-					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % byteStride);
 					auto& tan = reinterpret_cast<XMHALF4&>(verts[offset]);
 					auto vec = XMLoadHalf4(&tan);
 					const auto w = XMVectorGetW(vec);
@@ -1011,7 +1011,7 @@ void SDKMesh_Impl::createAsStaticMesh()
 
 				if (pDecl[++element].Usage == 7)
 				{
-					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % stride);
+					assert(pDecl[element].Stream == 0 && pDecl[element].Offset == offset % byteStride);
 					auto& biNorm = reinterpret_cast<XMHALF4&>(verts[offset]);
 					XMStoreHalf4(&biNorm, XMVector3TransformNormal(XMLoadHalf4(&biNorm), local));
 				}

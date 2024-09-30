@@ -267,14 +267,14 @@ bool Character_Impl::createTransformedStates(const Device* pDevice)
 bool Character_Impl::createTransformedVBs(const Device* pDevice, VertexBuffer* pVertexBuffer)
 {
 	// Create VBs that will hold all of the skinned vertices that need to be output
-	auto numVertices = 0u;
+	size_t numVertices = 0;
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	vector<uint32_t> firstVertices(numMeshes);
+	vector<uintptr_t> firstVertices(numMeshes);
 
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		firstVertices[m] = numVertices;
-		numVertices += static_cast<uint32_t>(m_mesh->GetNumVertices(m, 0));
+		numVertices += static_cast<size_t>(m_mesh->GetNumVertices(m, 0));
 	}
 
 	XUSG_N_RETURN(pVertexBuffer->Create(pDevice, numVertices, sizeof(Vertex),
@@ -289,9 +289,9 @@ bool Character_Impl::createTransformedVBs(const Device* pDevice, VertexBuffer* p
 bool Character_Impl::createBuffers(const Device* pDevice)
 {
 	// Bone world matrices
-	auto numElements = 0u;
+	size_t numElements = 0;
 	const auto numMeshes = m_mesh->GetNumMeshes();
-	vector<uint32_t> firstElements(numMeshes);
+	vector<uintptr_t> firstElements(numMeshes);
 	for (auto m = 0u; m < numMeshes; ++m)
 	{
 		firstElements[m] = numElements;

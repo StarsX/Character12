@@ -656,14 +656,14 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders)
 {
 	// Vertex buffer info
-	auto numVertices = 0u;
+	size_t numVertices = 0;
 	const auto byteStride = static_cast<uint32_t>(m_pVertexBufferArray->StrideBytes);
-	vector<uint32_t> firstVertices(m_pMeshHeader->NumVertexBuffers);
+	vector<uintptr_t> firstVertices(m_pMeshHeader->NumVertexBuffers);
 
 	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 	{
 		firstVertices[i] = numVertices;
-		numVertices += static_cast<uint32_t>(m_pVertexBufferArray[i].SizeBytes) / byteStride;
+		numVertices += static_cast<size_t>(m_pVertexBufferArray[i].SizeBytes / byteStride);
 	}
 
 	// Create a vertex Buffer
@@ -675,7 +675,7 @@ bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Res
 
 	// Copy vertices into one buffer
 	size_t offset = 0;
-	vector<uint8_t> bufferData(static_cast<size_t>(byteStride) * numVertices);
+	vector<uint8_t> bufferData(byteStride * numVertices);
 
 	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 	{
@@ -694,12 +694,12 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 {
 	// Index buffer info
 	size_t byteWidth = 0;
-	vector<size_t> offsets(m_pMeshHeader->NumIndexBuffers);
+	vector<uintptr_t> offsets(m_pMeshHeader->NumIndexBuffers);
 
 	for (auto i = 0u; i < m_pMeshHeader->NumIndexBuffers; ++i)
 	{
 		offsets[i] = byteWidth;
-		byteWidth += static_cast<uint32_t>(m_pIndexBufferArray[i].SizeBytes);
+		byteWidth += static_cast<size_t>(m_pIndexBufferArray[i].SizeBytes);
 	}
 
 	// Create a index Buffer

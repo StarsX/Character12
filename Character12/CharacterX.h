@@ -42,7 +42,16 @@ public:
 	virtual void OnMouseWheel(float deltaZ, float posX, float posY);
 	virtual void OnMouseLeave();
 
+	virtual void ParseCommandLineArgs(wchar_t* argv[], int argc);
+
 private:
+	enum DeviceType : uint8_t
+	{
+		DEVICE_DISCRETE,
+		DEVICE_UMA,
+		DEVICE_WARP
+	};
+
 	static const auto FrameCount = XUSG::Model::GetFrameCount();
 
 	XUSG::ShaderLib::sptr				m_shaderLib;
@@ -82,8 +91,9 @@ private:
 	uint64_t	m_fenceValues[FrameCount];
 
 	// Application state
-	bool		m_pausing;
+	DeviceType	m_deviceType;
 	StepTimer	m_timer;
+	bool		m_isPaused;
 
 	// User camera interactions
 	bool		m_tracking;

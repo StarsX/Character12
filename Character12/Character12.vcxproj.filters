@@ -66,9 +66,6 @@
     <ClInclude Include="XUSG\Advanced\XUSGCharacter.h">
       <Filter>XUSG\Advanced\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h">
-      <Filter>XUSG\Advanced\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Common\dds.h">
       <Filter>Common\Header Files</Filter>
     </ClInclude>

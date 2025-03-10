@@ -196,7 +196,6 @@ COPY /Y "$(ProjectDir)XUSG\Bin\$(Platform)\$(Configuration)\*.dll" "$(ProjectDir
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="XUSG\Advanced\XUSGAdvanced.h" />
     <ClInclude Include="XUSG\Advanced\XUSGCharacter.h" />
-    <ClInclude Include="XUSG\Advanced\XUSGDDSLoader.h" />
     <ClInclude Include="XUSG\Advanced\XUSGModel.h" />
     <ClInclude Include="XUSG\Advanced\XUSGSDKMesh.h" />
     <ClInclude Include="XUSG\Core\XUSG.h" />

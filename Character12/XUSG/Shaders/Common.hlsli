@@ -16,6 +16,12 @@
 #define SKIN_SHADING	1
 #define HAIR_SHADING	2
 
+#if !defined(__HLSL_VERSION) || (__HLSL_VERSION < 2021)
+#define and(a, b)		((a) && (b))
+#define or(a, b)		((a) || (b))
+#define select(c, a, b)	((c) ? (a) : (b))
+#endif
+
 #ifndef _NO_IO_STRUCT_
 //--------------------------------------------------------------------------------------
 // Input/Output structures

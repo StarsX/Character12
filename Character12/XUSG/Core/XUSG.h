@@ -316,8 +316,8 @@ namespace XUSG
 	{
 		UNKNOWN,
 		ROW_MAJOR,
-		UNDEFINED_SWIZZLE,
-		STANDARD_SWIZZLE
+		TILE_UNDEFINED_SWIZZLE,
+		TILE_STANDARD_SWIZZLE
 	};
 
 	enum class DescriptorType : uint8_t
@@ -364,6 +364,7 @@ namespace XUSG
 		ALLOW_SHADER_ATOMICS = (1 << 8),
 		CREATE_NOT_RESIDENT = (1 << 9),
 		CREATE_NOT_ZEROED = (1 << 10),
+		TOOLS_USE_MANUAL_WRITE_TRACKING = (1 << 11),
 		ALLOW_ALL_BUFFERS_AND_TEXTURES = 0,
 		ALLOW_ONLY_BUFFERS = DENY_RT_DS_TEXTURES | DENY_NON_RT_DS_TEXTURES,
 		ALLOW_ONLY_NON_RT_DS_TEXTURES = D3D12_HEAP_FLAG_DENY_BUFFERS | DENY_RT_DS_TEXTURES,
@@ -505,7 +506,8 @@ namespace XUSG
 	enum class CommandQueueFlag : uint8_t
 	{
 		NONE = 0,
-		DISABLE_GPU_TIMEOUT = (1 << 0)
+		DISABLE_GPU_TIMEOUT = (1 << 0),
+		ALLOW_DYNAMIC_PRIORITY = (1 << 1)
 	};
 
 	XUSG_DEF_ENUM_FLAG_OPERATORS(CommandQueueFlag);
@@ -661,6 +663,24 @@ namespace XUSG
 	};
 
 	XUSG_DEF_ENUM_FLAG_OPERATORS(TileCopyFlag);
+
+	enum class TileRangeFlag : uint8_t
+	{
+		NONE = 0,
+		NULL_RANGE = (1 << 0),
+		SKIP = (1 << 1),
+		REUSE_SINGLE_TILE = (1 << 2)
+	};
+
+	XUSG_DEF_ENUM_FLAG_OPERATORS(TileRangeFlag);
+
+	enum class TileMappingFlag : uint8_t
+	{
+		NONE = 0,
+		NO_HAZARD = (1 << 0)
+	};
+
+	XUSG_DEF_ENUM_FLAG_OPERATORS(TileMappingFlag);
 
 	namespace Shader
 	{
@@ -850,6 +870,7 @@ namespace XUSG
 	XUSG_DEF_ENUM_FLAG_OPERATORS(PresentFlag);
 
 	// Resources related
+	class Heap;
 	class Resource;
 
 	struct SubresourceData
@@ -890,6 +911,7 @@ namespace XUSG
 		uint64_t BufferFilledSizeLocation;
 	};
 
+	// Samplers related
 	enum class SamplerFlag : uint8_t
 	{
 		NONE = 0,
@@ -1036,6 +1058,7 @@ namespace XUSG
 		uint32_t SubresourceIndex;
 	};
 
+	// Tiled resources related
 	struct TiledResourceCoord
 	{
 		TiledResourceCoord() = default;
@@ -1060,6 +1083,29 @@ namespace XUSG
 		uint32_t Width;
 		uint16_t Height;
 		uint16_t Depth;
+	};
+
+	struct TileShape
+	{
+		uint32_t WidthInTexels;
+		uint32_t HeightInTexels;
+		uint32_t DepthInTexels;
+	};
+
+	struct SubresourceTiling
+	{
+		uint32_t WidthInTiles;
+		uint16_t HeightInTiles;
+		uint16_t DepthInTiles;
+		uint32_t StartTileIndexInOverallResource;
+	};
+
+	struct PackedMipInfo
+	{
+		uint8_t NumStandardMips;
+		uint8_t NumPackedMips;
+		uint32_t NumTilesForPackedMips;
+		uint32_t StartTileIndexInOverallResource;
 	};
 
 	// Descriptors related
@@ -1297,8 +1343,8 @@ namespace XUSG
 			const TextureCopyLocation& src, const BoxRange* pSrcBox = nullptr) const = 0;
 		virtual void CopyResource(const Resource* pDstResource, const Resource* pSrcResource) const = 0;
 		virtual void CopyTiles(const Resource* pTiledResource, const TiledResourceCoord* pTileRegionStartCoord,
-			const TileRegionSize* pTileRegionSize, const Resource* pBuffer, uint64_t bufferStartOffsetInBytes,
-			TileCopyFlag flags) const = 0;
+			const TileRegionSize& tileRegionSize, const Resource* pBuffer, uint64_t bufferStartOffsetInBytes,
+			TileCopyFlag flags = TileCopyFlag::NONE) const = 0;
 		virtual void ResolveSubresource(const Resource* pDstResource, uint32_t dstSubresource,
 			const Resource* pSrcResource, uint32_t srcSubresource, Format format) const = 0;
 		virtual void IASetPrimitiveTopology(PrimitiveTopology primitiveTopology) const = 0;
@@ -1410,6 +1456,14 @@ namespace XUSG
 
 		virtual void ExecuteCommandLists(uint32_t numCommandLists, const CommandList* const* ppCommandLists) = 0;
 		virtual void ExecuteCommandList(const CommandList* pCommandList) = 0;
+		virtual void UpdateTileMappings(const Resource* pResource, uint32_t numResourceRegions,
+			const TiledResourceCoord* pResourceRegionStartCoords, const TileRegionSize* pResourceRegionSizes,
+			const Heap* pHeap, uint32_t numHeapRanges, const TileRangeFlag* pHeapRangeFlags,
+			const uint32_t* pHeapRangeStartOffsets, const uint32_t* pHeapRangeTileCounts,
+			TileMappingFlag flags = TileMappingFlag::NONE) = 0;
+		virtual void CopyTileMappings(const Resource* pDstResource, const TiledResourceCoord* pDstRegionStartCoord,
+			const Resource* pSrcResource, const TiledResourceCoord* pSrcRegionStartCoordinate,
+			const TileRegionSize& regionSize, TileMappingFlag Flags = TileMappingFlag::NONE) const = 0;
 
 		// Create from API native handle
 		virtual void Create(void* pHandle, const wchar_t* name = nullptr) = 0;
@@ -1468,6 +1522,37 @@ namespace XUSG
 	};
 
 	//--------------------------------------------------------------------------------------
+	// Resource heap
+	//--------------------------------------------------------------------------------------
+	class XUSG_INTERFACE Heap
+	{
+	public:
+		//Heap();
+		virtual ~Heap() {};
+
+		virtual bool Create(const Device* pDevice, uint64_t byteSize, MemoryType memoryType,
+			MemoryFlag memoryFlags = MemoryFlag::NONE, uint64_t alignment = 0,
+			const wchar_t* name = nullptr) = 0;
+
+		virtual uint64_t GetSize() const = 0;
+		virtual uint64_t GetAlignment() const = 0;
+		virtual MemoryType GetType() const = 0;
+
+		// Create from API native handle
+		virtual void Create(void* pDeviceHandle, void* pHeapHandle, const wchar_t* name = nullptr) = 0;
+		virtual void SetName(const wchar_t* name) = 0;
+
+		// Get API native handle
+		virtual void* GetHandle() const = 0;
+
+		using uptr = std::unique_ptr<Heap>;
+		using sptr = std::shared_ptr<Heap>;
+
+		static uptr MakeUnique(API api = API::DIRECTX_12);
+		static sptr MakeShared(API api = API::DIRECTX_12);
+	};
+
+	//--------------------------------------------------------------------------------------
 	// Resource
 	//--------------------------------------------------------------------------------------
 	class XUSG_INTERFACE Resource
@@ -1497,6 +1582,9 @@ namespace XUSG
 		virtual uint64_t GetVirtualAddress(int offset = 0) const = 0;
 
 		virtual void Unmap(const Range* pWrittenRange = nullptr) = 0;
+		virtual void GetTiling(uint32_t* pTotalNumTiles, PackedMipInfo* pPackedMipInfo = nullptr,
+			TileShape* pStandardTileShapeForNonPackedMips = nullptr, uint32_t* pNumSubresourceTilings = nullptr,
+			uint32_t firstSubresourceTiling = 0, SubresourceTiling* pSubresourceTilingsForNonPackedMips = nullptr) const = 0;
 
 		// Create from API native handle
 		virtual void Create(void* pDeviceHandle, void* pResourceHandle,
@@ -1512,7 +1600,7 @@ namespace XUSG
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
 
-		BarrierLayout GetBarrierLayout(ResourceState resourceState);
+		static BarrierLayout GetBarrierLayout(ResourceState resourceState);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -1529,8 +1617,12 @@ namespace XUSG
 		virtual bool Create(const Device* pDevice, size_t byteWidth, uint32_t numCBVs = 1,
 			const size_t* cbvByteOffsets = nullptr, MemoryType memoryType = MemoryType::UPLOAD,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, const wchar_t* name = nullptr) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, size_t byteWidth,
+			uint32_t numCBVs, const size_t* cbvByteOffsets, const wchar_t* name) = 0;
 		virtual bool CreateResource(size_t byteWidth, MemoryType memoryType = MemoryType::UPLOAD,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, ResourceState initialResourceState = ResourceState::COMMON) = 0;
+		virtual bool CreateResource(const Heap* pHeap, uint64_t heapOffset, size_t byteWidth,
+			ResourceState initialResourceState = ResourceState::COMMON) = 0;
 		virtual bool Upload(CommandList* pCommandList, Resource* pUploader, const void* pData,
 			size_t size, size_t byteOffset = 0, ResourceState srcState = ResourceState::COMMON,
 			ResourceState dstState = ResourceState::COMMON) = 0;
@@ -1546,12 +1638,16 @@ namespace XUSG
 
 		virtual const Descriptor& GetCBV(uint32_t index = 0) const = 0;
 		virtual uint32_t GetCBVOffset(uint32_t index) const = 0;
+		virtual size_t GetTiledResourceTileSize() const = 0;
 
 		using uptr = std::unique_ptr<ConstantBuffer>;
 		using sptr = std::shared_ptr<ConstantBuffer>;
 
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
+
+		static void GetAllocationInfo(uint64_t& byteSize, uint64_t& alignment,
+			const Device* pDevice, size_t byteWidth, API api = API::DIRECTX_12);
 
 		static size_t AlignCBV(size_t byteSize, API api = API::DIRECTX_12);
 	};
@@ -1601,9 +1697,22 @@ namespace XUSG
 			TextureLayout textureLayout = TextureLayout::UNKNOWN,
 			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
 			uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset,
+			uint32_t width, uint32_t height, Format format, uint16_t arraySize = 1,
+			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			uint8_t sampleCount = 1, bool isCubeMap = false, const wchar_t* name = nullptr,
+			uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
+			uint32_t maxThreads = 1) = 0;
 		virtual bool CreateResource(uint32_t width, uint32_t height, Format format, uint16_t arraySize = 1,
 			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1, uint8_t sampleCount = 1,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, ResourceState initialResourceState = ResourceState::COMMON,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN, uint8_t numCastableFormats = 0,
+			const Format* pCastableFormats = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool CreateResource(const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height,
+			Format format, uint16_t arraySize = 1, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint8_t numMips = 1, uint8_t sampleCount = 1, ResourceState initialResourceState = ResourceState::COMMON,
 			TextureLayout textureLayout = TextureLayout::UNKNOWN, uint8_t numCastableFormats = 0,
 			const Format* pCastableFormats = nullptr, uint32_t maxThreads = 1) = 0;
 		virtual bool Upload(CommandList* pCommandList, Resource* pUploader,
@@ -1656,6 +1765,7 @@ namespace XUSG
 		virtual uint16_t	GetArraySize() const = 0;
 		virtual uint8_t		GetNumMips() const = 0;
 		virtual size_t		GetRequiredIntermediateSize(uint32_t firstSubresource, uint32_t numSubresources) const = 0;
+		virtual size_t		GetTiledResourceTileSize() const = 0;
 
 		virtual void* Map(uint32_t subresource = 0, uintptr_t readBegin = 0, uintptr_t readEnd = 0) = 0;
 		virtual void* Map(const Range* pReadRange, uint32_t subresource = 0) = 0;
@@ -1665,6 +1775,12 @@ namespace XUSG
 
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
+
+		static void GetAllocationInfo(uint64_t& byteSize, uint64_t& alignment, const Device* pDevice,
+			uint32_t width, uint32_t height, Format format, uint16_t arraySize = 1,
+			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			uint8_t sampleCount = 1, TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			API api = API::DIRECTX_12);
 
 		static uint8_t CalculateMipLevels(uint32_t width, uint32_t height, uint32_t depth = 1);
 	};
@@ -1694,6 +1810,14 @@ namespace XUSG
 			TextureLayout textureLayout = TextureLayout::UNKNOWN,
 			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
 			uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height,
+			Format format, uint16_t arraySize = 1, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint8_t numMips = 1, uint8_t sampleCount = 1, const float* pClearColor = nullptr,
+			bool isCubeMap = false, const wchar_t* name = nullptr,
+			uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
+			uint32_t maxThreads = 1) = 0;
 		// CreateArray() will create a single array RTV of n slices, where numMips can be 0 for full MIP chain
 		virtual bool CreateArray(const Device* pDevice, uint32_t width, uint32_t height, uint16_t arraySize,
 			Format format, ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
@@ -1703,12 +1827,24 @@ namespace XUSG
 			TextureLayout textureLayout = TextureLayout::UNKNOWN,
 			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
 			uint32_t maxThreads = 1) = 0;
+		virtual bool CreateArray(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height,
+			uint16_t arraySize, Format format, ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			uint8_t sampleCount = 1, const float* pClearColor = nullptr, bool isCubeMap = false,
+			const wchar_t* name = nullptr, uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
+			uint32_t maxThreads = 1) = 0;
 		virtual bool CreateFromSwapChain(const Device* pDevice, const SwapChain* pSwapChain,
 			uint32_t bufferIndex, uint32_t maxThreads = 1) = 0;
 		virtual bool Initialize(const Device* pDevice, Format format) = 0;
 		virtual bool CreateResource(uint32_t width, uint32_t height, Format format, uint16_t arraySize = 1,
 			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1, uint8_t sampleCount = 1,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, ResourceState initialResourceState = ResourceState::COMMON,
+			const float* pClearColor = nullptr, TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			uint8_t numCastableFormats = 0, const Format* pCastableFormats = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool CreateResource(const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height, Format format,
+			uint16_t arraySize = 1, ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			uint8_t sampleCount = 1, ResourceState initialResourceState = ResourceState::COMMON,
 			const float* pClearColor = nullptr, TextureLayout textureLayout = TextureLayout::UNKNOWN,
 			uint8_t numCastableFormats = 0, const Format* pCastableFormats = nullptr, uint32_t maxThreads = 1) = 0;
 
@@ -1743,6 +1879,12 @@ namespace XUSG
 
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
+
+		static void GetAllocationInfo(uint64_t& byteSize, uint64_t& alignment, const Device* pDevice,
+			uint32_t width, uint32_t height, Format format, uint16_t arraySize = 1,
+			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			uint8_t sampleCount = 1, TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -1765,6 +1907,13 @@ namespace XUSG
 			uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
 			uint16_t stencilSrvComponentMapping = XUSG_DEFAULT_STENCIL_SRV_COMPONENT_MAPPING,
 			TextureLayout textureLayout = TextureLayout::UNKNOWN, uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height,
+			Format format = Format::UNKNOWN, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint16_t arraySize = 1, uint8_t numMips = 1, uint8_t sampleCount = 1,
+			float clearDepth = 1.0f, uint8_t clearStencil = 0, bool isCubeMap = false,
+			const wchar_t* name = nullptr, uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			uint16_t stencilSrvComponentMapping = XUSG_DEFAULT_STENCIL_SRV_COMPONENT_MAPPING,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN, uint32_t maxThreads = 1) = 0;
 		// CreateArray() will create a single array DSV of n slices, where numMips can be 0 for full MIP chain
 		virtual bool CreateArray(const Device* pDevice, uint32_t width, uint32_t height, uint16_t arraySize,
 			Format format = Format::UNKNOWN, ResourceFlag resourceFlags = ResourceFlag::NONE,
@@ -1773,10 +1922,22 @@ namespace XUSG
 			uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
 			uint16_t stencilSrvComponentMapping = XUSG_DEFAULT_STENCIL_SRV_COMPONENT_MAPPING,
 			TextureLayout textureLayout = TextureLayout::UNKNOWN, uint32_t maxThreads = 1) = 0;
+		virtual bool CreateArray(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height,
+			uint16_t arraySize, Format format = Format::UNKNOWN, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint8_t numMips = 1, uint8_t sampleCount = 1, float clearDepth = 1.0f, uint8_t clearStencil = 0,
+			bool isCubeMap = false, const wchar_t* name = nullptr,
+			uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			uint16_t stencilSrvComponentMapping = XUSG_DEFAULT_STENCIL_SRV_COMPONENT_MAPPING,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN, uint32_t maxThreads = 1) = 0;
 		virtual bool Initialize(const Device* pDevice, Format& format) = 0;
 		virtual bool CreateResource(uint32_t width, uint32_t height, Format format, uint16_t arraySize = 1,
 			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1, uint8_t sampleCount = 1,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, ResourceState initialResourceState = ResourceState::DEPTH_WRITE,
+			float clearDepth = 1.0f, uint8_t clearStencil = 0, TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			uint32_t maxThreads = 1) = 0;
+		virtual bool CreateResource(const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height, Format format,
+			uint16_t arraySize = 1, ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			uint8_t sampleCount = 1, ResourceState initialResourceState = ResourceState::DEPTH_WRITE,
 			float clearDepth = 1.0f, uint8_t clearStencil = 0, TextureLayout textureLayout = TextureLayout::UNKNOWN,
 			uint32_t maxThreads = 1) = 0;
 
@@ -1793,6 +1954,12 @@ namespace XUSG
 
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
+
+		static void GetAllocationInfo(uint64_t& byteSize, uint64_t& alignment, const Device* pDevice,
+			uint32_t width, uint32_t height, Format format, uint16_t arraySize = 1,
+			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			uint8_t sampleCount = 1, TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -1814,10 +1981,22 @@ namespace XUSG
 			TextureLayout textureLayout = TextureLayout::UNKNOWN,
 			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
 			uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height,
+			uint16_t depth, Format format, ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			const wchar_t* name = nullptr, uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			uint8_t numUavFormats = 0, const Format* uavFormats = nullptr,
+			uint32_t maxThreads = 1) = 0;
 		virtual bool CreateResource(uint32_t width, uint32_t height, uint16_t depth,
 			Format format, ResourceFlag resourceFlags = ResourceFlag::NONE,
 			uint8_t numMips = 1, MemoryFlag memoryFlags = MemoryFlag::NONE,
 			ResourceState initialResourceState = ResourceState::COMMON,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN,
+			uint8_t numCastableFormats = 0, const Format* pCastableFormats = nullptr,
+			uint32_t maxThreads = 1) = 0;
+		virtual bool CreateResource(const Heap* pHeap, uint64_t heapOffset, uint32_t width, uint32_t height,
+			uint16_t depth, Format format, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint8_t numMips = 1, ResourceState initialResourceState = ResourceState::COMMON,
 			TextureLayout textureLayout = TextureLayout::UNKNOWN,
 			uint8_t numCastableFormats = 0, const Format* pCastableFormats = nullptr,
 			uint32_t maxThreads = 1) = 0;
@@ -1836,6 +2015,11 @@ namespace XUSG
 
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
+
+		static void GetAllocationInfo(uint64_t& byteSize, uint64_t& alignment, const Device* pDevice,
+			uint32_t width, uint32_t height, uint16_t depth, Format format,
+			ResourceFlag resourceFlags = ResourceFlag::NONE, uint8_t numMips = 1,
+			TextureLayout textureLayout = TextureLayout::UNKNOWN, API api = API::DIRECTX_12);
 	};
 
 	//--------------------------------------------------------------------------------------
@@ -1855,8 +2039,16 @@ namespace XUSG
 			const uintptr_t* firstUavElements = nullptr, MemoryFlag memoryFlags = MemoryFlag::NONE,
 			const wchar_t* name = nullptr, const uintptr_t* counterByteOffsets = nullptr,
 			uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, size_t byteWidth,
+			ResourceFlag resourceFlags = ResourceFlag::NONE, uint32_t numSRVs = 1,
+			const uintptr_t* firstSrvElements = nullptr, uint32_t numUAVs = 1,
+			const uintptr_t* firstUavElements = nullptr, const wchar_t* name = nullptr,
+			const uintptr_t* counterByteOffsets = nullptr, uint32_t maxThreads = 1) = 0;
 		virtual bool CreateResource(size_t byteWidth, ResourceFlag resourceFlags = ResourceFlag::NONE,
 			MemoryType memoryType = MemoryType::DEFAULT, MemoryFlag memoryFlags = MemoryFlag::NONE,
+			ResourceState initialResourceState = ResourceState::COMMON, uint8_t numCastableFormats = 0,
+			const Format* pCastableFormats = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool CreateResource(const Heap* pHeap, uint64_t heapOffset, size_t byteWidth, ResourceFlag resourceFlags = ResourceFlag::NONE,
 			ResourceState initialResourceState = ResourceState::COMMON, uint8_t numCastableFormats = 0,
 			const Format* pCastableFormats = nullptr, uint32_t maxThreads = 1) = 0;
 		virtual bool Upload(CommandList* pCommandList, Resource* pUploader, const void* pData, size_t size,
@@ -1880,12 +2072,16 @@ namespace XUSG
 		virtual void SetCounter(const Resource::sptr& counter) = 0;
 
 		virtual Resource::sptr GetCounter() const = 0;
+		virtual size_t GetTiledResourceTileSize() const = 0;
 
 		using uptr = std::unique_ptr<Buffer>;
 		using sptr = std::shared_ptr<Buffer>;
 
 		static uptr MakeUnique(API api = API::DIRECTX_12);
 		static sptr MakeShared(API api = API::DIRECTX_12);
+
+		static void GetAllocationInfo(uint64_t& byteSize, uint64_t& alignment, const Device* pDevice,
+			size_t byteWidth, ResourceFlag resourceFlags = ResourceFlag::NONE, API api = API::DIRECTX_12);
 
 		static size_t AlignRawView(size_t byteSize, API api = API::DIRECTX_12);
 		static size_t AlignCounter(size_t byteSize, API api = API::DIRECTX_12);
@@ -1913,6 +2109,12 @@ namespace XUSG
 			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, const wchar_t* name = nullptr,
 			const uintptr_t* counterByteOffsets = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, size_t numElements,
+			uint32_t byteStride, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint32_t numSRVs = 1, const uintptr_t* firstSrvElements = nullptr,
+			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
+			const wchar_t* name = nullptr, const uintptr_t* counterByteOffsets = nullptr,
+			uint32_t maxThreads = 1) = 0;
 		virtual bool Initialize(const Device* pDevice) = 0;
 
 		using uptr = std::unique_ptr<StructuredBuffer>;
@@ -1939,6 +2141,13 @@ namespace XUSG
 			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, const wchar_t* name = nullptr,
 			uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			const uintptr_t* counterByteOffsets = nullptr, uint8_t numUavFormats = 0,
+			const Format* uavFormats = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, size_t numElements,
+			uint32_t byteStride, Format format, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint32_t numSRVs = 1, const uintptr_t* firstSrvElements = nullptr,
+			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
+			const wchar_t* name = nullptr, uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
 			const uintptr_t* counterByteOffsets = nullptr, uint8_t numUavFormats = 0,
 			const Format* uavFormats = nullptr, uint32_t maxThreads = 1) = 0;
 
@@ -1969,6 +2178,13 @@ namespace XUSG
 			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, const wchar_t* name = nullptr,
 			const uintptr_t* counterByteOffsets = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, size_t numVertices,
+			uint32_t byteStride, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint32_t numVBVs = 1, const uintptr_t* firstVertices = nullptr,
+			uint32_t numSRVs = 1, const uintptr_t* firstSrvElements = nullptr,
+			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
+			const wchar_t* name = nullptr, const uintptr_t* counterByteOffsets = nullptr,
+			uint32_t maxThreads = 1) = 0;
 		virtual bool CreateAsRaw(const Device* pDevice, size_t numVertices, uint32_t byteStride,
 			ResourceFlag resourceFlags = ResourceFlag::NONE, MemoryType memoryType = MemoryType::DEFAULT,
 			uint32_t numVBVs = 1, const uintptr_t* firstVertices = nullptr,
@@ -1976,6 +2192,13 @@ namespace XUSG
 			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, const wchar_t* name = nullptr,
 			const uintptr_t* counterByteOffsets = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool CreateAsRaw(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, size_t numVertices,
+			uint32_t byteStride, ResourceFlag resourceFlags = ResourceFlag::NONE,
+			uint32_t numVBVs = 1, const uintptr_t* firstVertices = nullptr,
+			uint32_t numSRVs = 1, const uintptr_t* firstSrvElements = nullptr,
+			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
+			const wchar_t* name = nullptr, const uintptr_t* counterByteOffsets = nullptr,
+			uint32_t maxThreads = 1) = 0;
 
 		virtual void CreateVBV(VertexBufferView& vbv, uint32_t numVertices, uint32_t byteStride, size_t firstVertex = 0) = 0;
 
@@ -2007,6 +2230,13 @@ namespace XUSG
 			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
 			MemoryFlag memoryFlags = MemoryFlag::NONE, const wchar_t* name = nullptr,
 			uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
+			const uintptr_t* counterByteOffsets = nullptr, uint32_t maxThreads = 1) = 0;
+		virtual bool Create(const Device* pDevice, const Heap* pHeap, uint64_t heapOffset, size_t byteWidth,
+			Format format = Format::R32_UINT, ResourceFlag resourceFlags = ResourceFlag::DENY_SHADER_RESOURCE,
+			uint32_t numIBVs = 1, const uintptr_t* ibvByteOffsets = nullptr,
+			uint32_t numSRVs = 1, const uintptr_t* firstSrvElements = nullptr,
+			uint32_t numUAVs = 1, const uintptr_t* firstUavElements = nullptr,
+			const wchar_t* name = nullptr, uint16_t srvComponentMapping = XUSG_DEFAULT_SRV_COMPONENT_MAPPING,
 			const uintptr_t* counterByteOffsets = nullptr, uint32_t maxThreads = 1) = 0;
 
 		virtual void CreateIBV(IndexBufferView& ibv, Format format, uint32_t byteSize, size_t byteOffset = 0) = 0;
@@ -2672,15 +2902,15 @@ namespace XUSG
 		};
 	}
 
+	XUSG_INTERFACE void GetPipelineCacheData(Pipeline pipeline, const void** ppData, size_t* pSize, API api = API::DIRECTX_12);
+
+	XUSG_INTERFACE void GetBlobData(const Blob& blob, const void** ppData, size_t* pSize, API api = API::DIRECTX_12);
+
 	XUSG_INTERFACE Blob GetPipelineCache(Pipeline pipeline, API api = API::DIRECTX_12);
-
-	XUSG_INTERFACE uint8_t Log2(uint32_t value);
-
-	XUSG_INTERFACE size_t GetBlobData(const Blob& blob, const void*& pData, API api = API::DIRECTX_12);
-
-	XUSG_INTERFACE size_t GetPipelineCacheData(Pipeline pipeline, const void*& pData, API api = API::DIRECTX_12);
 
 	XUSG_INTERFACE size_t Align(size_t size, size_t alignment);
 
-	XUSG_INTERFACE uint32_t Divide_RoundUp(uint32_t x, uint32_t n);
+	XUSG_INTERFACE uint8_t Log2(uint32_t value);
+
+	XUSG_INTERFACE uint32_t DivideAndRoundUp(uint32_t x, uint32_t n);
 }

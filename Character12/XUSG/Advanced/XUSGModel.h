@@ -48,7 +48,7 @@ namespace XUSG
 		};
 
 		bool createConstantBuffers(const Device* pDevice);
-		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats, uint32_t numRTVs,
+		bool createPipelines(const InputLayout* pInputLayout, uint32_t numRTVs, const Format* rtvFormats,
 			Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual);
 		void render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
 			SubsetFlags subsetFlag, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
@@ -58,10 +58,10 @@ namespace XUSG
 		API m_api;
 		std::wstring m_name;
 
-		uint8_t		m_currentFrame;
-		uint8_t		m_previousFrame;
+		uint8_t	m_currentFrame;
+		uint8_t	m_previousFrame;
 
-		uint8_t		m_variableSlot;
+		uint8_t	m_variableSlot;
 
 		SDKMesh::sptr				m_mesh;
 		ShaderLib::sptr				m_shaderLib;

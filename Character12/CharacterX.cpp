@@ -184,7 +184,7 @@ void CharacterX::LoadAssets()
 		XUSG_N_RETURN(m_character->Init(m_device.get(), m_pInputLayout, characterMesh,
 			m_shaderLib, m_graphicsPipelineLib, m_computePipelineLib,
 			m_pipelineLayoutLib, m_descriptorTableLib, nullptr, nullptr,
-			nullptr, 0, Format::UNKNOWN, Format::UNKNOWN, false, false),
+			0, nullptr, Format::UNKNOWN, Format::UNKNOWN, false, false),
 			ThrowIfFailed(E_FAIL));
 		XUSG_N_RETURN(m_character->CreateDescriptorTables(), ThrowIfFailed(E_FAIL));
 	}

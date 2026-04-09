@@ -95,7 +95,7 @@ bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout
 	const DescriptorTableLib::sptr& descriptorTableLib,
 	const shared_ptr<vector<SDKMesh>>& linkedMeshes,
 	const shared_ptr<vector<MeshLink>>& meshLinks,
-	const Format* rtvFormats, uint32_t numRTVs,
+	uint32_t numRTVs, const Format* rtvFormats,
 	Format dsvFormat, Format shadowFormat,
 	bool twoSidedAll, bool useZEqual)
 {
@@ -117,8 +117,8 @@ bool Character_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout
 
 	// Create pipeline layout and pipelines
 	XUSG_N_RETURN(createPipelineLayouts(), false);
-	XUSG_N_RETURN(createPipelines(pInputLayout, rtvFormats,
-		numRTVs, dsvFormat, shadowFormat, useZEqual), false);
+	XUSG_N_RETURN(createPipelines(pInputLayout, numRTVs, rtvFormats,
+		dsvFormat, shadowFormat, useZEqual), false);
 
 	return true;
 }
@@ -399,8 +399,8 @@ bool Character_Impl::createPipelineLayouts()
 	return true;
 }
 
-bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
-	uint32_t numRTVs, Format dsvFormat, Format shadowFormat, bool useZEqual)
+bool Character_Impl::createPipelines(const InputLayout* pInputLayout, uint32_t numRTVs,
+	const Format* rtvFormats, Format dsvFormat, Format shadowFormat, bool useZEqual)
 {
 	// Skinning
 	{
@@ -412,8 +412,8 @@ bool Character_Impl::createPipelines(const InputLayout* pInputLayout, const Form
 	}
 
 	// Rendering
-	return Model_Impl::createPipelines(pInputLayout, rtvFormats,
-		numRTVs, dsvFormat, shadowFormat, false, useZEqual);
+	return Model_Impl::createPipelines(pInputLayout, numRTVs,
+		rtvFormats, dsvFormat, shadowFormat, false, useZEqual);
 }
 
 void Character_Impl::setLinkedMatrices(uint32_t mesh, CXMMATRIX world, bool isTemporal)

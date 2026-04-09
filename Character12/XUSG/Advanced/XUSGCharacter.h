@@ -25,7 +25,7 @@ namespace XUSG
 			const DescriptorTableLib::sptr& descriptorTableLib,
 			const std::shared_ptr<std::vector<SDKMesh>>& linkedMeshes = nullptr,
 			const std::shared_ptr<std::vector<MeshLink>>& meshLinks = nullptr,
-			const Format* rtvFormats = nullptr, uint32_t numRTVs = 0,
+			uint32_t numRTVs = 0, const Format* rtvFormats = nullptr,
 			Format dsvFormat = Format::UNKNOWN, Format shadowFormat = Format::UNKNOWN,
 			bool twoSidedAll = false, bool useZEqual = true);
 		bool CreateDescriptorTables();
@@ -62,8 +62,8 @@ namespace XUSG
 		bool createTransformedVBs(const Device* pDevice, VertexBuffer* pVertexBuffer);
 		bool createBuffers(const Device* pDevice);
 		bool createPipelineLayouts();
-		bool createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
-			uint32_t numRTVs, Format dsvFormat, Format shadowFormat, bool useZEqual);
+		bool createPipelines(const InputLayout* pInputLayout, uint32_t numRTVs,
+			const Format* rtvFormats, Format dsvFormat, Format shadowFormat, bool useZEqual);
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world, bool isTemporal);
 		void skinning(const CommandList* pCommandList, bool reset);
 		void renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,

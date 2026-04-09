@@ -41,7 +41,7 @@ const InputLayout* Model::CreateInputLayout(PipelineLib* pPipelineLib)
 		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, XUSG_APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
 	};
 
-	return pPipelineLib->CreateInputLayout(inputElements, static_cast<uint32_t>(size(inputElements)));
+	return pPipelineLib->CreateInputLayout(static_cast<uint32_t>(size(inputElements)), inputElements);
 }
 
 SDKMesh::sptr Model::LoadSDKMesh(const Device* pDevice, const wstring& meshFileName,
@@ -266,8 +266,8 @@ bool Model_Impl::createConstantBuffers(const Device* pDevice)
 	return true;
 }
 
-bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* rtvFormats,
-	uint32_t numRTVs, Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual)
+bool Model_Impl::createPipelines(const InputLayout* pInputLayout, uint32_t numRTVs, const Format* rtvFormats,
+	Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual)
 {
 	const auto defaultRtvFormat = Format::B8G8R8A8_UNORM;
 	numRTVs = (max)(numRTVs, 1u);
@@ -289,7 +289,7 @@ bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* 
 		state->SetShader(Shader::Stage::PS, m_shaderLib->GetShader(Shader::Stage::PS, PS_BASE_PASS));
 		state->DSSetState(useZEqual ? Graphics::DepthStencilPreset::DEPTH_READ_EQUAL :
 			Graphics::DepthStencilPreset::DEFAULT_LESS, m_graphicsPipelineLib.get());
-		state->OMSetRTVFormats(rtvFormats, numRTVs);
+		state->OMSetRTVFormats(numRTVs, rtvFormats);
 		state->OMSetDSVFormat(dsvFormat);
 		XUSG_X_RETURN(m_pipelines[OPAQUE_FRONT], state->GetPipeline(m_graphicsPipelineLib.get(),
 			m_name.empty() ? nullptr : (m_name + L".OpaqueFront").c_str()), false);
@@ -330,7 +330,7 @@ bool Model_Impl::createPipelines(const InputLayout* pInputLayout, const Format* 
 		// Get depth pipelines
 		state->RSSetState(Graphics::RasterizerPreset::CULL_BACK, m_graphicsPipelineLib.get());
 		state->DSSetState(Graphics::DepthStencilPreset::DEFAULT_LESS, m_graphicsPipelineLib.get());
-		state->OMSetRTVFormats(nullRtvFormats, 8);
+		state->OMSetRTVFormats(static_cast<uint8_t>(size(nullRtvFormats)), nullRtvFormats);
 		state->OMSetNumRenderTargets(0);
 
 		if (vsDepth)

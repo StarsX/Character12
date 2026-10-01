@@ -30,9 +30,9 @@ public:
 	virtual void OnWindowMoved() {}
 	virtual void OnWindowSizeChanged(int width, int height) {}
 
-	// Samples override the event handlers to handle specific messages.
-	virtual void OnKeyDown(uint8_t /*key*/)   {}
-	virtual void OnKeyUp(uint8_t /*key*/)     {}
+	// Applications override the event handlers to handle specific messages.
+	virtual void OnKeyDown(uint8_t /*key*/)	{}
+	virtual void OnKeyUp(uint8_t /*key*/)	{}
 
 	virtual void OnLButtonDown(float posX, float posY) {}
 	virtual void OnLButtonUp(float posX, float posY) {}
@@ -51,13 +51,21 @@ public:
 
 protected:
 	std::wstring GetAssetFullPath(LPCWSTR assetName);
-	void GetHardwareAdapter(_In_ IDXGIFactory2* pFactory, _Outptr_result_maybenull_ IDXGIAdapter1** ppAdapter);
+
+	void GetHardwareAdapter(
+		_In_ IDXGIFactory1* pFactory,
+		_Outptr_result_maybenull_ IDXGIAdapter1** ppAdapter,
+		bool requestHighPerformanceAdapter = false);
+
 	void SetCustomWindowText(LPCWSTR text);
 
 	// Viewport dimensions.
 	uint32_t m_width;
 	uint32_t m_height;
 	float m_aspectRatio;
+
+	// Adapter info.
+	bool m_useWarpDevice;
 
 	// Window title.
 	std::wstring m_title;

@@ -68,6 +68,9 @@ SDKMesh::sptr Character::LoadSDKMesh(const Device* pDevice, const wstring& meshF
 Character_Impl::Character_Impl(const wchar_t* name, API api) :
 	Model_Impl(name, api),
 	m_computePipelineLib(nullptr),
+	m_mWorld(),
+	m_vPosRot(),
+	m_time(0.0),
 	m_skinningPipelineLayout(nullptr),
 	m_skinningPipeline(nullptr),
 	m_srvSkinningTables(),

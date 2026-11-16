@@ -10,13 +10,13 @@
 //--------------------------------------------------------------------------------------
 struct VS_Input
 {
-	float3	Pos		: POSITION;		// Position
-	float4	Weights	: WEIGHTS;		// Bone weights
-	uint4	Bones	: BONES;		// Bone indices
-	float3	Norm	: NORMAL;		// Normal
-	uint	UV		: TEXCOORD;		// Texture coordinate
+	float3	Pos		: POSITION;	// Position
+	float4	Weights	: WEIGHTS;	// Bone weights
+	uint4	Bones	: BONES;	// Bone indices
+	float3	Norm	: NORMAL;	// Normal
+	uint	UV		: TEXCOORD;	// Texture coordinate
 #ifdef _TANGENT_
-	float4	Tan		: TANGENT;		// Normalized Tangent vector
+	float4	Tan		: TANGENT;	// Normalized Tangent vector
 #endif
 };
 
@@ -30,7 +30,8 @@ struct TRS
 // Buffers
 //--------------------------------------------------------------------------------------
 // Structured buffer for bone transforms
-StructuredBuffer<TRS> g_roTransforms;
+XUSG_VK_BINDING(0, XUSG_VK_SPACE_SRV)
+StructuredBuffer<TRS> g_roTransforms : register(t0);
 
 //--------------------------------------------------------------------------------------
 // Helper struct for passing back skinned vertex information

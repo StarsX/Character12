@@ -4,6 +4,7 @@
 
 #define _TANGENT_
 
+#include "XUSGAdvanced.h"
 #include "CSSkinning.hlsli"
 
 //--------------------------------------------------------------------------------------
@@ -13,9 +14,9 @@ struct CS_Input
 {
 	float3	Pos;		// Position
 	uint	Weights;	// Bone weights
-	uint	Bones;		// Bone indices
+	uint2	Bones;		// Bone indices
 	uint2	Norm;		// Normal
-	uint	UV;			// Texture coordinate
+	uint2	UV;			// Texture coordinate
 #ifdef _TANGENT_
 	uint2	Tan;		// Normalized Tangent vector
 #endif
@@ -23,19 +24,21 @@ struct CS_Input
 
 struct CS_Output
 {
-	float3	Pos;		// Position
+	float4	Pos;		// Position
 	uint2	Norm;		// Normal
-	uint	UV;			// Texture coordinate
+	uint2	UV;			// Texture coordinate
 #ifdef _TANGENT_
-	uint2	Tan;		// Normalized Tangent vector
+	uint4	Tan;		// Normalized Tangent vector
 #endif
 };
 
 //--------------------------------------------------------------------------------------
 // Buffers
 //--------------------------------------------------------------------------------------
-RWStructuredBuffer<CS_Output>	g_rwVertices;
-StructuredBuffer<CS_Input>		g_roVertices;
+XUSG_VK_BINDING(0, XUSG_VK_SPACE_UAV)
+RWStructuredBuffer<CS_Output>	g_rwVertices : register(u0);
+XUSG_VK_BINDING(1, XUSG_VK_SPACE_SRV)
+StructuredBuffer<CS_Input>		g_roVertices : register(t1);
 
 //--------------------------------------------------------------------------------------
 // Encode R16G16B16_FLOAT
@@ -95,12 +98,12 @@ VS_Input LoadVertex(uint i)
 	CS_Input vertexIn = g_roVertices[i];
 	vertex.Pos = vertexIn.Pos;
 	vertex.Weights = DecodeRGBA8(vertexIn.Weights);
-	vertex.Bones = DecodeRGBA8u(vertexIn.Bones);
+	vertex.Bones = DecodeRGBA8u(vertexIn.Bones.x);
 	vertex.Norm = DecodeRGB16f(vertexIn.Norm);
 #ifdef _TANGENT_
 	vertex.Tan = DecodeRGBA16f(vertexIn.Tan);
 #endif
-	vertex.UV = vertexIn.UV;
+	vertex.UV = vertexIn.UV.x;
 	
 	return vertex;
 }
@@ -111,11 +114,12 @@ VS_Input LoadVertex(uint i)
 void StoreVertex(SkinnedInfo skinned, uint i)
 {
 	CS_Output output;
-	output.Pos = skinned.Pos;
+	output.Pos = float4(skinned.Pos, 0.0);
 	output.Norm = EncodeRGB16f(skinned.Norm);
-	output.UV = skinned.UV;
+	output.UV = uint2(skinned.UV, 0);
 #ifdef _TANGENT_
-	output.Tan = EncodeRGBA16f(skinned.Tan);
+	output.Tan.xy = EncodeRGBA16f(skinned.Tan);
+	output.Tan.zw = 0;
 #endif
 
 	g_rwVertices[i] = output;

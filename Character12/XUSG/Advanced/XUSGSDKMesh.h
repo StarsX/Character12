@@ -115,12 +115,12 @@ namespace XUSG
 		static_assert(sizeof(AnimationData) == 40, "SDK Mesh structure size incorrect");
 		static_assert(sizeof(AnimationFrameData) == 112, "SDK Mesh structure size incorrect");
 
-		SDKMesh_Impl(API api = API::DIRECTX_12);
+		SDKMesh_Impl();
 		virtual ~SDKMesh_Impl();
 
-		bool Create(const Device* pDevice, const wchar_t* fileName,
+		bool Create(Device* pDevice, const wchar_t* fileName,
 			const TextureLib& textureLib, bool isStaticMesh = false);
-		bool Create(const Device* pDevice, uint8_t* pData, const TextureLib& textureLib,
+		bool Create(Device* pDevice, uint8_t* pData, const TextureLib& textureLib,
 			size_t dataBytes, bool isStaticMesh = false, bool copyStatic = false);
 		bool LoadAnimation(const wchar_t* fileName);
 		void Destroy();
@@ -193,9 +193,9 @@ namespace XUSG
 		bool createVertexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders);
 		bool createIndexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders);
 
-		virtual bool createFromFile(const Device* pDevice, const wchar_t* fileName,
+		virtual bool createFromFile(Device* pDevice, const wchar_t* fileName,
 			const TextureLib& textureLib, bool isStaticMesh);
-		virtual bool createFromMemory(const Device* pDevice, uint8_t* pData, const TextureLib& textureLib,
+		virtual bool createFromMemory(Device* pDevice, uint8_t* pData, const TextureLib& textureLib,
 			size_t dataBytes, bool isStaticMesh, bool copyStatic);
 
 		void createAsStaticMesh();
@@ -207,7 +207,7 @@ namespace XUSG
 		void transformFrame(uint32_t frame, DirectX::CXMMATRIX parentWorld, double time);
 		void transformFrameAbsolute(uint32_t frame, double time);
 
-		API m_api;
+		uint8_t m_vertexStride;
 
 		// These are the pointers to the two chunks of data loaded in from the mesh file
 		uint8_t* m_pStaticMeshData;

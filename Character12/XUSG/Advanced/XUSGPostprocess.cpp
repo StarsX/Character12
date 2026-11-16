@@ -2,13 +2,21 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#include "XUSGAdvanced.h"
 #include "XUSGPostprocess.h"
 
 #include "PSBlit2D.h"
+#include "PSBlit2DSpv.h"
 #include "PSPostprocess.h"
+#include "PSPostprocessSpv.h"
 #include "PSTemporalAA.h"
+#include "PSTemporalAASpv.h"
 #include "PSToneMap.h"
+#include "PSToneMapSpv.h"
 #include "CSLumAdapt.h"
+#include "CSLumAdaptSpv.h"
+#include "VSScreenQuad.h"
+#include "VSScreenQuadSpv.h"
 
 using namespace std;
 using namespace DirectX;
@@ -17,21 +25,22 @@ using namespace XUSG;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-Postprocess::uptr Postprocess::MakeUnique(API api)
+Postprocess::uptr Postprocess::MakeUnique()
 {
-	return make_unique<Postprocess_Impl>(api);
+	Device::LockApi();
+	return make_unique<Postprocess_Impl>();
 }
 
-Postprocess::sptr Postprocess::MakeShared(API api)
+Postprocess::sptr Postprocess::MakeShared()
 {
-	return make_shared<Postprocess_Impl>(api);
+	Device::LockApi();
+	return make_shared<Postprocess_Impl>();
 }
 
 //--------------------------------------------------------------------------------------
 // Postprocess implementations
 //--------------------------------------------------------------------------------------
-Postprocess_Impl::Postprocess_Impl(API api) :
-	m_api(api),
+Postprocess_Impl::Postprocess_Impl() :
 	m_frameIndex(0),
 	m_timeStep(-FLT_MAX),
 	m_shaderLib(nullptr),
@@ -51,7 +60,7 @@ Postprocess_Impl::~Postprocess_Impl()
 {
 }
 
-bool Postprocess_Impl::Init(const Device* pDevice, const ShaderLib::sptr& shaderLib,
+bool Postprocess_Impl::Init(Device* pDevice, const ShaderLib::sptr& shaderLib,
 	const Graphics::PipelineLib::sptr& graphicsPipelineLib,
 	const Compute::PipelineLib::sptr& computePipelineLib,
 	const PipelineLayoutLib::sptr& pipelineLayoutLib,
@@ -70,19 +79,19 @@ bool Postprocess_Impl::Init(const Device* pDevice, const ShaderLib::sptr& shader
 	XUSG_N_RETURN(createPipelines(hdrFormat, ldrFormat), false);
 
 	// Create constant buffer
-	m_cbTimeStep = ConstantBuffer::MakeUnique(m_api);
+	m_cbTimeStep = ConstantBuffer::MakeUnique();
 	XUSG_N_RETURN(m_cbTimeStep->Create(pDevice, sizeof(float[FrameCount]), FrameCount,
-		nullptr, MemoryType::UPLOAD, MemoryFlag::NONE, L"cbTimeStep"), false);
+		nullptr, MemoryType::GPU_UPLOAD, MemoryFlag::NONE, L"cbTimeStep"), false);
 
 	return true;
 }
 
-bool Postprocess_Impl::ChangeWindowSize(const Device* pDevice, const Texture* pReference)
+bool Postprocess_Impl::ChangeWindowSize(Device* pDevice, const Texture* pReference)
 {
 	// Create CBV tables
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_cbTimeStep->GetCBV(i));
 		XUSG_X_RETURN(m_cbvTables[CBV_TIME_STEP + i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 	}
@@ -101,7 +110,7 @@ void Postprocess_Impl::Update(const DescriptorTable& cbvImmutable, const Descrip
 }
 
 void Postprocess_Impl::Render(CommandList* pCommandList, RenderTarget* pDst, Texture* pSrc,
-	const DescriptorTable& srvTable, bool clearRT)
+	const DescriptorTable& srvTable, bool clearRT) const
 {
 	// Post-process effects
 	ResourceBarrier barriers[3];
@@ -109,6 +118,10 @@ void Postprocess_Impl::Render(CommandList* pCommandList, RenderTarget* pDst, Tex
 	numBarriers = m_postImage->SetBarrier(barriers, ResourceState::RENDER_TARGET, numBarriers);
 	numBarriers = m_logLum->SetBarrier(barriers, ResourceState::RENDER_TARGET, numBarriers);
 	pCommandList->Barrier(numBarriers, barriers);
+
+	// Full-screen post overwrite - avoid VK LOAD decompress/RMW.
+	pCommandList->DiscardResource(m_postImage.get(), 0, nullptr, 0, 1);
+	pCommandList->DiscardResource(m_logLum.get(), 0, nullptr, 0, 1);
 
 	// Set render targets
 	const Descriptor rtvs[] =
@@ -130,7 +143,8 @@ void Postprocess_Impl::Render(CommandList* pCommandList, RenderTarget* pDst, Tex
 
 	// Generate Mips
 	numBarriers = m_avgLum->SetBarrier(barriers, ResourceState::UNORDERED_ACCESS,
-		0, XUSG_BARRIER_ALL_SUBRESOURCES, BarrierFlag::NONE, ResourceState::COMMON);
+		0, XUSG_BARRIER_ALL_SUBRESOURCES, BarrierFlag::NONE,
+		Device::GetApi() == API::VULKAN ? ResourceState::AUTO : ResourceState::COMMON);
 	numBarriers = m_logLum->GenerateMips(pCommandList, barriers, ResourceState::ALL_SHADER_RESOURCE,
 		m_pipelineLayouts[BLIT_LOG_LUM], m_pipelines[BLIT_LOG_LUM],
 		&m_uavSrvTables[SRV_LOG_LUM + 1], TEXTURES, XUSG_NULL, 0, numBarriers);
@@ -144,6 +158,7 @@ void Postprocess_Impl::Render(CommandList* pCommandList, RenderTarget* pDst, Tex
 	numBarriers = m_postImage->SetBarrier(barriers, ResourceState::PIXEL_SHADER_RESOURCE, numBarriers);
 	numBarriers = m_avgLum->SetBarrier(barriers, ResourceState::PIXEL_SHADER_RESOURCE, numBarriers);
 	pCommandList->Barrier(numBarriers, barriers);
+	pCommandList->DiscardResource(pDst, 0, nullptr, 0, 1);
 	pCommandList->OMSetRenderTargets(1, &pDst->GetRTV());
 	if (clearRT)
 	{
@@ -156,8 +171,8 @@ void Postprocess_Impl::Render(CommandList* pCommandList, RenderTarget* pDst, Tex
 	ScreenRender(pCommandList, TONE_MAP, m_uavSrvTables[SRV_COLOR_AVG_LUM], false, false);
 }
 
-void Postprocess_Impl::ScreenRender(const CommandList* pCommandList, PipelineIndex pipelineIndex,
-	const DescriptorTable& srvTable, bool hasImmutableCB, bool hasPerFrameCB)
+void Postprocess_Impl::ScreenRender(CommandList* pCommandList, PipelineIndex pipelineIndex,
+	const DescriptorTable& srvTable, bool hasImmutableCB, bool hasPerFrameCB) const
 {
 	// Set pipeline layout and descriptor tables
 	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[pipelineIndex]);
@@ -173,7 +188,7 @@ void Postprocess_Impl::ScreenRender(const CommandList* pCommandList, PipelineInd
 	pCommandList->Draw(3, 1, 0, 0);
 }
 
-void Postprocess_Impl::LumAdaption(const CommandList* pCommandList, const DescriptorTable& uavSrvTable)
+void Postprocess_Impl::LumAdaption(CommandList* pCommandList, const DescriptorTable& uavSrvTable) const
 {
 	// Set shader constants
 	const auto pCBTimeStep = static_cast<float*>(m_cbTimeStep->Map(m_frameIndex));
@@ -192,7 +207,7 @@ void Postprocess_Impl::LumAdaption(const CommandList* pCommandList, const Descri
 }
 
 void Postprocess_Impl::Antialias(CommandList* pCommandList, uint8_t numRTVs, RenderTarget** ppDsts,
-	uint8_t numSRVs, Texture** ppSrcs, const DescriptorTable& srvTable)
+	uint8_t numSRVs, Texture** ppSrcs, const DescriptorTable& srvTable) const
 {
 	// Set barriers
 	vector<ResourceBarrier> barriers(numRTVs + numSRVs);
@@ -203,6 +218,10 @@ void Postprocess_Impl::Antialias(CommandList* pCommandList, uint8_t numRTVs, Ren
 		numBarriers = ppSrcs[i]->SetBarrier(barriers.data(), ResourceState::PIXEL_SHADER_RESOURCE, numBarriers);
 	pCommandList->Barrier(numBarriers, barriers.data());
 
+	// TAA full-screen overwrite of history / meta destinations.
+	for (uint8_t i = 0; i < numRTVs; ++i)
+		pCommandList->DiscardResource(ppDsts[i], 0, nullptr, 0, 1);
+
 	// Set render targets
 	vector<Descriptor> rtvs(numRTVs);
 	for (uint8_t i = 0; i < numRTVs; ++i) rtvs[i] = ppDsts[i]->GetRTV();
@@ -211,8 +230,8 @@ void Postprocess_Impl::Antialias(CommandList* pCommandList, uint8_t numRTVs, Ren
 	ScreenRender(pCommandList, ANTIALIAS, srvTable, true, false);
 }
 
-void Postprocess_Impl::Unsharp(const CommandList* pCommandList, uint8_t numRTVs,
-	const Descriptor* pRTVs, const DescriptorTable& srvTable)
+void Postprocess_Impl::Unsharp(CommandList* pCommandList, uint8_t numRTVs,
+	const Descriptor* pRTVs, const DescriptorTable& srvTable) const
 {
 	// Set render target
 	pCommandList->OMSetRenderTargets(numRTVs, pRTVs);
@@ -232,29 +251,29 @@ void Postprocess_Impl::Unsharp(const CommandList* pCommandList, uint8_t numRTVs,
 DescriptorTable Postprocess_Impl::CreateTAASrvTable(const Descriptor& srvCurrent, const Descriptor& srvPrevious,
 	const Descriptor& srvVelocity, const Descriptor& srvShadeAmt, const Descriptor& srvMeta)
 {
-	const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+	const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 	const Descriptor descriptors[] = { srvCurrent, srvPrevious, srvVelocity, srvShadeAmt, srvMeta };
 	descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 
 	return descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get());
 }
 
-bool Postprocess_Impl::createGBuffers(const Device* pDevice, const Texture* pReference)
+bool Postprocess_Impl::createGBuffers(Device* pDevice, const Texture* pReference)
 {
 	const auto width = static_cast<uint32_t>(pReference->GetWidth());
 	const auto height = pReference->GetHeight();
 
 	const auto numLogLumMips = Log2((max)(width, height));
 
-	m_postImage = RenderTarget::MakeUnique(m_api);
+	m_postImage = RenderTarget::MakeUnique();
 	XUSG_N_RETURN(m_postImage->Create(pDevice, width, height, pReference->GetFormat(), 1,
 		ResourceFlag::NONE, 1, 1, nullptr, false, MemoryFlag::NONE, L"PostImage"), false);
 
-	m_logLum = RenderTarget::MakeUnique(m_api);
+	m_logLum = RenderTarget::MakeUnique();
 	XUSG_N_RETURN(m_logLum->Create(pDevice, width, height, Format::R16_FLOAT, 1, ResourceFlag::NONE,
 		numLogLumMips, 1, nullptr, false, MemoryFlag::NONE, L"LogLuminance"), false);
 
-	m_avgLum = StructuredBuffer::MakeUnique(m_api);
+	m_avgLum = StructuredBuffer::MakeUnique();
 	XUSG_N_RETURN(m_avgLum->Create(pDevice, 1, sizeof(float), ResourceFlag::ALLOW_UNORDERED_ACCESS,
 		MemoryType::DEFAULT, 1, nullptr, 1, nullptr, MemoryFlag::NONE, L"AverageLogLuminance"), false);
 
@@ -266,14 +285,14 @@ bool Postprocess_Impl::createGBuffers(const Device* pDevice, const Texture* pRef
 	m_uavSrvTables.resize(SRV_LOG_LUM + numLogLumMips);
 
 	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const Descriptor descriptors[] = { m_postImage->GetSRV(), m_avgLum->GetSRV() };
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 		XUSG_X_RETURN(m_uavSrvTables[SRV_COLOR_AVG_LUM], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 	}
 
 	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		const Descriptor descriptors[] = { m_avgLum->GetUAV(), m_logLum->GetSRV(numLogLumMips - 1) };
 		descriptorTable->SetDescriptors(0, static_cast<uint32_t>(size(descriptors)), descriptors);
 		XUSG_X_RETURN(m_uavSrvTables[UAV_SRV_LUM], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
@@ -281,7 +300,7 @@ bool Postprocess_Impl::createGBuffers(const Device* pDevice, const Texture* pRef
 
 	for (uint8_t i = 1; i < numLogLumMips; ++i)
 	{
-		const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+		const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 		descriptorTable->SetDescriptors(0, 1, &m_logLum->GetSRV(i - 1, true));
 		XUSG_X_RETURN(m_uavSrvTables[SRV_LOG_LUM + i], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 	}
@@ -291,6 +310,10 @@ bool Postprocess_Impl::createGBuffers(const Device* pDevice, const Texture* pRef
 
 bool Postprocess_Impl::createPipelineLayouts()
 {
+	const auto cbvSpace = GetCBVSpace();
+	const auto srvSpace = GetSRVSpace();
+	const auto samplerSpace = GetSamplerSpace();
+	const auto uavSpace = GetUAVSpace();
 	const auto pSampler = m_descriptorTableLib->GetSampler(LINEAR_CLAMP);
 
 	// Temporal AA
@@ -304,44 +327,44 @@ bool Postprocess_Impl::createPipelineLayouts()
 		auto smpLinearClamp = 0u;
 
 		// Load shader
-		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_TEMPORAL_AA, PSTemporalAA, sizeof(PSTemporalAA)), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_TEMPORAL_AA,
+			PSTemporalAA, sizeof(PSTemporalAA), PSTemporalAASpv, sizeof(PSTemporalAASpv)), false);
 
 		// Get pixel shader slots
 		auto reflector = m_shaderLib->GetReflector(Shader::Stage::PS, PS_TEMPORAL_AA);
 		if (reflector && reflector->IsValid())
 		{
 			// Get constant buffer slot
-			cbImmutable = reflector->GetResourceBindingPointByName("cbImmutable", cbImmutable);
+			cbImmutable = reflector->ReflectBinding("cbImmutable", cbImmutable, cbvSpace);
 
 			// Get shader resource slots
-			txImage = reflector->GetResourceBindingPointByName("g_txImage", txImage);
-			txHistory = reflector->GetResourceBindingPointByName("g_txHistory", txHistory);
-			txVelocity = reflector->GetResourceBindingPointByName("g_txVelocity", txVelocity);
-			txMasks = reflector->GetResourceBindingPointByName("g_txMask", txMasks);
-			txHistMeta = reflector->GetResourceBindingPointByName("g_txHistMeta", txHistMeta);
+			txImage = reflector->ReflectBinding("g_txImage", txImage, srvSpace);
+			txHistory = reflector->ReflectBinding("g_txHistory", txHistory, srvSpace);
+			txVelocity = reflector->ReflectBinding("g_txVelocity", txVelocity, srvSpace);
+			txMasks = reflector->ReflectBinding("g_txMask", txMasks, srvSpace);
+			txHistMeta = reflector->ReflectBinding("g_txHistMeta", txHistMeta, srvSpace);
 
 			// Get sampler slot
-			smpLinearClamp = reflector->GetResourceBindingPointByName("g_smpLinear", smpLinearClamp);
+			smpLinearClamp = reflector->ReflectBinding("g_smpLinear", smpLinearClamp, samplerSpace);
 		}
 
 		// Pipeline layout utility
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique(m_api);
+		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
 
 		// Constant buffers
-		utilPipelineLayout->SetRange(IMMUTABLE, DescriptorType::CBV, 1, cbImmutable,
-			0, DescriptorFlag::DATA_STATIC);
+		utilPipelineLayout->SetRange(IMMUTABLE, DescriptorType::CBV, 1, cbImmutable, cbvSpace, DescriptorFlag::DATA_STATIC);
 		utilPipelineLayout->SetShaderStage(IMMUTABLE, Shader::Stage::PS);
 
 		// Textures
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txImage);
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txHistory);
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txVelocity);
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txMasks);
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txHistMeta);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txImage, srvSpace);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txHistory, srvSpace);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txVelocity, srvSpace);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txMasks, srvSpace);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txHistMeta, srvSpace);
 		utilPipelineLayout->SetShaderStage(TEXTURES, Shader::Stage::PS);
 
 		// Sampler
-		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, 0, Shader::Stage::PS);
+		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, samplerSpace, Shader::Stage::PS);
 
 		XUSG_X_RETURN(m_pipelineLayouts[ANTIALIAS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::NONE, L"TemporalAALayout"), false);
@@ -356,42 +379,41 @@ bool Postprocess_Impl::createPipelineLayouts()
 		auto smpLinearClamp = 0u;
 
 		// Load shader
-		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_POST_PROC, PSPostprocess, sizeof(PSPostprocess)), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_POST_PROC,
+			PSPostprocess, sizeof(PSPostprocess), PSPostprocessSpv, sizeof(PSPostprocessSpv)), false);
 
 		// Get pixel shader slots
 		auto reflector = m_shaderLib->GetReflector(Shader::Stage::PS, PS_POST_PROC);
 		if (reflector && reflector->IsValid())
 		{
 			// Get constant buffer slots
-			cbImmutable = reflector->GetResourceBindingPointByName("cbImmutable", cbImmutable);
-			cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame", cbPerFrame);
+			cbImmutable = reflector->ReflectBinding("cbImmutable", cbImmutable, cbvSpace);
+			cbPerFrame = reflector->ReflectBinding("cbPerFrame", cbPerFrame, cbvSpace);
 
 			// Get shader resource slots
-			txImage = reflector->GetResourceBindingPointByName("g_txImage", txImage);
-			txDepth = reflector->GetResourceBindingPointByName("g_txDepth", txDepth);
+			txImage = reflector->ReflectBinding("g_txImage", txImage, srvSpace);
+			txDepth = reflector->ReflectBinding("g_txDepth", txDepth, srvSpace);
 
 			// Get sampler slot
-			smpLinearClamp = reflector->GetResourceBindingPointByName("g_smpLinear", smpLinearClamp);
+			smpLinearClamp = reflector->ReflectBinding("g_smpLinear", smpLinearClamp, samplerSpace);
 		}
 
 		// Pipeline layout utility
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique(m_api);
+		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
 
 		// Constant buffers
-		utilPipelineLayout->SetRange(IMMUTABLE, DescriptorType::CBV, 1, cbImmutable,
-			0, DescriptorFlag::DATA_STATIC);
+		utilPipelineLayout->SetRange(IMMUTABLE, DescriptorType::CBV, 1, cbImmutable, cbvSpace, DescriptorFlag::DATA_STATIC);
 		utilPipelineLayout->SetShaderStage(IMMUTABLE, Shader::Stage::PS);
 
-		utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame,
-			0, DescriptorFlag::DATA_STATIC);
+		utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, cbvSpace, DescriptorFlag::DATA_STATIC);
 		utilPipelineLayout->SetShaderStage(PER_FRAME, Shader::Stage::PS);
 
 		// Texture
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txImage);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txImage, srvSpace);
 		utilPipelineLayout->SetShaderStage(TEXTURES, Shader::Stage::PS);
 
 		// Sampler
-		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, 0, Shader::Stage::PS);
+		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, samplerSpace, Shader::Stage::PS);
 
 		XUSG_X_RETURN(m_pipelineLayouts[POST_EFFECTS], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::NONE, L"PostEffectsLayout"), false);
@@ -404,28 +426,29 @@ bool Postprocess_Impl::createPipelineLayouts()
 
 		// Load shader if neccessary
 		if (!m_shaderLib->GetShader(Shader::Stage::PS, PS_BLIT_2D))
-			XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_BLIT_2D, PSBlit2D, sizeof(PSBlit2D)), false);
+			XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_BLIT_2D,
+				PSBlit2D, sizeof(PSBlit2D), PSBlit2DSpv, sizeof(PSBlit2DSpv)), false);
 
 		// Get pixel shader slots
 		auto reflector = m_shaderLib->GetReflector(Shader::Stage::PS, PS_BLIT_2D);
 		if (reflector && reflector->IsValid())
 		{
 			// Get shader resource slot
-			txSource = reflector->GetResourceBindingPointByName("g_txSource", txSource);
+			txSource = reflector->ReflectBinding("g_txSource", txSource, srvSpace);
 
 			// Get sampler slot
-			smpLinearClamp = reflector->GetResourceBindingPointByName("g_smpLinear", smpLinearClamp);
+			smpLinearClamp = reflector->ReflectBinding("g_smpLinear", smpLinearClamp, samplerSpace);
 		}
 
 		// Pipeline layout utility
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique(m_api);
+		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
 
 		// Texture
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txSource);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txSource, srvSpace);
 		utilPipelineLayout->SetShaderStage(TEXTURES, Shader::Stage::PS);
 
 		// Samplers
-		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, 0, Shader::Stage::PS);
+		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, samplerSpace, Shader::Stage::PS);
 
 		XUSG_X_RETURN(m_pipelineLayouts[BLIT_LOG_LUM], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::NONE, L"BlitLogLuminanceLayout"), false);
@@ -439,41 +462,41 @@ bool Postprocess_Impl::createPipelineLayouts()
 		auto smpLinearClamp = 0u;
 
 		// Load shader
-		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::CS, CS_LUM_ADAPT, CSLumAdapt, sizeof(CSLumAdapt)), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::CS, CS_LUM_ADAPT,
+			CSLumAdapt, sizeof(CSLumAdapt), CSLumAdaptSpv, sizeof(CSLumAdaptSpv)), false);
 
 		// Get compute shader slots
 		auto reflector = m_shaderLib->GetReflector(Shader::Stage::CS, CS_LUM_ADAPT);
 		if (reflector && reflector->IsValid())
 		{
 			// Get constant buffer slot
-			cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame", cbPerFrame);
+			cbPerFrame = reflector->ReflectBinding("cbPerFrame", cbPerFrame, cbvSpace);
 
 			// Get UAV slot
-			rwAvgLum = reflector->GetResourceBindingPointByName("g_rwAvgLum", rwAvgLum);
+			rwAvgLum = reflector->ReflectBinding("g_rwAvgLum", rwAvgLum, uavSpace);
 
 			// Get shader resource slot
-			txLogLum = reflector->GetResourceBindingPointByName("g_txLogLum", txLogLum);
+			txLogLum = reflector->ReflectBinding("g_txLogLum", txLogLum, srvSpace);
 
 			// Get sampler slot
-			smpLinearClamp = reflector->GetResourceBindingPointByName("g_smpLinear", smpLinearClamp);
+			smpLinearClamp = reflector->ReflectBinding("g_smpLinear", smpLinearClamp, samplerSpace);
 		}
 
 		// Pipeline layout utility
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique(m_api);
+		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
 
 		// Constant buffers
-		utilPipelineLayout->SetRange(TIME_STEP, DescriptorType::CBV, 1, cbPerFrame,
-			0, DescriptorFlag::DATA_STATIC);
+		utilPipelineLayout->SetRange(TIME_STEP, DescriptorType::CBV, 1, cbPerFrame, cbvSpace, DescriptorFlag::DATA_STATIC);
 		utilPipelineLayout->SetShaderStage(TIME_STEP, Shader::Stage::CS);
 
 		// Textures
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::UAV, 1, rwAvgLum, 0,
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::UAV, 1, rwAvgLum, uavSpace,
 			DescriptorFlag::DATA_STATIC_WHILE_SET_AT_EXECUTE);
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txLogLum);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txLogLum, srvSpace);
 		utilPipelineLayout->SetShaderStage(TEXTURES, Shader::Stage::CS);
 
 		// Sampler
-		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, 0, Shader::Stage::CS);
+		utilPipelineLayout->SetStaticSamplers(&pSampler, 1, smpLinearClamp, samplerSpace, Shader::Stage::CS);
 
 		XUSG_X_RETURN(m_pipelineLayouts[LUM_ADAPT], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
 			PipelineLayoutFlag::NONE, L"LuminanceAdaptationLayout"), false);
@@ -485,23 +508,24 @@ bool Postprocess_Impl::createPipelineLayouts()
 		auto roAvgLum = txImage + 1;
 
 		// Load shader
-		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_TONE_MAP, PSToneMap, sizeof(PSToneMap)), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::PS, PS_TONE_MAP,
+			PSToneMap, sizeof(PSToneMap), PSToneMapSpv, sizeof(PSToneMapSpv)), false);
 
 		// Get pixel shader slots
 		auto reflector = m_shaderLib->GetReflector(Shader::Stage::PS, PS_TONE_MAP);
 		if (reflector && reflector->IsValid())
 		{
 			// Get shader resource slots
-			txImage = reflector->GetResourceBindingPointByName("g_txImage", txImage);
-			roAvgLum = reflector->GetResourceBindingPointByName("g_roAvgLum", roAvgLum);
+			txImage = reflector->ReflectBinding("g_txImage", txImage, srvSpace);
+			roAvgLum = reflector->ReflectBinding("g_roAvgLum", roAvgLum, srvSpace);
 		}
 
 		// Pipeline layout utility
-		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique(m_api);
+		const auto utilPipelineLayout = Util::PipelineLayout::MakeUnique();
 
 		// Textures
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txImage);
-		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, roAvgLum);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, txImage, srvSpace);
+		utilPipelineLayout->SetRange(TEXTURES, DescriptorType::SRV, 1, roAvgLum, srvSpace);
 		utilPipelineLayout->SetShaderStage(TEXTURES, Shader::Stage::PS);
 
 		XUSG_X_RETURN(m_pipelineLayouts[TONE_MAP], utilPipelineLayout->GetPipelineLayout(m_pipelineLayoutLib.get(),
@@ -513,11 +537,12 @@ bool Postprocess_Impl::createPipelineLayouts()
 
 bool Postprocess_Impl::createPipelines(Format hdrFormat, Format ldrFormat)
 {
-	const auto state = Graphics::State::MakeUnique(m_api);
+	const auto state = Graphics::State::MakeUnique();
 
 	// Load shader if neccessary
 	if (!m_shaderLib->GetShader(Shader::Stage::VS, VS_SCREEN_QUAD))
-		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::VS, VS_SCREEN_QUAD, L"VSScreenQuad.cso"), false);
+		XUSG_N_RETURN(m_shaderLib->CreateShader(Shader::Stage::VS, VS_SCREEN_QUAD,
+			VSScreenQuad, sizeof(VSScreenQuad), VSScreenQuadSpv, sizeof(VSScreenQuadSpv)), false);
 
 	// Common pipeline settings
 	state->IASetPrimitiveTopologyType(PrimitiveTopologyType::TRIANGLE);
@@ -548,19 +573,19 @@ bool Postprocess_Impl::createPipelines(Format hdrFormat, Format ldrFormat)
 
 	state->OMSetNumRenderTargets(1);
 
-	// Resampling
+	// Blit
 	{
-		// Get resampling pipelines
+		// Get blit pipelines
 		state->SetPipelineLayout(m_pipelineLayouts[BLIT_LOG_LUM]);
 		state->SetShader(Shader::Stage::VS, m_shaderLib->GetShader(Shader::Stage::VS, VS_SCREEN_QUAD));
 		state->SetShader(Shader::Stage::PS, m_shaderLib->GetShader(Shader::Stage::PS, PS_BLIT_2D));
 		state->OMSetRTVFormat(0, Format::R16_FLOAT);
-		XUSG_X_RETURN(m_pipelines[BLIT_LOG_LUM], state->GetPipeline(m_graphicsPipelineLib.get(), L"ResampleLum"), false);
+		XUSG_X_RETURN(m_pipelines[BLIT_LOG_LUM], state->GetPipeline(m_graphicsPipelineLib.get(), L"BlitLum"), false);
 	}
 
 	// Luminance adaptation
 	{
-		const auto state = Compute::State::MakeUnique(m_api);
+		const auto state = Compute::State::MakeUnique();
 		state->SetPipelineLayout(m_pipelineLayouts[LUM_ADAPT]);
 		state->SetShader(m_shaderLib->GetShader(Shader::Stage::CS, CS_LUM_ADAPT));
 		XUSG_X_RETURN(m_pipelines[LUM_ADAPT], state->GetPipeline(m_computePipelineLib.get(), L"LuminanceAdaptation"), false);

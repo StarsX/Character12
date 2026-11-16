@@ -2,6 +2,7 @@
 // Copyright (c) XU, Tianchen. All rights reserved.
 //--------------------------------------------------------------------------------------
 
+#include "XUSGAdvanced.h"
 #include "XUSGModel.h"
 
 using namespace std;
@@ -12,14 +13,16 @@ using namespace XUSG::Graphics;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-Model::uptr Model::MakeUnique(const wchar_t* name, API api)
+Model::uptr Model::MakeUnique(const wchar_t* name)
 {
-	return make_unique<Model_Impl>(name, api);
+	Device::LockApi();
+	return make_unique<Model_Impl>(name);
 }
 
-Model::sptr Model::MakeShared(const wchar_t* name, API api)
+Model::sptr Model::MakeShared(const wchar_t* name)
 {
-	return make_shared<Model_Impl>(name, api);
+	Device::LockApi();
+	return make_shared<Model_Impl>(name);
 }
 
 Model* Model::AsModel()
@@ -36,19 +39,21 @@ const InputLayout* Model::CreateInputLayout(PipelineLib* pPipelineLib)
 	const InputElement inputElements[] =
 	{
 		{ "POSITION",	0, Format::R32G32B32_FLOAT,		0, 0,							InputClassification::PER_VERTEX_DATA, 0 },
-		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, XUSG_APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, XUSG_APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
-		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, XUSG_APPEND_ALIGNED_ELEMENT,	InputClassification::PER_VERTEX_DATA, 0 },
+		{ "NORMAL",		0, Format::R16G16B16A16_FLOAT,	0, 16,							InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD",	0, Format::R16G16_FLOAT,		0, 24,							InputClassification::PER_VERTEX_DATA, 0 },
+		{ "TANGENT",	0, Format::R16G16B16A16_FLOAT,	0, 32,							InputClassification::PER_VERTEX_DATA, 0 },
 	};
 
 	return pPipelineLib->CreateInputLayout(static_cast<uint32_t>(size(inputElements)), inputElements);
 }
 
-SDKMesh::sptr Model::LoadSDKMesh(const Device* pDevice, const wstring& meshFileName,
-	const TextureLib& textureLib, bool isStaticMesh, API api)
+SDKMesh::sptr Model::LoadSDKMesh(Device* pDevice, const wstring& meshFileName,
+	const TextureLib& textureLib, bool isStaticMesh)
 {
+	Device::LockApi();
+
 	// Load the mesh
-	const auto mesh = SDKMesh::MakeShared(api);
+	const auto mesh = SDKMesh::MakeShared();
 	XUSG_N_RETURN(mesh->Create(pDevice, meshFileName.c_str(), textureLib, isStaticMesh), nullptr);
 
 	return mesh;
@@ -57,8 +62,7 @@ SDKMesh::sptr Model::LoadSDKMesh(const Device* pDevice, const wstring& meshFileN
 //--------------------------------------------------------------------------------------
 // Model implementations
 //--------------------------------------------------------------------------------------
-Model_Impl::Model_Impl(const wchar_t* name, API api) :
-	m_api(api),
+Model_Impl::Model_Impl(const wchar_t* name) :
 	m_currentFrame(0),
 	m_variableSlot(VARIABLE_SLOT),
 	m_mesh(nullptr),
@@ -66,10 +70,18 @@ Model_Impl::Model_Impl(const wchar_t* name, API api) :
 	m_graphicsPipelineLib(nullptr),
 	m_pipelineLayoutLib(nullptr),
 	m_descriptorTableLib(nullptr),
+#if XUSG_TEMPORAL
+	m_world(),
+#endif
+	m_cbMatrices(nullptr),
+#if XUSG_TEMPORAL_AA
+	m_cbTemporalBias(nullptr),
+#endif
 	m_pipelineLayouts(),
 	m_pipelines(),
 	m_cbvTables(),
-	m_srvTables(0)
+	m_srvTables(0),
+	m_twoSidedAll(false)
 {
 	if (name) m_name = name;
 	else m_name = L"";
@@ -79,7 +91,7 @@ Model_Impl::~Model_Impl()
 {
 }
 
-bool Model_Impl::Init(const Device* pDevice, const InputLayout* pInputLayout,
+bool Model_Impl::Init(Device* pDevice, const InputLayout* pInputLayout,
 	const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
 	const PipelineLib::sptr& pipelineLib,
 	const PipelineLayoutLib::sptr& pipelineLayoutLib,
@@ -108,14 +120,14 @@ bool Model_Impl::CreateDescriptorTables()
 	for (uint8_t i = 0; i < FrameCount; ++i)
 	{
 		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 			descriptorTable->SetDescriptors(0, 1, &m_cbMatrices->GetCBV(i));
 			XUSG_X_RETURN(m_cbvTables[i][CBV_MATRICES], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 		}
 
 #if XUSG_TEMPORAL_AA
 		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 			descriptorTable->SetDescriptors(0, 1, &m_cbTemporalBias->GetCBV(i));
 			XUSG_X_RETURN(m_cbvTables[i][CBV_LOCAL_TEMPORAL_BIAS], descriptorTable->GetCbvSrvUavTable(m_descriptorTableLib.get()), false);
 		}
@@ -131,7 +143,7 @@ bool Model_Impl::CreateDescriptorTables()
 
 		if (pMaterial && pMaterial->pAlbedo && pMaterial->pNormal && pMaterial->pSpecular)
 		{
-			const auto descriptorTable = Util::DescriptorTable::MakeUnique(m_api);
+			const auto descriptorTable = Util::DescriptorTable::MakeUnique();
 			const Descriptor descriptors[] =
 			{
 				pMaterial->pAlbedo->GetSRV(),
@@ -150,7 +162,7 @@ bool Model_Impl::CreateDescriptorTables()
 void Model_Impl::Update(uint8_t frameIndex)
 {
 	m_currentFrame = frameIndex;
-	m_previousFrame = (frameIndex + FrameCount - 1) % FrameCount;
+
 }
 
 void Model_Impl::SetMatrices(CXMMATRIX world, bool isTemporal)
@@ -177,17 +189,17 @@ void Model_Impl::SetTemporalBias(const XMFLOAT2& temporalBias)
 }
 #endif
 
-void Model_Impl::SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout)
+void Model_Impl::SetPipelineLayout(CommandList* pCommandList, PipelineLayoutIndex layout) const
 {
 	pCommandList->SetGraphicsPipelineLayout(m_pipelineLayouts[layout]);
 }
 
-void Model_Impl::SetPipeline(const CommandList* pCommandList, PipelineIndex pipeline)
+void Model_Impl::SetPipeline(CommandList* pCommandList, PipelineIndex pipeline) const
 {
 	pCommandList->SetPipelineState(m_pipelines[pipeline]);
 }
 
-void Model_Impl::SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlag, PipelineLayoutIndex layout)
+void Model_Impl::SetPipeline(CommandList* pCommandList, SubsetFlags subsetFlag, PipelineLayoutIndex layout) const
 {
 	subsetFlag = subsetFlag & SUBSET_FULL;
 	assert(subsetFlag != SUBSET_FULL);
@@ -207,8 +219,8 @@ void Model_Impl::SetPipeline(const CommandList* pCommandList, SubsetFlags subset
 	}
 }
 
-void Model_Impl::Render(const CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
-	PipelineLayoutIndex layout, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
+void Model_Impl::Render(CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+	PipelineLayoutIndex layout, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances) const
 {
 	if (pCbvPerFrameTable)
 	{
@@ -239,11 +251,11 @@ bool Model_Impl::IsTwoSidedAll() const
 	return m_twoSidedAll;
 }
 
-bool Model_Impl::createConstantBuffers(const Device* pDevice)
+bool Model_Impl::createConstantBuffers(Device* pDevice)
 {
-	m_cbMatrices = ConstantBuffer::MakeUnique(m_api);
+	m_cbMatrices = ConstantBuffer::MakeUnique();
 	XUSG_N_RETURN(m_cbMatrices->Create(pDevice, sizeof(CBMatrices[FrameCount]), FrameCount, nullptr,
-		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
+		MemoryType::GPU_UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBMatrices").c_str()), false);
 
 	// Initialize constant buffers
 	const auto identity = XMMatrixIdentity();
@@ -258,9 +270,9 @@ bool Model_Impl::createConstantBuffers(const Device* pDevice)
 	}
 
 #if XUSG_TEMPORAL_AA
-	m_cbTemporalBias = ConstantBuffer::MakeUnique(m_api);
+	m_cbTemporalBias = ConstantBuffer::MakeUnique();
 	XUSG_N_RETURN(m_cbTemporalBias->Create(pDevice, sizeof(XMFLOAT2[FrameCount]), FrameCount, nullptr,
-		MemoryType::UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
+		MemoryType::GPU_UPLOAD, MemoryFlag::NONE, m_name.empty() ? nullptr : (m_name + L".CBTemporalBias").c_str()), false);
 #endif
 
 	return true;
@@ -275,7 +287,7 @@ bool Model_Impl::createPipelines(const InputLayout* pInputLayout, uint32_t numRT
 	dsvFormat = dsvFormat != Format::UNKNOWN ? dsvFormat : Format::D24_UNORM_S8_UINT;
 	shadowFormat = shadowFormat != Format::UNKNOWN ? shadowFormat : Format::D24_UNORM_S8_UINT;
 
-	const auto state = Graphics::State::MakeUnique(m_api);
+	const auto state = Graphics::State::MakeUnique();
 
 	// Base pass
 	{
@@ -381,8 +393,8 @@ bool Model_Impl::createPipelines(const InputLayout* pInputLayout, uint32_t numRT
 	return true;
 }
 
-void Model_Impl::render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
-	SubsetFlags subsetFlag, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances)
+void Model_Impl::render(CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
+	SubsetFlags subsetFlag, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances) const
 {
 	assert((subsetFlag & SUBSET_FULL) != SUBSET_FULL);
 
@@ -415,6 +427,9 @@ void Model_Impl::render(const CommandList* pCommandList, uint32_t mesh, Pipeline
 
 Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, PixelShader ps)
 {
+	const auto cbvSpace = GetCBVSpace();
+	const auto srvSpace = GetSRVSpace();
+	const auto samplerSpace = GetSamplerSpace();
 	auto perFrameStage = Shader::Stage::VS;
 	auto cbMatrices = 0u;
 	auto cbPerFrame = cbMatrices + 1;
@@ -432,10 +447,10 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 	if (reflector && reflector->IsValid())
 	{
 		// Get constant buffer slots
-		cbMatrices = reflector->GetResourceBindingPointByName("cbMatrices", cbMatrices);
-		cbPerFrame = reflector->GetResourceBindingPointByName("cbPerFrame", cbPerFrame);
+		cbMatrices = reflector->ReflectBinding("cbMatrices", cbMatrices, cbvSpace);
+		cbPerFrame = reflector->ReflectBinding("cbPerFrame", cbPerFrame, cbvSpace);
 #if XUSG_TEMPORAL_AA
-		cbTempBias = reflector->GetResourceBindingPointByName("cbTempBias", cbTempBias);
+		cbTempBias = reflector->ReflectBinding("cbTempBias", cbTempBias, cbvSpace);
 #endif
 	}
 
@@ -447,33 +462,33 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 		if (reflector && reflector->IsValid())
 		{
 			// Get constant buffer slots
-			cbImmutable = reflector->GetResourceBindingPointByName("cbImmutable");
-			cbPerObject = reflector->GetResourceBindingPointByName("cbPerObject", cbPerObject);
-			const auto bindPoint = reflector->GetResourceBindingPointByName("cbPerFrame");
+			cbImmutable = reflector->ReflectBinding("cbImmutable", UINT32_MAX, cbvSpace);
+			cbPerObject = reflector->ReflectBinding("cbPerObject", cbPerObject, cbvSpace);
+			const auto bindPoint = reflector->ReflectBinding("cbPerFrame", UINT32_MAX, cbvSpace);
 			if (bindPoint != UINT32_MAX && cbPerFrame == bindPoint) perFrameStage = Shader::Stage::ALL;
 
 			// Get shader resource slots
-			txBaseColor = reflector->GetResourceBindingPointByName("g_txBaseColor", txBaseColor);
-			txNormal = reflector->GetResourceBindingPointByName("g_txNormal", txNormal);
-			txSpecular = reflector->GetResourceBindingPointByName("g_txSpecular", txSpecular);
+			txBaseColor = reflector->ReflectBinding("g_txBaseColor", txBaseColor, srvSpace);
+			txNormal = reflector->ReflectBinding("g_txNormal", txNormal, srvSpace);
+			txSpecular = reflector->ReflectBinding("g_txSpecular", txSpecular, srvSpace);
 			
 			// Get sampler slots
-			smpAnisoWrap = reflector->GetResourceBindingPointByName("g_smpLinear", smpAnisoWrap);
+			smpAnisoWrap = reflector->ReflectBinding("g_smpLinear", smpAnisoWrap, samplerSpace);
 		}
 	}
 
 	// Pipeline layout utility
-	const auto utilPipelineLayout = Util::PipelineLayout::MakeShared(m_api);
+	const auto utilPipelineLayout = Util::PipelineLayout::MakeShared();
 
 	// Constant buffers
-	utilPipelineLayout->SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices, 0, DescriptorFlag::DATA_STATIC);
+	utilPipelineLayout->SetRange(MATRICES, DescriptorType::CBV, 1, cbMatrices, cbvSpace, DescriptorFlag::DATA_STATIC);
 	utilPipelineLayout->SetShaderStage(MATRICES, Shader::Stage::VS);
 
-	utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, 0, DescriptorFlag::DATA_STATIC);
+	utilPipelineLayout->SetRange(PER_FRAME, DescriptorType::CBV, 1, cbPerFrame, cbvSpace, DescriptorFlag::DATA_STATIC);
 	utilPipelineLayout->SetShaderStage(PER_FRAME, perFrameStage);
 
 #if XUSG_TEMPORAL_AA
-	utilPipelineLayout->SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias, 0, DescriptorFlag::DATA_STATIC);
+	utilPipelineLayout->SetRange(TEMPORAL_BIAS, DescriptorType::CBV, 1, cbTempBias, cbvSpace, DescriptorFlag::DATA_STATIC);
 	utilPipelineLayout->SetShaderStage(TEMPORAL_BIAS, Shader::Stage::VS);
 #endif
 
@@ -482,26 +497,25 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 		if (ps != PS_DEPTH && cbImmutable != UINT32_MAX)
 		{
 			const uint8_t immutableSlot = m_variableSlot + IMMUTABLE_OFFSET;
-			utilPipelineLayout->SetRange(immutableSlot, DescriptorType::CBV, 1, cbImmutable,
-				0, DescriptorFlag::DATA_STATIC);
+			utilPipelineLayout->SetRange(immutableSlot, DescriptorType::CBV, 1, cbImmutable, cbvSpace, DescriptorFlag::DATA_STATIC);
 			utilPipelineLayout->SetShaderStage(immutableSlot, Shader::Stage::PS);
 		}
 
 		// Textures (material)
 		const uint8_t materialSlot = m_variableSlot + MATERIAL_OFFSET;
-		utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV, 1, txBaseColor, 0, DescriptorFlag::DATA_STATIC);
+		utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV, 1, txBaseColor, srvSpace, DescriptorFlag::DATA_STATIC);
 		if (ps != PS_DEPTH)
 		{
 			utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV,
-				1, txNormal, 0, DescriptorFlag::DATA_STATIC);
+				1, txNormal, srvSpace, DescriptorFlag::DATA_STATIC);
 			utilPipelineLayout->SetRange(materialSlot, DescriptorType::SRV,
-				1, txSpecular, 0, DescriptorFlag::DATA_STATIC);
+				1, txSpecular, srvSpace, DescriptorFlag::DATA_STATIC);
 		}
 		utilPipelineLayout->SetShaderStage(materialSlot, Shader::Stage::PS);
 
 		if (ps == PS_DEPTH)
 			utilPipelineLayout->SetConstants(m_variableSlot + ALPHA_REF_OFFSET,
-				XUSG_UINT32_SIZE_OF(XMFLOAT2), cbPerObject, 0, Shader::Stage::PS);
+				XUSG_UINT32_SIZE_OF(XMFLOAT2), cbPerObject, cbvSpace, Shader::Stage::PS);
 
 		// Samplers
 		const Sampler* pSamplers[] =
@@ -510,7 +524,7 @@ Util::PipelineLayout::sptr Model_Impl::initPipelineLayout(VertexShader vs, Pixel
 			m_descriptorTableLib->GetSampler(POINT_WRAP)
 		};
 		utilPipelineLayout->SetStaticSamplers(pSamplers, static_cast<uint32_t>(size(pSamplers)),
-			smpAnisoWrap, 0, Shader::Stage::PS);
+			smpAnisoWrap, samplerSpace, Shader::Stage::PS);
 	}
 
 	return utilPipelineLayout;

@@ -12,10 +12,10 @@ namespace XUSG
 		public virtual Model
 	{
 	public:
-		Model_Impl(const wchar_t* name, API api);
+		Model_Impl(const wchar_t* name);
 		virtual ~Model_Impl();
 
-		bool Init(const Device* pDevice, const InputLayout* pInputLayout,
+		bool Init(Device* pDevice, const InputLayout* pInputLayout,
 			const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
 			const Graphics::PipelineLib::sptr& pipelineLib,
 			const PipelineLayoutLib::sptr& pipelineLayoutLib,
@@ -28,12 +28,12 @@ namespace XUSG
 #if XUSG_TEMPORAL_AA
 		void SetTemporalBias(const DirectX::XMFLOAT2& temporalBias);
 #endif
-		void SetPipelineLayout(const CommandList* pCommandList, PipelineLayoutIndex layout);
-		void SetPipeline(const CommandList* pCommandList, PipelineIndex pipeline);
-		void SetPipeline(const CommandList* pCommandList, SubsetFlags subsetFlag, PipelineLayoutIndex layout);
-		void Render(const CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
+		void SetPipelineLayout(CommandList* pCommandList, PipelineLayoutIndex layout) const;
+		void SetPipeline(CommandList* pCommandList, PipelineIndex pipeline) const;
+		void SetPipeline(CommandList* pCommandList, SubsetFlags subsetFlag, PipelineLayoutIndex layout) const;
+		void Render(CommandList* pCommandList, SubsetFlags subsetFlags, uint8_t matrixTableIndex,
 			PipelineLayoutIndex layout = NUM_PIPELINE_LAYOUT, const DescriptorTable* pCbvPerFrameTable = nullptr,
-			uint32_t numInstances = 1);
+			uint32_t numInstances = 1) const;
 
 		bool IsTwoSidedAll() const;
 
@@ -47,20 +47,17 @@ namespace XUSG
 #endif
 		};
 
-		bool createConstantBuffers(const Device* pDevice);
+		bool createConstantBuffers(Device* pDevice);
 		bool createPipelines(const InputLayout* pInputLayout, uint32_t numRTVs, const Format* rtvFormats,
 			Format dsvFormat, Format shadowFormat, bool isStatic, bool useZEqual);
-		void render(const CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
-			SubsetFlags subsetFlag, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
+		void render(CommandList* pCommandList, uint32_t mesh, PipelineLayoutIndex layout,
+			SubsetFlags subsetFlag, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances) const;
 
 		Util::PipelineLayout::sptr initPipelineLayout(VertexShader vs, PixelShader ps);
 
-		API m_api;
 		std::wstring m_name;
 
 		uint8_t	m_currentFrame;
-		uint8_t	m_previousFrame;
-
 		uint8_t	m_variableSlot;
 
 		SDKMesh::sptr				m_mesh;

@@ -13,14 +13,16 @@ using namespace XUSG;
 //--------------------------------------------------------------------------------------
 // Create interfaces
 //--------------------------------------------------------------------------------------
-SDKMesh::uptr SDKMesh::MakeUnique(API api)
+SDKMesh::uptr SDKMesh::MakeUnique()
 {
-	return make_unique<SDKMesh_Impl>(api);
+	Device::LockApi();
+	return make_unique<SDKMesh_Impl>();
 }
 
-SDKMesh::sptr SDKMesh::MakeShared(API api)
+SDKMesh::sptr SDKMesh::MakeShared()
 {
-	return make_shared<SDKMesh_Impl>(api);
+	Device::LockApi();
+	return make_shared<SDKMesh_Impl>();
 }
 
 //--------------------------------------------------------------------------------------
@@ -49,11 +51,8 @@ PrimitiveTopology SDKMesh::GetPrimitiveType(PrimitiveType primType)
 //--------------------------------------------------------------------------------------
 // SDKMesh implementations
 //--------------------------------------------------------------------------------------
-SDKMesh_Impl::SDKMesh_Impl(API api) :
-	m_api(api),
-	//m_device(nullptr),
-	m_numOutstandingResources(0),
-	m_isLoading(false),
+SDKMesh_Impl::SDKMesh_Impl() :
+	m_vertexStride(0),
 	m_pStaticMeshData(nullptr),
 	m_heapData(0),
 	m_animation(0),
@@ -74,7 +73,10 @@ SDKMesh_Impl::SDKMesh_Impl(API api) :
 	m_pAnimationFrameData(nullptr),
 	m_bindPoseFrameMatrices(0),
 	m_transformedFrameMatrices(0),
-	m_worldPoseFrameMatrices(0)
+	m_worldPoseFrameMatrices(0),
+	//m_device(nullptr),
+	m_numOutstandingResources(0),
+	m_isLoading(false)
 {
 }
 
@@ -84,13 +86,13 @@ SDKMesh_Impl::~SDKMesh_Impl()
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh_Impl::Create(const Device* pDevice, const wchar_t* fileName,
+bool SDKMesh_Impl::Create(Device* pDevice, const wchar_t* fileName,
 	const TextureLib& textureLib, bool isStaticMesh)
 {
 	return createFromFile(pDevice, fileName, textureLib, isStaticMesh);
 }
 
-bool SDKMesh_Impl::Create(const Device* pDevice, uint8_t* pData,
+bool SDKMesh_Impl::Create(Device* pDevice, uint8_t* pData,
 	const TextureLib& textureLib, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
@@ -350,7 +352,7 @@ SDKMesh::Subset* SDKMesh_Impl::GetSubset(uint32_t mesh, uint32_t subset, SubsetF
 
 uint32_t SDKMesh_Impl::GetVertexStride(uint32_t mesh, uint32_t i) const
 {
-	return static_cast<uint32_t>(m_pVertexBufferArray[m_pMeshArray[mesh].VertexBuffers[i]].StrideBytes);
+	return m_vertexStride ? m_vertexStride : static_cast<uint32_t>(m_pVertexBufferArray[m_pMeshArray[mesh].VertexBuffers[i]].StrideBytes);
 }
 
 uint32_t SDKMesh_Impl::GetNumFrames() const
@@ -484,6 +486,17 @@ XMMATRIX SDKMesh_Impl::GetMeshInfluenceMatrix(uint32_t mesh, uint32_t influence)
 	return XMLoadFloat4x4(&m_transformedFrameMatrices[frame]);
 }
 
+uint32_t SDKMesh_Impl::GetAnimationKeyFromTime(double time) const
+{
+	if (!m_pAnimationHeader) return 0;
+
+	auto tick = static_cast<uint32_t>(m_pAnimationHeader->AnimationFPS * time);
+
+	tick = tick % (m_pAnimationHeader->NumAnimationKeys - 1);
+
+	return ++tick;
+}
+
 XMMATRIX SDKMesh_Impl::GetWorldMatrix(uint32_t frameIndex) const
 {
 	return XMLoadFloat4x4(&m_worldPoseFrameMatrices[frameIndex]);
@@ -497,17 +510,6 @@ XMMATRIX SDKMesh_Impl::GetInfluenceMatrix(uint32_t frameIndex) const
 XMMATRIX SDKMesh_Impl::GetBindMatrix(uint32_t frameIndex) const
 {
 	return XMLoadFloat4x4(&m_bindPoseFrameMatrices[frameIndex]);
-}
-
-uint32_t SDKMesh_Impl::GetAnimationKeyFromTime(double time) const
-{
-	if (!m_pAnimationHeader) return 0;
-
-	auto tick = static_cast<uint32_t>(m_pAnimationHeader->AnimationFPS * time);
-
-	tick = tick % (m_pAnimationHeader->NumAnimationKeys - 1);
-
-	return ++tick;
 }
 
 bool SDKMesh_Impl::GetAnimationProperties(uint32_t* pNumKeys, float* pFrameTime) const
@@ -560,12 +562,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			else
 			{
 				Texture::sptr texture;
-				uploaders.emplace_back(Resource::MakeUnique(m_api));
+				uploaders.emplace_back(Resource::MakeUnique());
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(), 8192,
 					true, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
-					MemoryFlag::NONE, m_api))
+					MemoryFlag::NONE))
 					pMaterials[m].Albedo64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -588,12 +590,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			else
 			{
 				Texture::sptr texture;
-				uploaders.emplace_back(Resource::MakeUnique(m_api));
+				uploaders.emplace_back(Resource::MakeUnique());
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(), 8192,
 					false, texture, uploaders.back().get(), &alphaMode, ResourceState::COMMON,
-					MemoryFlag::NONE, m_api))
+					MemoryFlag::NONE))
 					pMaterials[m].Normal64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -635,12 +637,12 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 			else
 			{
 				Texture::sptr texture;
-				uploaders.emplace_back(Resource::MakeUnique(m_api));
+				uploaders.emplace_back(Resource::MakeUnique());
 
 				filePathW.assign(filePath.cbegin(), filePath.cend());
 				if (!textureLoader.CreateTextureFromFile(pCommandList, filePathW.c_str(), 8192,
 					false, texture, uploaders.back().get(), nullptr, ResourceState::COMMON,
-					MemoryFlag::NONE, m_api))
+					MemoryFlag::NONE))
 					pMaterials[m].Specular64 = ERROR_RESOURCE_VALUE;
 				else
 				{
@@ -653,39 +655,69 @@ void SDKMesh_Impl::loadMaterials(CommandList* pCommandList, Material* pMaterials
 	}
 }
 
+static const uint8_t GpuVertexStride = 48;
+
+static void packAlignedVertex(uint8_t* dst, const uint8_t* src, uint32_t srcStride)
+{
+	memset(dst, 0, GpuVertexStride);
+	memcpy(dst, src, 12);
+	if (srcStride == 32)
+	{
+		memcpy(dst + 16, src + 12, 8);
+		memcpy(dst + 24, src + 20, 4);
+		memcpy(dst + 32, src + 24, 8);
+	}
+	else
+	{
+		memcpy(dst + 12, src + 12, 8);
+		memcpy(dst + 24, src + 20, 8);
+		memcpy(dst + 32, src + 28, 4);
+		memcpy(dst + 40, src + 32, 8);
+	}
+}
+
 bool SDKMesh_Impl::createVertexBuffer(CommandList* pCommandList, std::vector<Resource::uptr>& uploaders)
 {
 	// Vertex buffer info
 	size_t numVertices = 0;
 	const auto byteStride = static_cast<uint32_t>(m_pVertexBufferArray->StrideBytes);
+	assert(byteStride == 32 || byteStride == 40);
 	vector<uintptr_t> firstVertices(m_pMeshHeader->NumVertexBuffers);
 
 	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 	{
+		assert(m_pVertexBufferArray[i].StrideBytes == byteStride);
 		firstVertices[i] = numVertices;
 		numVertices += static_cast<size_t>(m_pVertexBufferArray[i].SizeBytes / byteStride);
 	}
 
+	m_vertexStride = GpuVertexStride;
+
 	// Create a vertex Buffer
-	m_vertexBuffer = VertexBuffer::MakeShared(m_api);
-	XUSG_N_RETURN(m_vertexBuffer->Create(pCommandList->GetDevice(), numVertices, byteStride, ResourceFlag::NONE,
+	m_vertexBuffer = VertexBuffer::MakeShared();
+	XUSG_N_RETURN(m_vertexBuffer->Create(pCommandList->GetDevice(), numVertices, m_vertexStride, ResourceFlag::NONE,
 		MemoryType::DEFAULT, m_pMeshHeader->NumVertexBuffers, firstVertices.data(),
 		m_pMeshHeader->NumVertexBuffers, firstVertices.data(), 1, nullptr, MemoryFlag::NONE,
 		m_name.empty() ? nullptr : (m_name + L".VertexBuffer").c_str()), false);
 
 	// Copy vertices into one buffer
-	size_t offset = 0;
-	vector<uint8_t> bufferData(byteStride * numVertices);
+	vector<uint8_t> bufferData(m_vertexStride * numVertices);
+	auto dst = bufferData.data();
 
 	for (auto i = 0u; i < m_pMeshHeader->NumVertexBuffers; ++i)
 	{
-		const auto sizeBytes = static_cast<size_t>(m_pVertexBufferArray[i].SizeBytes);
-		memcpy(&bufferData[offset], m_vertices[i], sizeBytes);
-		offset += sizeBytes;
+		const auto count = static_cast<size_t>(m_pVertexBufferArray[i].SizeBytes / byteStride);
+		auto src = m_vertices[i];
+		for (size_t v = 0; v < count; ++v)
+		{
+			packAlignedVertex(dst, src, byteStride);
+			src += byteStride;
+			dst += m_vertexStride;
+		}
 	}
 
 	// Upload vertices
-	uploaders.emplace_back(Resource::MakeUnique(m_api));
+	uploaders.emplace_back(Resource::MakeUnique());
 
 	return m_vertexBuffer->Upload(pCommandList, uploaders.back().get(), bufferData.data(), bufferData.size());
 }
@@ -703,7 +735,7 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 	}
 
 	// Create a index Buffer
-	m_indexBuffer = IndexBuffer::MakeShared(m_api);
+	m_indexBuffer = IndexBuffer::MakeShared();
 	XUSG_N_RETURN(m_indexBuffer->Create(pCommandList->GetDevice(), byteWidth, m_pIndexBufferArray->IndexType == IT_32BIT ?
 		Format::R32_UINT : Format::R16_UINT, ResourceFlag::DENY_SHADER_RESOURCE, MemoryType::DEFAULT,
 		m_pMeshHeader->NumIndexBuffers, offsets.data(), 1, nullptr, 1, nullptr, MemoryFlag::NONE,
@@ -721,13 +753,13 @@ bool SDKMesh_Impl::createIndexBuffer(CommandList* pCommandList, std::vector<Reso
 	}
 
 	// Upload indices
-	uploaders.emplace_back(Resource::MakeUnique(m_api));
+	uploaders.emplace_back(Resource::MakeUnique());
 
 	return m_indexBuffer->Upload(pCommandList, uploaders.back().get(), bufferData.data(), bufferData.size());
 }
 
 //--------------------------------------------------------------------------------------
-bool SDKMesh_Impl::createFromFile(const Device* pDevice, const wchar_t* fileName,
+bool SDKMesh_Impl::createFromFile(Device* pDevice, const wchar_t* fileName,
 	const TextureLib& textureLib, bool isStaticMesh)
 {
 	// Find the path for the file
@@ -761,20 +793,21 @@ bool SDKMesh_Impl::createFromFile(const Device* pDevice, const wchar_t* fileName
 	return createFromMemory(pDevice, m_pStaticMeshData, textureLib, cBytes, isStaticMesh, false);
 }
 
-bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
+bool SDKMesh_Impl::createFromMemory(Device* pDevice, uint8_t* pData,
 	const TextureLib& textureLib, size_t dataBytes,
 	bool isStaticMesh, bool copyStatic)
 {
 	XMFLOAT3 lower;
 	XMFLOAT3 upper;
 
-	const auto commandAllocator = CommandAllocator::MakeUnique(m_api);
-	const auto commandList = CommandList::MakeUnique(m_api);
+	const auto commandAllocator = CommandAllocator::MakeUnique();
+	const auto commandList = CommandList::MakeUnique();
 	const auto pCommandList = commandList.get();
 	if (pDevice)
 	{
 		XUSG_N_RETURN(commandAllocator->Create(pDevice, CommandListType::DIRECT, (m_name + L".CommandAllocator").c_str()), false);
-		XUSG_N_RETURN(pCommandList->Create(pDevice, 0, CommandListType::DIRECT, commandAllocator.get(),
+		CommandAllocator* pAllocator = commandAllocator.get();
+		XUSG_N_RETURN(pCommandList->Create(pDevice, 0, CommandListType::DIRECT, 1, &pAllocator,
 			nullptr, (m_name + L".CommandList").c_str()), false);
 	}
 
@@ -846,7 +879,7 @@ bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
 	Subset* pSubset = nullptr;
 	PrimitiveTopology primType;
 
-	// update bounding volume
+	// Update bounding volume
 	Data* currentMesh = m_pMeshArray;
 	auto tris = 0;
 
@@ -920,7 +953,6 @@ bool SDKMesh_Impl::createFromMemory(const Device* pDevice, uint8_t* pData,
 		currentMesh->BoundingBoxCenter.z = lower.z + half.z;
 		currentMesh->BoundingBoxExtents = half;
 	}
-	// Update 
 
 	// Classify material type for each subset
 	classifyMaterialType();
@@ -1082,7 +1114,7 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 		const auto pDevice = pCommandList->GetDevice();
 
 		// Create the command queue.
-		CommandQueue::uptr commandQueue = CommandQueue::MakeUnique(m_api);
+		CommandQueue::uptr commandQueue = CommandQueue::MakeUnique();
 		XUSG_N_RETURN(commandQueue->Create(pDevice, CommandListType::DIRECT, CommandQueueFlag::NONE,
 			0, 0, (m_name + L".CommandQueue").c_str()), false);
 
@@ -1093,7 +1125,7 @@ bool SDKMesh_Impl::executeCommandList(CommandList* pCommandList)
 		// Create synchronization objects and wait until assets have been uploaded to the GPU.
 		{
 			void* fenceEvent;
-			const auto fence = Fence::MakeUnique(m_api);
+			const auto fence = Fence::MakeUnique();
 			uint64_t fenceValue = 0;
 			XUSG_N_RETURN(fence->Create(pDevice, fenceValue++, FenceFlag::NONE, (m_name + L".Fence").c_str()), false);
 

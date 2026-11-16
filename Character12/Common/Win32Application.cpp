@@ -60,15 +60,20 @@ int Win32Application::Run(DXFramework* pFramework, HINSTANCE hInstance, int nCmd
 
 	ShowWindow(m_hwnd, nCmdShow);
 
-	// Main sample loop.
+	// Main sample loop. Render outside the window procedure: Vulkan acquire and
+	// present deadlock if they run inside WM_PAINT on this thread.
 	MSG msg = {};
 	while (msg.message != WM_QUIT)
 	{
-		// Process any messages in the queue.
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
+		}
+		else if (!IsIconic(m_hwnd))
+		{
+			pFramework->OnUpdate();
+			pFramework->OnRender();
 		}
 	}
 
@@ -203,10 +208,10 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
 		return 0;
 
 	case WM_PAINT:
-		if (pFramework)
 		{
-			pFramework->OnUpdate();
-			pFramework->OnRender();
+			PAINTSTRUCT ps;
+			BeginPaint(hWnd, &ps);
+			EndPaint(hWnd, &ps);
 		}
 		return 0;
 

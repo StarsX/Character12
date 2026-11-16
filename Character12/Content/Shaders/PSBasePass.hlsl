@@ -10,7 +10,10 @@
 
 #include "Common.hlsli"
 
+XUSG_VK_BINDING(0, XUSG_VK_SPACE_SRV)
 Texture2D g_albedo;
+
+XUSG_VK_BINDING(0, XUSG_VK_SPACE_SAMPLER)
 SamplerState g_sampler;
 
 float4 main(PS_Input input) : SV_TARGET

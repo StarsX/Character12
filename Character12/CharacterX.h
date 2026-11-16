@@ -54,6 +54,10 @@ private:
 
 	static const auto FrameCount = XUSG::Model::GetFrameCount();
 
+	// Destroyed last. Queues, allocators, swapchain, and pipeline libraries
+	// still call into the device from their destructors.
+	XUSG::Device::uptr					m_device;
+
 	XUSG::ShaderLib::sptr				m_shaderLib;
 	XUSG::Graphics::PipelineLib::sptr	m_graphicsPipelineLib;
 	XUSG::Compute::PipelineLib::sptr	m_computePipelineLib;
@@ -69,7 +73,6 @@ private:
 	XUSG::CommandAllocator::uptr	m_commandAllocators[FrameCount];
 	XUSG::CommandQueue::uptr		m_commandQueue;
 
-	XUSG::Device::uptr			m_device;
 	XUSG::RenderTarget::uptr	m_renderTargets[FrameCount];
 	XUSG::CommandList::uptr		m_commandList;
 

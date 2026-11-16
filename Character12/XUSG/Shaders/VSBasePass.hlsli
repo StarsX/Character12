@@ -7,22 +7,22 @@
 //--------------------------------------------------------------------------------------
 struct VS_Input
 {
-	float3		Pos		: POSITION;		// Position
-	float3		Norm	: NORMAL;		// Normal
-	min16float2	UV		: TEXCOORD;		// Texture coordinate
+	float3	Pos		: POSITION;	// Position
+	float3	Norm	: NORMAL;	// Normal
+	float2	UV		: TEXCOORD;	// Texture coordinate
 #ifdef _TANGENT_
-	float4		Tan		: TANGENT;		// Normalized Tangent vector
+	float4	Tan		: TANGENT;	// Normalized Tangent vector
 #endif
 };
 
 #if XUSG_TEMPORAL
 struct Vertex
 {
-	float3	Pos;	// Position
+	float4	Pos;	// Position
 	uint2	Norm;	// Normal
-	uint	UV;		// Texture coordinate
+	uint2	UV;		// Texture coordinate
 #ifdef _TANGENT_
-	uint2	Tan;	// Normalized Tangent vector
+	uint4	Tan;	// Normalized Tangent vector
 #endif
 };
 #endif
@@ -30,7 +30,8 @@ struct Vertex
 //--------------------------------------------------------------------------------------
 // Constant buffers
 //--------------------------------------------------------------------------------------
-cbuffer cbMatrices : register (b0)
+XUSG_VK_BINDING(0, XUSG_VK_SPACE_CBV)
+cbuffer cbMatrices : register(b0)
 {
 	float4x3 g_world;
 	float3x3 g_worldIT;
@@ -40,7 +41,8 @@ cbuffer cbMatrices : register (b0)
 };
 
 #if XUSG_TEMPORAL_AA
-cbuffer cbTemporalBias	: register (b3)
+XUSG_VK_BINDING(3, XUSG_VK_SPACE_CBV)
+cbuffer cbTemporalBias	: register(b3)
 {
 	float2	g_projBias;
 };
@@ -51,7 +53,8 @@ cbuffer cbTemporalBias	: register (b3)
 // Buffers
 //--------------------------------------------------------------------------------------
 // Buffer for the historical moition state
-StructuredBuffer<Vertex> g_roVertices;
+XUSG_VK_BINDING(0, XUSG_VK_SPACE_SRV)
+StructuredBuffer<Vertex> g_roVertices : register(t0);
 #endif
 
 //--------------------------------------------------------------------------------------
@@ -65,7 +68,7 @@ VS_Output main(uint vid : SV_VertexID, VS_Input input)
 #if defined(_BASEPASS_) && XUSG_TEMPORAL // Temporal tracking
 
 #ifdef _CHARACTER_
-	float4 hPos = { g_roVertices[vid].Pos, 1.0 };
+	float4 hPos = { g_roVertices[vid].Pos.xyz, 1.0 };
 #elif defined(_VEGETATION_)
 	float4 hPos = pos;
 	VegetationWave(hPos, 1.0);
@@ -94,12 +97,12 @@ VS_Output main(uint vid : SV_VertexID, VS_Input input)
 #endif
 
 #ifdef _NORMAL_
-	output.Norm = min16float3(normalize(mul(input.Norm, g_worldIT)));
+	output.Norm = normalize(mul(input.Norm, g_worldIT));
 #endif
 
 #ifdef _TANGENT_
-	output.Tangent.xyz = min16float3(normalize(mul(input.Tan.xyz, (float3x3)g_world)));
-	output.Tangent.w = min16float(input.Tan.w);
+	output.Tangent.xyz = normalize(mul(input.Tan.xyz, (float3x3)g_world));
+	output.Tangent.w = input.Tan.w;
 #endif
 
 	output.UV = input.UV;

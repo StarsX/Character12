@@ -12,28 +12,28 @@ namespace XUSG
 		public virtual Postprocess
 	{
 	public:
-		Postprocess_Impl(API api);
+		Postprocess_Impl();
 		virtual ~Postprocess_Impl();
 
-		bool Init(const Device* pDevice, const ShaderLib::sptr& shaderLib,
+		bool Init(Device* pDevice, const ShaderLib::sptr& shaderLib,
 			const Graphics::PipelineLib::sptr& graphicsPipelineLib,
 			const Compute::PipelineLib::sptr& computePipelineLib,
 			const PipelineLayoutLib::sptr& pipelineLayoutLib,
 			const DescriptorTableLib::sptr& descriptorTableLib,
 			Format hdrFormat, Format ldrFormat);
-		bool ChangeWindowSize(const Device* pDevice, const Texture* pReference);
+		bool ChangeWindowSize(Device* pDevice, const Texture* pReference);
 
 		void Update(const DescriptorTable& cbvImmutable, const DescriptorTable& cbvPerFrameTable,
 			uint8_t frameIndex, float timeStep);
 		void Render(CommandList* pCommandList, RenderTarget* pDst, Texture* pSrc,
-			const DescriptorTable& srvTable, bool clearRT = false);
-		void ScreenRender(const CommandList* pCommandList, PipelineIndex pipelineIndex,
-			const DescriptorTable& srvTable, bool hasImmutableCB, bool hasPerFrameCB);
-		void LumAdaption(const CommandList* pCommandList, const DescriptorTable& uavSrvTable);
+			const DescriptorTable& srvTable, bool clearRT = false) const;
+		void ScreenRender(CommandList* pCommandList, PipelineIndex pipelineIndex,
+			const DescriptorTable& srvTable, bool hasImmutableCB, bool hasPerFrameCB) const;
+		void LumAdaption(CommandList* pCommandList, const DescriptorTable& uavSrvTable) const;
 		void Antialias(CommandList* pCommandList, uint8_t numRTVs, RenderTarget** ppDsts,
-			uint8_t numSRVs, Texture** ppSrcs, const DescriptorTable& srvTable);
-		void Unsharp(const CommandList* pCommandList, uint8_t numRTVs,
-			const Descriptor* pRTVs, const DescriptorTable& srvTable);
+			uint8_t numSRVs, Texture** ppSrcs, const DescriptorTable& srvTable) const;
+		void Unsharp(CommandList* pCommandList, uint8_t numRTVs,
+			const Descriptor* pRTVs, const DescriptorTable& srvTable) const;
 
 		DescriptorTable CreateTAASrvTable(const Descriptor& srvCurrent, const Descriptor& srvPrevious,
 			const Descriptor& srvVelocity, const Descriptor& srvShadeAmt, const Descriptor& srvMeta);
@@ -66,11 +66,10 @@ namespace XUSG
 			UAV_SRV_LUM = SRV_LOG_LUM
 		};
 
-		bool createGBuffers(const Device* pDevice, const Texture* pReference);
+		bool createGBuffers(Device* pDevice, const Texture* pReference);
 		bool createPipelineLayouts();
 		bool createPipelines(Format hdrFormat, Format ldrFormat);
 
-		API m_api;
 		uint8_t			m_frameIndex;
 		float			m_timeStep;
 

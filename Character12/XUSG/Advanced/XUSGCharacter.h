@@ -14,10 +14,10 @@ namespace XUSG
 		public virtual Model_Impl
 	{
 	public:
-		Character_Impl(const wchar_t* name = nullptr, API api = API::DIRECTX_12);
+		Character_Impl(const wchar_t* name = nullptr);
 		virtual ~Character_Impl();
 
-		bool Init(const Device* pDevice, const InputLayout* pInputLayout,
+		bool Init(Device* pDevice, const InputLayout* pInputLayout,
 			const SDKMesh::sptr& mesh, const ShaderLib::sptr& shaderLib,
 			const Graphics::PipelineLib::sptr& graphicsPipelineLib,
 			const Compute::PipelineLib::sptr& computePipelineLib,
@@ -34,12 +34,12 @@ namespace XUSG
 		void Update(uint8_t frameIndex, double time);
 		void Update(uint8_t frameIndex, double time, DirectX::FXMMATRIX* pWorld, bool isTemporal = true);
 		virtual void SetMatrices(DirectX::FXMMATRIX* pWorld = nullptr, bool isTemporal = true);
-		void SetSkinningPipeline(const CommandList* pCommandList);
+		void SetSkinningPipeline(CommandList* pCommandList) const;
 		void Skinning(CommandList* pCommandList, uint32_t& numBarriers,
-			ResourceBarrier* pBarriers, bool reset = false);
-		void RenderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
+			ResourceBarrier* pBarriers, bool reset = false) const;
+		void RenderTransformed(CommandList* pCommandList, PipelineLayoutIndex layout,
 			SubsetFlags subsetMask = SUBSET_FULL, const DescriptorTable* pCbvPerFrameTable = nullptr,
-			uint32_t numInstances = 1);
+			uint32_t numInstances = 1) const;
 
 		const DirectX::XMFLOAT4& GetPosition() const;
 		DirectX::FXMMATRIX GetWorldMatrix() const;
@@ -53,44 +53,47 @@ namespace XUSG
 
 		struct Vertex
 		{
-			DirectX::XMFLOAT3	Pos;
-			DirectX::XMUINT3	NormTex;
-			DirectX::XMUINT2	Tangent;
+			DirectX::XMFLOAT4	Pos;
+			DirectX::XMUINT4	NormUV;
+			DirectX::XMUINT4	Tangent;
 		};
+		static_assert(sizeof(Vertex) == 48, "Vertex stride must match 16-byte alignement");
 
-		bool createTransformedStates(const Device* pDevice);
-		bool createTransformedVBs(const Device* pDevice, VertexBuffer* pVertexBuffer);
-		bool createBuffers(const Device* pDevice);
+		bool createTransformedStates(Device* pDevice);
+		bool createTransformedVBs(Device* pDevice, VertexBuffer* pVertexBuffer);
+		bool createBuffers(Device* pDevice);
 		bool createPipelineLayouts();
 		bool createPipelines(const InputLayout* pInputLayout, uint32_t numRTVs,
 			const Format* rtvFormats, Format dsvFormat, Format shadowFormat, bool useZEqual);
 		virtual void setLinkedMatrices(uint32_t mesh, DirectX::CXMMATRIX world, bool isTemporal);
-		void skinning(const CommandList* pCommandList, bool reset);
-		void renderTransformed(const CommandList* pCommandList, PipelineLayoutIndex layout,
-			SubsetFlags subsetMask, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances);
+		void skinning(CommandList* pCommandList, bool reset) const;
+		void renderTransformed(CommandList* pCommandList, PipelineLayoutIndex layout,
+			SubsetFlags subsetMask, const DescriptorTable* pCbvPerFrameTable, uint32_t numInstances) const;
 		void renderLinked(uint32_t mesh, PipelineLayoutIndex layout, uint32_t numInstances);
-		void setSkeletalMatrices(uint32_t numMeshes);
-		void setBoneMatrices(uint32_t mesh);
+		void setSkeletalMatrices(uint32_t numMeshes) const;
+		void setBoneMatrices(uint32_t mesh) const;
 		void convertToDQ(DirectX::XMFLOAT4& dqTran, DirectX::CXMVECTOR quat,
 			const DirectX::XMFLOAT3& tran) const;
 		DirectX::FXMMATRIX getDualQuat(uint32_t mesh, uint32_t influence) const;
 
 		std::shared_ptr<Compute::PipelineLib> m_computePipelineLib;
 
-		VertexBuffer::uptr	m_transformedVBs[FrameCount];
+		VertexBuffer::uptr	m_transformedVB;
 		DirectX::XMFLOAT4X4	m_mWorld;
 		DirectX::XMFLOAT4	m_vPosRot;
 
 		double m_time;
 
-		StructuredBuffer::uptr m_boneWorlds[FrameCount];
+		StructuredBuffer::uptr m_boneWorlds;
+		uint32_t m_numBoneWorlds;
+		uint8_t m_framePingPong;
 
 		PipelineLayout	m_skinningPipelineLayout;
 		Pipeline		m_skinningPipeline;
 		std::vector<DescriptorTable> m_srvSkinningTables[FrameCount];
-		std::vector<DescriptorTable> m_uavSkinningTables[FrameCount];
+		std::vector<DescriptorTable> m_uavSkinningTables[2];
 #if XUSG_TEMPORAL
-		std::vector<DescriptorTable> m_srvSkinnedTables[FrameCount];
+		std::vector<DescriptorTable> m_srvSkinnedTables[2];
 
 		std::vector<DirectX::XMFLOAT3X4> m_linkedWorlds;
 #endif
